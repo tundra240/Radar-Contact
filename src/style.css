@@ -1,0 +1,33 @@
+/* Layout only. All radar colours live in src/render/theme.ts so that the
+   palette has exactly one source of truth (see ARCHITECTURE.md, open
+   question 1 -- the background shade is not settled yet). */
+
+:root {
+  --bg-page: #0a0e14;
+  --fg-page: #c8d4e0;
+  font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-page);
+  color: var(--fg-page);
+}
+
+#app {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+canvas {
+  display: block;
+}
