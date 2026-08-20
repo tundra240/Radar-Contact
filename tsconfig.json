@@ -5,6 +5,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "types": ["vite/client"],
+    "resolveJsonModule": true,
 
     /* No emit -- Vite handles the build; tsc is the type checker only. */
     "noEmit": true,

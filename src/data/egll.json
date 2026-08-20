@@ -1,0 +1,114 @@
+{
+  "icao": "EGLL",
+  "name": "London Heathrow",
+  "arp": { "lat": 51.470748, "lon": -0.459909 },
+  "elevationFt": 83,
+  "magVarDeg": 0,
+
+  "sector": {
+    "radiusNM": 40,
+    "ceilingFt": 15000,
+    "floorFt": 1500,
+    "speedLimitKts": 250,
+    "speedLimitBelowFt": 10000,
+    "interceptAltMaxFt": 3000,
+    "rangeRingsNM": [5, 10, 15, 20],
+    "defaultRangeNM": 30,
+    "activeArrivalRunways": ["27R", "27L"]
+  },
+
+  "runways": [
+    {
+      "id": "27R",
+      "threshold": { "lat": 51.477681, "lon": -0.433227 },
+      "bearingTrue": 270,
+      "lengthFt": 12799,
+      "thresholdElevationFt": 78,
+      "ils": { "available": true, "glideslopeDeg": 3.0, "fafDistNM": 10, "minInterceptDeg": 30 }
+    },
+    {
+      "id": "27L",
+      "threshold": { "lat": 51.464957, "lon": -0.434048 },
+      "bearingTrue": 270,
+      "lengthFt": 12001,
+      "thresholdElevationFt": 77,
+      "ils": { "available": true, "glideslopeDeg": 3.0, "fafDistNM": 10, "minInterceptDeg": 30 }
+    },
+    {
+      "id": "09L",
+      "threshold": { "lat": 51.47749, "lon": -0.489439 },
+      "bearingTrue": 90,
+      "lengthFt": 12799,
+      "thresholdElevationFt": 79,
+      "displacedThresholdFt": 1007,
+      "ils": { "available": true, "glideslopeDeg": 3.0, "fafDistNM": 10, "minInterceptDeg": 30 }
+    },
+    {
+      "id": "09R",
+      "threshold": { "lat": 51.46478, "lon": -0.486808 },
+      "bearingTrue": 90,
+      "lengthFt": 12001,
+      "thresholdElevationFt": 75,
+      "displacedThresholdFt": 1013,
+      "ils": { "available": true, "glideslopeDeg": 3.0, "fafDistNM": 10, "minInterceptDeg": 30 }
+    }
+  ],
+
+  "fixes": [
+    {
+      "name": "LAM",
+      "fullName": "Lambourne",
+      "lat": 51.646099,
+      "lon": 0.151667,
+      "navaid": { "type": "VOR-DME", "freqMHz": 115.6 },
+      "hold": { "turns": "right", "legMins": 1 }
+    },
+    {
+      "name": "BIG",
+      "fullName": "Biggin",
+      "lat": 51.330898,
+      "lon": 0.034811,
+      "navaid": { "type": "VOR-DME", "freqMHz": 115.1 },
+      "hold": { "turns": "right", "legMins": 1 }
+    },
+    {
+      "name": "BNN",
+      "fullName": "Bovingdon",
+      "lat": 51.726101,
+      "lon": -0.549722,
+      "navaid": { "type": "VOR-DME", "freqMHz": 113.75 },
+      "hold": { "turns": "right", "legMins": 1 }
+    },
+    {
+      "name": "OCK",
+      "fullName": "Ockham",
+      "lat": 51.305,
+      "lon": -0.447222,
+      "navaid": { "type": "VOR-DME", "freqMHz": 115.3 },
+      "hold": { "turns": "right", "legMins": 1 }
+    }
+  ],
+
+  "aircraftTypes": [
+    { "type": "A319", "wake": "M", "cruiseKts": 250, "approachKts": 135 },
+    { "type": "A320", "wake": "M", "cruiseKts": 250, "approachKts": 140 },
+    { "type": "A321", "wake": "M", "cruiseKts": 250, "approachKts": 142 },
+    { "type": "B738", "wake": "M", "cruiseKts": 250, "approachKts": 142 },
+    { "type": "A350", "wake": "H", "cruiseKts": 280, "approachKts": 148 },
+    { "type": "B789", "wake": "H", "cruiseKts": 280, "approachKts": 150 },
+    { "type": "B77W", "wake": "H", "cruiseKts": 280, "approachKts": 152 },
+    { "type": "A388", "wake": "J", "cruiseKts": 280, "approachKts": 145 }
+  ],
+
+  "provenance": {
+    "positions": "Airport reference point, runway threshold coordinates, elevations and displaced thresholds from the OurAirports open dataset (airports.csv, runways.csv). Navaid positions and frequencies from OurAirports navaids.csv.",
+    "retrieved": "2026-08-21",
+    "notes": [
+      "All bearings in this file are TRUE. magVarDeg is 0 because magnetic declination over London is currently within about a degree of zero, so true and magnetic headings are treated as interchangeable for gameplay. The VOR slaved variations in the source dataset (about 2.1 to 2.3 degrees west) reflect older calibration epochs and are deliberately not used.",
+      "bearingTrue is the published rounded value. The bearing computed geometrically between the 09L and 27R thresholds is about 269.7 degrees; airport.test.ts asserts the two agree within half a degree, so a genuinely wrong threshold or bearing in any future airport file fails the test.",
+      "Hold inbound tracks are not published in the source dataset. The loader derives each hold's inbound leg as the bearing from the fix to the airport reference point, which is a sensible default rather than a charted procedure. Override per fix with hold.inboundTrue when real STAR data is added.",
+      "Transition altitude is deliberately not encoded: the UK value has been under review and the simulation does not use it yet.",
+      "Runway threshold separation between 27R and 27L computes to 0.764 NM (1415 m), matching Heathrow's published parallel centreline spacing."
+    ]
+  }
+}

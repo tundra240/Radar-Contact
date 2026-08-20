@@ -206,56 +206,45 @@ fails loudly at startup rather than rendering a subtly wrong scope.
 Replaces the pixel-based schema in the design doc. Positions become real coordinates; the
 camera decides pixels at render time.
 
-```jsonc
-{
-  "icao": "EGLL",
-  "name": "London Heathrow",
-  "arp": { "lat": 51.4775, "lon": -0.4614 },      // origin of world space
-  "magVar": -0.5,
-  "elevationFt": 83,
-  "sector": {
-    "radiusNM": 40,
-    "ceilingFt": 15000,
-    "floorFt": 1500,
-    "speedLimitBelowFL100": 250,
-    "rangeRingsNM": [5, 10, 15, 20]
-  },
-  "runways": [
-    {
-      "id": "27R",
-      "threshold": { "lat": 51.4647, "lon": -0.4342 },  // verify against chart
-      "bearingTrue": 270,
-      "lengthFt": 12802,
-      "ils": {
-        "available": true,
-        "glideslopeDeg": 3.0,
-        "fafDistNM": 10,
-        "minInterceptDeg": 30
-      }
-    },
-    { "id": "27L", "note": "roughly 1415 m south of 27R -- verify" }
-  ],
-  "fixes": [
-    { "name": "LAM", "lat": 51.646, "lon":  0.151,
-      "hold": { "inboundTrue": 233, "turns": "right", "legMins": 1 } },
-    { "name": "BIG", "lat": 51.331, "lon":  0.035,
-      "hold": { "inboundTrue": 304, "turns": "right", "legMins": 1 } },
-    { "name": "BNN", "lat": 51.726, "lon": -0.549,
-      "hold": { "inboundTrue": 116, "turns": "right", "legMins": 1 } },
-    { "name": "OCK", "lat": 51.305, "lon": -0.447,
-      "hold": { "inboundTrue":  32, "turns": "right", "legMins": 1 } }
-  ],
-  "aircraftTypes": [
-    { "type": "A320", "wake": "M", "cruiseKts": 250, "approachKts": 140 },
-    { "type": "B789", "wake": "H", "cruiseKts": 280, "approachKts": 150 }
-  ]
-}
-```
+The live file is `src/data/egll.json`; the loader is `src/data/airport.ts`.
 
-The latitudes and longitudes above are approximate and flagged for verification against a
-current chart or an open dataset before they are trusted; the four fixes themselves are the
-real Heathrow holds. Nothing in the code depends on their precision, so they can be refined
-at any point without touching a module.
+Provenance: the airport reference point, runway threshold coordinates, elevations and
+displaced thresholds come from the OurAirports open dataset (`airports.csv`, `runways.csv`);
+navaid positions and frequencies from `navaids.csv`. Retrieved 2026-08-21 and recorded in a
+`provenance` block inside the JSON.
+
+Key values as loaded:
+
+| Item | Value |
+|---|---|
+| ARP | 51.470748 N, 0.459909 W, 83 ft |
+| 27R threshold | 51.477681 N, 0.433227 W -- 0.997 NM E, 0.416 NM N of ARP |
+| 27L threshold | 51.464957 N, 0.434048 W -- 0.967 NM E, 0.347 NM S of ARP |
+| 27R / 27L centreline separation | 0.764 NM (1415 m), matching the published figure |
+| Runway bearing | 270 true published; 269.7 computed from the thresholds |
+| LAM (Lambourne) | 25.1 NM on 065 -- VOR-DME 115.60 |
+| BIG (Biggin) | 20.3 NM on 114 -- VOR-DME 115.10 |
+| BNN (Bovingdon) | 15.7 NM on 348 -- VOR-DME 113.75 |
+| OCK (Ockham) | 10.0 NM on 177 -- VOR-DME 115.30 |
+
+Two things the real data changed:
+
+- **The four holds are not diagonal corners.** The design doc frames them as NE / SE / NW /
+  SW entries. In fact LAM and BIG are both well to the east, BNN is almost due north and OCK
+  almost due south. Anything assuming diagonal symmetry -- spawn placement, hold rendering,
+  sequencing hints -- has to cope with the real layout.
+- **3000 ft and the 10 NM FAF are not the same point.** A 3 degree glideslope climbs
+  318.4 ft/NM, putting it at about 3262 ft AMSL over the 10 NM FAF. An aircraft levelled at
+  the 3000 ft intercept altitude is therefore *below* the glideslope at the FAF and captures
+  it from underneath at about 9.2 NM. That is correct procedure, but `ils.ts` must not treat
+  reaching the FAF and reaching the glideslope as one event.
+
+All bearings in the config are TRUE. `magVarDeg` is 0, because magnetic declination over
+London is currently within about a degree of zero, so true and magnetic are interchangeable
+for gameplay; the roughly 2.2 degrees west of slaved variation in the source dataset reflects
+older VOR calibration epochs and is deliberately unused. Hold inbound legs are not published
+in the open dataset, so the loader derives each one as the bearing from the fix to the field
+and flags it with `inboundIsDerived`; real STAR data overrides it per fix.
 
 ---
 
@@ -265,11 +254,15 @@ The design doc's three days hold, with a short foundation block pulled to the fr
 coordinate system and the game loop are what Days 2 and 3 would otherwise have to be
 rewritten around.
 
-### Day 0 -- Foundation (about 3 hours)
+### Day 0 -- Foundation  [DONE]
 Scaffold Vite, TS and Vitest. Implement `geo.ts`, `camera.ts`, `loop.ts`, `theme.ts` and the
 airport loader with `egll.json`. Unit-test the geo maths.
-**Milestone:** a scope with range rings, a compass rose and the two runways drawn in correct
-relative geometry, which survives a window resize and pans and zooms cleanly.
+**Milestone reached.** `core/geo.ts` (projection, bearings, angleDelta), `core/camera.ts`
+(world/screen transform, pan, zoom, range-preserving resize), `data/egll.json` with real
+coordinates, `data/airport.ts` (validating loader), `render/theme.ts` and `render/scope.ts`
+(range rings, runways, extended centrelines with FAF ticks, holds). 56 unit tests, including
+the projection measured against great-circle distance and a headless render check that the
+scope geometry lands on the right pixels.
 
 ### Day 1 -- Physics and Rendering
 `types.ts`, `aircraft.ts`, `autopilot.ts`, `world.ts`, then the target, trail and data block
@@ -332,7 +325,9 @@ Rendering and interaction get checked by eye, which is what HMR is for.
    derived set of line and text colours, so it is one edit either way -- but the direction
    changes every other colour in the palette, since the existing neon teal, green and
    crimson accents assume a dark ground and would need desaturating and darkening
-   substantially to stay legible on a light one. Worth pinning down before Day 0.
+   substantially to stay legible on a light one. Day 0 shipped a dark palette in
+   `render/theme.ts`; switching now means repainting the accents, not flipping a token, so
+   this is worth settling before Day 1 adds targets and data blocks.
 2. **Runway mode.** The MVP lands both 27R and 27L. Real Heathrow segregates arrivals and
    departures and alternates at 15:00. Mixed-mode is simpler and is what is planned; the
    config can carry a `mode` field later.
