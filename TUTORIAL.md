@@ -27,6 +27,29 @@ overlays and the rest of the interface are in [README.md](README.md); the code l
 
 There are three ways in, and they all do exactly the same thing.
 
+### What is yours, and what is not
+
+**The circle is your airspace.** Everything outside it is washed back towards the background:
+still there, still readable -- neighbouring fields, the coast, the airspace next door -- but
+plainly not the bit you are working.
+
+Arrivals appear **outside** that circle and fly in. You can see them coming for a couple of
+minutes, read their callsign and type off the tag, and start planning where they fit. What you
+cannot do is touch them: any clearance for an aircraft outside the boundary is refused with
+*"not in your airspace yet"*. They are drawn dimmer to say so, they carry no sequence number,
+and the strip bay lists them at the bottom marked **INBOUND** with the distance still to run.
+
+The moment one crosses the boundary it is yours -- full brightness, a sequence number, and it
+will take instructions.
+
+### Keeping score
+
+**SCORE** on the status bar. Landing an aircraft is worth **+100**; losing one off the boundary
+without landing it costs **50**. Losing one costs less than landing one earns, so a session
+where you land most of the traffic still climbs -- it is a penalty, not a punishment. The
+`LANDED n LOST n` cell breaks the same figure into its two halves, and every landing and every
+loss is named in the console as it happens.
+
 ### Drag the vector you want
 
 **Press on an aircraft and drag.** A line comes out of the target and follows the cursor, with

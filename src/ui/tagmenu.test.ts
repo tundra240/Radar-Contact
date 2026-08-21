@@ -58,6 +58,7 @@ function ac(over: Partial<Aircraft> = {}): Aircraft {
     clearedApproach: null,
     hold: null,
     originFix: 'LAM',
+    entered: true,
     trail: [],
     trailAt: 0,
     spawnedAt: 0,
@@ -177,7 +178,7 @@ describe('readout', () => {
  * teaches limits the simulation does not have -- is worse than no menu.
  */
 describe('every offer is accepted by commands/apply', () => {
-  const ctx: ApplyContext = { ...LIMITS, envelopeFor, holdFor, approachFor: () => null }
+  const ctx: ApplyContext = { ...LIMITS, envelopeFor, holdFor, approachFor: () => null, sectorRadiusNM: 40 }
 
   it('accepts every level in the list', () => {
     for (const ft of altitudeChoices(LIMITS)) {

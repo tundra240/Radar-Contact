@@ -20,6 +20,7 @@ function ac(over: Partial<Aircraft> = {}): Aircraft {
     clearedApproach: null,
     hold: null,
     originFix: 'LAM',
+    entered: true,
     trail: [],
     trailAt: 0,
     spawnedAt: 0,
@@ -163,5 +164,53 @@ describe('buildSequence', () => {
       ac({ callsign: 'WORKED', pos: { x: 40, y: 0 } }),
     ])
     expect(sequenceOrder(built).map((a) => a.callsign)).toEqual(['WORKED', 'HELD'])
+  })
+})
+
+describe('traffic that is not yours yet', () => {
+  it('keeps it out of the sequence and out of the stack', () => {
+    const built = buildSequence([
+      ac({ callsign: 'MINE', entered: true, pos: { x: 10, y: 0 } }),
+      ac({ callsign: 'COMING', entered: false, pos: { x: 48, y: 0 } }),
+    ])
+    expect(built.sequence.map((f) => f.aircraft.callsign)).toEqual(['MINE'])
+    expect(built.stack).toEqual([])
+    expect(built.inbound.map((f) => f.aircraft.callsign)).toEqual(['COMING'])
+  })
+
+  it('does not let it consume a sequence gap', () => {
+    // The one that matters: an aircraft nobody can touch must not make the
+    // spacing behind it look wrong.
+    const built = buildSequence([
+      ac({ callsign: 'COMING', entered: false, pos: { x: 9, y: 0 } }),
+      ac({ callsign: 'MINE', entered: true, pos: { x: 10, y: 0 } }),
+    ])
+    expect(built.sequence).toHaveLength(1)
+    expect(built.sequence[0]?.gapNM).toBeNull()
+  })
+
+  it('keeps holding traffic out of the inbound list once it has entered', () => {
+    const built = buildSequence([ac({ navMode: 'HOLD', entered: true })])
+    expect(built.stack).toHaveLength(1)
+    expect(built.inbound).toEqual([])
+  })
+
+  it('lists the furthest out first, so the next to arrive is last', () => {
+    // Read down the bay and the aircraft nearest joining the traffic is the
+    // one nearest the traffic it is joining.
+    const built = buildSequence([
+      ac({ callsign: 'NEARER', entered: false, pos: { x: 44, y: 0 } }),
+      ac({ callsign: 'FURTHER', entered: false, pos: { x: 52, y: 0 } }),
+    ])
+    expect(built.inbound.map((f) => f.aircraft.callsign)).toEqual(['FURTHER', 'NEARER'])
+  })
+
+  it('puts the inbound list after everything the controller owns', () => {
+    const built = buildSequence([
+      ac({ callsign: 'COMING', entered: false, pos: { x: 48, y: 0 } }),
+      ac({ callsign: 'HELD', entered: true, navMode: 'HOLD' }),
+      ac({ callsign: 'WORKED', entered: true, pos: { x: 20, y: 0 } }),
+    ])
+    expect(sequenceOrder(built).map((a) => a.callsign)).toEqual(['WORKED', 'HELD', 'COMING'])
   })
 })

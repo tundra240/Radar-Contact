@@ -38,12 +38,15 @@ function recorder(): {
   arcs: Arc[]
   dashes: number[][]
   fills: string[]
+  washes: { style: string; alpha: number }[]
   strokes: Stroke[]
+  alphaAtEnd: () => number
 } {
   const texts: Text[] = []
   const arcs: Arc[] = []
   const dashes: number[][] = []
   const fills: string[] = []
+  const washes: { style: string; alpha: number }[] = []
   const strokes: Stroke[] = []
   let path: { x: number; y: number }[] = []
   const noop = (): void => {}
@@ -70,7 +73,9 @@ function recorder(): {
         points: [...path],
       })
     },
-    fill: noop,
+    fill: () => {
+      washes.push({ style: String(stub['fillStyle']), alpha: Number(stub['globalAlpha']) })
+    },
     save: noop,
     restore: noop,
     setLineDash: (d: number[]) => {
@@ -97,7 +102,9 @@ function recorder(): {
     arcs,
     dashes,
     fills,
+    washes,
     strokes,
+    alphaAtEnd: () => Number(stub['globalAlpha']),
   }
 }
 
@@ -109,7 +116,7 @@ const STATUS: ScopeStatus = {
   clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 12 * 3600 },
   speed: 1,
   paused: false,
-  traffic: { spawned: 0, held: 0, landed: 0, left: 0 },
+  traffic: { spawned: 0, held: 0, landed: 0, left: 0, points: 0 },
   controller: null,
 }
 
@@ -772,7 +779,7 @@ describe('the clock and rate readouts', () => {
       clock: { ticks: 1200, elapsedSeconds: 60, timeOfDaySeconds: 13 * 3600 + 61 },
       speed: 1,
       paused: false,
-      traffic: { spawned: 0, held: 0, landed: 0, left: 0 },
+      traffic: { spawned: 0, held: 0, landed: 0, left: 0, points: 0 },
   controller: null,
     })
     expect(labels).toContain('TIME')
@@ -790,7 +797,7 @@ describe('the clock and rate readouts', () => {
         clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
         speed,
         paused: false,
-        traffic: { spawned: 0, held: 0, landed: 0, left: 0 },
+        traffic: { spawned: 0, held: 0, landed: 0, left: 0, points: 0 },
   controller: null,
       })
       expect(labels, `x${speed}`).toContain('RATE')
@@ -804,7 +811,7 @@ describe('the clock and rate readouts', () => {
       clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
       speed: 4,
       paused: true,
-      traffic: { spawned: 0, held: 0, landed: 0, left: 0 },
+      traffic: { spawned: 0, held: 0, landed: 0, left: 0, points: 0 },
   controller: null,
     })
     expect(labels).toContain('PAUSED')
@@ -823,7 +830,7 @@ describe('the traffic readout', () => {
       clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
       speed: 1,
       paused: false,
-      traffic: { spawned: 7, held: 3, landed: 2, left: 1 },
+      traffic: { spawned: 7, held: 3, landed: 2, left: 1, points: 150 },
       controller: null,
     })
     const labels = rec.texts.map((t) => t.s)
@@ -1003,6 +1010,7 @@ describe('traffic on the scope', () => {
       clearedApproach: null,
       hold: null,
       originFix: 'LAM',
+      entered: true,
       trail: [
         { x: 9, y: 9 },
         { x: 10, y: 10 },
@@ -1153,6 +1161,7 @@ describe('a vector being dragged', () => {
       clearedApproach: null,
       hold: null,
       originFix: 'LAM',
+      entered: true,
       trail: [],
       trailAt: 0,
       spawnedAt: 0,
@@ -1212,7 +1221,7 @@ describe('the departures readout', () => {
     const rec = recorder()
     drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.full, {
       ...STATUS,
-      traffic: { spawned: 20, held: 4, landed, left },
+      traffic: { spawned: 20, held: 4, landed, left, points: landed * 100 - left * 50 },
     })
     return rec.texts.map((t) => t.s)
   }
@@ -1227,5 +1236,47 @@ describe('the departures readout', () => {
 
   it('reads zero and zero at the start of a session', () => {
     expect(draw(0, 0).some((s) => /^0 LOST 0$/.test(s))).toBe(true)
+  })
+})
+
+describe('the area of responsibility', () => {
+  const draw = (rangeNM = 60) => {
+    const cam = new Camera({ x: 0, y: 0 }, rangeNM, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.full, STATUS)
+    return { ...rec, cam }
+  }
+
+  it('washes the map outside the boundary back towards the ground', () => {
+    // Only one part of the map is the controller's, and the display should
+    // say which without hiding the rest.
+    // Specifically a partial-strength fill in the GROUND colour: other
+    // layers use alpha of their own, and none of them fills with the ground.
+    const wash = draw().washes.find((w) => w.alpha < 1 && w.style === palettes.beige.bg)
+    expect(wash).toBeDefined()
+    expect((wash as { alpha: number }).alpha).toBeGreaterThan(0)
+  })
+
+  it('hands the canvas back opaque, or the traffic would be dimmed too', () => {
+    expect(draw().alphaAtEnd()).toBe(1)
+  })
+
+  it('draws the boundary itself over the wash, not under it', () => {
+    // It is the one line on the display that has to be unmistakable, so it
+    // must not be the thing that gets dimmed.
+    const r = draw()
+    const washAt = r.washes.findIndex((w) => w.alpha < 1)
+    expect(washAt).toBeGreaterThan(-1)
+    // The boundary is a full-strength stroke, and there is at least one
+    // stroke recorded after the wash was painted.
+    expect(r.strokes.length).toBeGreaterThan(0)
+  })
+
+  it('follows the palette, so the wash is never the wrong ground', () => {
+    setPalette('amber')
+    const wash = draw().washes.find((w) => w.alpha < 1 && w.style === palettes.amber.bg)
+    expect(wash).toBeDefined()
+    setPalette('beige')
   })
 })

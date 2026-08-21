@@ -185,6 +185,7 @@ export class StripBay {
     const entries = new Map<string, SequencedFlight | StackedFlight>()
     for (const f of built.sequence) entries.set(f.aircraft.callsign, f)
     for (const f of built.stack) entries.set(f.aircraft.callsign, f)
+    for (const f of built.inbound) entries.set(f.aircraft.callsign, f)
 
     const present = new Set<string>()
     for (const a of ordered) {
@@ -203,9 +204,11 @@ export class StripBay {
     this.reorder(ordered)
 
     const count = ordered.length
-    // Both numbers, because how much is parked is as much of the picture
-    // as how much is running.
-    const label = `${built.sequence.length} SEQ / ${built.stack.length} HOLD`
+    // All three, because what is parked and what is on its way are as much
+    // of the picture as what is being worked.
+    const label =
+      `${built.sequence.length} SEQ / ${built.stack.length} HOLD` +
+      `${built.inbound.length > 0 ? ` / ${built.inbound.length} IN` : ''}`
     if (this.counter.textContent !== label) this.counter.textContent = label
     // Guarded rather than assigned: setting an attribute to the value it
     // already has still counts as a DOM mutation, and an idle tick should
@@ -346,7 +349,11 @@ export class StripBay {
       fld: entry === undefined ? 'FLD --' : `FLD ${entry.toFieldNM.toFixed(1)}`,
       gap:
         flight === null
-          ? 'IN STACK'
+          ? // Not the controller's yet, so it is neither sequenced nor
+            // parked: it is on its way.
+            a.entered
+            ? 'IN STACK'
+            : 'INBOUND'
           : flight.gapNM === null || flight.requiredNM === null
             ? // Nobody to follow. Said outright rather than left blank, so an
               // empty gap never reads as a gap of zero.

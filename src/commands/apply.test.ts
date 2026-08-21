@@ -28,6 +28,7 @@ const base: Aircraft = {
   clearedApproach: null,
   hold: null,
   originFix: 'LAM',
+  entered: true,
   trail: [],
   trailAt: 0,
   spawnedAt: 0,
@@ -66,6 +67,7 @@ const ILS_27R: ApproachClearance = {
 }
 
 const ctx: ApplyContext = {
+  sectorRadiusNM: 40,
   floorFt: 1500,
   ceilingFt: 15000,
   speedLimitKts: 250,
@@ -456,5 +458,48 @@ describe('from a typed line to a turning aircraft', () => {
     const issued = applyAll(parsed.commands, base, ctx)
     expect(issued.ok).toBe(true)
     if (issued.ok) expect(issued.aircraft.clearedAltFt).toBe(5000)
+  })
+})
+
+describe('traffic outside the area of responsibility', () => {
+  /**
+   * The rule that makes the boundary mean something rather than being a
+   * circle on a display: an aircraft that is not yours takes no
+   * instructions, whatever the instruction is.
+   */
+  const coming = ac({ pos: { x: 48, y: 0 }, entered: false })
+
+  it('refuses every kind of clearance, by name', () => {
+    const commands: Command[] = [
+      { kind: 'heading', callsign: 'BAW178', deg: 270 },
+      { kind: 'altitude', callsign: 'BAW178', ft: 5000 },
+      { kind: 'speed', callsign: 'BAW178', kts: 200 },
+      { kind: 'approach', callsign: 'BAW178', runway: '27R' },
+      { kind: 'hold', callsign: 'BAW178', fix: 'LAM' },
+      { kind: 'handoff', callsign: 'BAW178' },
+    ]
+    for (const command of commands) {
+      expect(refuse(command, coming), command.kind).toBe('BAW178 is not in your airspace yet')
+    }
+  })
+
+  it('accepts the same clearance the moment it is inside', () => {
+    const inside = ac({ pos: { x: 30, y: 0 }, entered: true })
+    expect(applyCommand({ kind: 'heading', callsign: 'BAW178', deg: 270 }, inside, ctx).ok)
+      .toBe(true)
+  })
+
+  it('judges it on where it is, not on whether it has been in before', () => {
+    // An aircraft that entered and has drifted back out is equally
+    // untouchable, and the world is about to remove it anyway.
+    const gone = ac({ pos: { x: 48, y: 0 }, entered: true })
+    expect(refuse({ kind: 'heading', callsign: 'BAW178', deg: 270 }, gone))
+      .toBe('BAW178 is not in your airspace yet')
+  })
+
+  it('takes the boundary from the context rather than assuming one', () => {
+    const wide: ApplyContext = { ...ctx, sectorRadiusNM: 60 }
+    expect(applyCommand({ kind: 'heading', callsign: 'BAW178', deg: 270 }, coming, wide).ok)
+      .toBe(true)
   })
 })

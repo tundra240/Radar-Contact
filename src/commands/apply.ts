@@ -1,4 +1,5 @@
 import { normalizeHeading } from '../core/geo'
+import { isInSector } from '../sim/aircraft'
 import { onApproach } from '../sim/ils'
 import type { Aircraft, ApproachClearance, HoldClearance } from '../sim/types'
 import type { Command } from './types'
@@ -40,6 +41,8 @@ export interface ApplyContext {
   readonly holdFor: (fix: string) => HoldClearance | null
   /** Null for a runway with no ILS available, which refuses the clearance. */
   readonly approachFor: (runway: string) => ApproachClearance | null
+  /** The area of responsibility. Nothing outside it takes a clearance. */
+  readonly sectorRadiusNM: number
 }
 
 export type Outcome =
@@ -54,6 +57,17 @@ export function applyCommand(
   aircraft: Aircraft,
   ctx: ApplyContext,
 ): Outcome {
+  // Before anything else: an aircraft outside the area of responsibility is
+  // somebody else's. It can be seen, identified and planned around, and it
+  // takes no instructions -- which is the one rule that makes the boundary
+  // mean something rather than being a circle on a display.
+  if (!isInSector(aircraft, ctx.sectorRadiusNM)) {
+    return {
+      ok: false,
+      reason: `${aircraft.callsign} is not in your airspace yet`,
+    }
+  }
+
   switch (command.kind) {
     case 'heading':
       return heading(command.deg, aircraft)

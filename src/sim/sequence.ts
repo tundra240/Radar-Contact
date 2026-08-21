@@ -15,6 +15,9 @@ import type { Aircraft } from './types'
  * - the **sequence**: everything being worked, nearest the field first.
  * - the **stack**: everything holding, lowest first, since the bottom of a
  *   hold is what comes out of it next.
+ * - the **inbound**: traffic still outside the boundary, which can be seen
+ *   and not touched. Furthest first, so the next one to arrive is at the
+ *   bottom of the list, nearest the traffic it is about to join.
  */
 
 const FIELD: Vec2NM = { x: 0, y: 0 }
@@ -50,6 +53,8 @@ export interface ArrivalSequence {
   readonly sequence: readonly SequencedFlight[]
   /** Holding traffic, lowest first: a hold is a vertical queue. */
   readonly stack: readonly StackedFlight[]
+  /** Not in the sector yet, so not the controller's to sequence. */
+  readonly inbound: readonly StackedFlight[]
 }
 
 /** True once the gap to the aircraft ahead is below what the pair needs. */
@@ -61,8 +66,12 @@ export function buildSequence(
   traffic: readonly Aircraft[],
   field: Vec2NM = FIELD,
 ): ArrivalSequence {
-  const holding = traffic.filter((a) => a.navMode === 'HOLD')
-  const working = traffic.filter((a) => a.navMode !== 'HOLD')
+  // `entered` rather than a distance: the bay must not need to know where
+  // the boundary is, and the flag is already the answer to this question.
+  const arriving = traffic.filter((a) => !a.entered)
+  const mine = traffic.filter((a) => a.entered)
+  const holding = mine.filter((a) => a.navMode === 'HOLD')
+  const working = mine.filter((a) => a.navMode !== 'HOLD')
 
   const byDistance = working
     .map((a) => ({ a, toFieldNM: distanceNM(a.pos, field) }))
@@ -85,10 +94,14 @@ export function buildSequence(
     .sort((a, b) => a.altFt - b.altFt || a.callsign.localeCompare(b.callsign))
     .map((a) => ({ aircraft: a, toFieldNM: distanceNM(a.pos, field) }))
 
-  return { sequence, stack }
+  const inbound = [...arriving]
+    .map((a) => ({ aircraft: a, toFieldNM: distanceNM(a.pos, field) }))
+    .sort((x, y) => y.toFieldNM - x.toFieldNM || x.aircraft.callsign.localeCompare(y.aircraft.callsign))
+
+  return { sequence, stack, inbound }
 }
 
 /** Everything the bay shows, in the order it shows it. */
 export function sequenceOrder(built: ArrivalSequence): readonly Aircraft[] {
-  return [...built.sequence, ...built.stack].map((f) => f.aircraft)
+  return [...built.sequence, ...built.stack, ...built.inbound].map((f) => f.aircraft)
 }

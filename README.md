@@ -109,6 +109,18 @@ geometry actually allows it -- inside the beam, within 30 degrees of the course,
 onto the aircraft. From there it flies the path to the numbers and comes off the scope, and the
 `LANDED n LOST n` cell on the status bar counts them against the ones that got away.
 
+**Only your airspace is lit.** The sector circle is the area of responsibility; everything
+outside it is washed back towards the background, so the part of the map you are working is
+obvious at a glance without the rest being hidden.
+
+**You see traffic before it is yours.** Arrivals are released outside the boundary and fly in,
+drawn dimmed, listed at the bottom of the strip bay as `INBOUND` with no sequence number. Any
+clearance for one is refused -- *"not in your airspace yet"* -- until it crosses in.
+
+**There is a score.** `SCORE` on the status bar: +100 for a landing, -50 for an aircraft lost
+off the boundary unlanded. Losing one costs less than landing one earns, so landing most of
+your traffic still climbs.
+
 **Nothing leaves silently.** An aircraft comes off the scope for exactly two reasons -- it landed,
 or it crossed the sector boundary -- and both are announced in the console. The boundary it
 crosses is the circle the scope actually draws, so a target never disappears in open space.

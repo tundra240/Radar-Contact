@@ -476,6 +476,54 @@ accepted**, because that is how traffic is spaced on final. And a **heading brea
 off an approach** at any stage, clearing the approach with it -- otherwise the next tick would
 steer it straight back onto the localiser.
 
+### The area of responsibility
+
+The sector circle is what the controller owns, and three things now follow from it.
+
+**The map outside it is washed back towards the ground colour.** One path -- the whole display
+with the sector punched out of it, filled odd-even -- at partial alpha over the finished map,
+before the traffic. Drawn there so that all of the map is covered and none of the traffic is,
+and the boundary itself and its cardinals are then drawn *over* the wash, so the one line that
+matters most is also the crispest thing on the display. The alpha is set back to 1 explicitly
+rather than by save/restore, because a leaked alpha would dim everything drawn after it.
+
+**Arrivals are released outside it and fly in.** `entryDistanceNM` is measured from the
+boundary rather than from the fix, so every feed hands traffic over at the same range whether
+its fix is ten miles out or twenty-five. Traffic is therefore visible and identifiable for a
+couple of minutes before it can be worked, which is most of what makes a sequence plannable.
+
+**Nothing outside it takes a clearance.** `applyCommand` refuses every kind, by name, before it
+looks at the command at all -- that is the rule that makes a boundary mean something rather than
+being a circle on a display. The interface agrees rather than duplicating: `pickTarget` is given
+only the traffic inside, so an aircraft that is not yours cannot be clicked, dragged or
+right-clicked either.
+
+`entered` on the Aircraft record is what holds this together. Being outside the boundary means
+two opposite things -- not yours yet, or gone -- and nothing about a position distinguishes
+them. It also drives the display: dimmed targets, the strip bay's third group, and the
+distinction between an aircraft that has never arrived and one that has left.
+
+Two things that had to be got right and were not obvious:
+
+- **The concurrency cap counts everything, inbound included.** Capping on in-sector traffic
+  alone let an unbounded queue build up outside waiting to come in -- sixty-five aircraft in a
+  measured hour. Inbound traffic transits in a couple of minutes, so counting it costs two or
+  three off the workload and bounds the world.
+- **There is an outer limit.** An inbound aircraft turned away never enters, so the "has been
+  inside and now is not" rule can never fire for it and it would fly outward for ever. Nothing
+  exists beyond the ring arrivals are released on, plus a little.
+
+### The score
+
+`sim/score.ts`. Two events move it, because two things happen to an arrival: +100 for a
+landing, -50 for one lost off the boundary. Losing one costs less than landing one earns, so a
+session that lands most of its traffic still climbs; it is a penalty, not a punishment.
+
+Deliberately not more. A score built out of things the simulation does not model yet -- conflicts,
+go-arounds, delay against a schedule -- would be a number that means nothing. It is a value
+rather than a counter object, so what a session came to is a single thing you can hold, compare
+and replay to, in the same spirit as the seeded traffic.
+
 ### Coming off the scope
 
 An aircraft leaves the world for exactly two reasons, and `departureOf` in `sim/aircraft.ts` is

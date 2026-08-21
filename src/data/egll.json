@@ -20,7 +20,7 @@
       15,
       20
     ],
-    "defaultRangeNM": 30,
+    "defaultRangeNM": 45,
     "activeArrivalRunways": [
       "27R",
       "27L"
@@ -17664,6 +17664,6 @@
       }
     ],
     "entrySpeedKts": 220,
-    "entryDistanceNM": 12
+    "entryDistanceNM": 8
   }
 }

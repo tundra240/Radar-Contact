@@ -1,8 +1,9 @@
 import './style.css'
 import { Camera } from './core/camera'
-import { loadAirport } from './data/airport'
+import { loadAirport, outerLimitNM } from './data/airport'
 import egllConfig from './data/egll.json'
-import { departureOf, stepAircraft } from './sim/aircraft'
+import { departureOf, enterSector, isInSector, stepAircraft } from './sim/aircraft'
+import { NO_SCORE, pointsFor, scoreDeparture, type Score } from './sim/score'
 import { Spawner } from './sim/spawner'
 import type { Aircraft } from './sim/types'
 import type { Command } from './commands/types'
@@ -204,7 +205,7 @@ function start(
 
     // The selected aircraft wins a tie, so pulling one out of a stack from
     // its strip and then dragging on the scope turns the one you meant.
-    const target = pickTarget(cam, traffic, at, undefined, selected)
+    const target = pickTarget(cam, mine(), at, undefined, selected)
     if (target === null) {
       mode = 'pan'
       dragCallsign = null
@@ -292,7 +293,7 @@ function start(
   // there is nothing to instruct, so the menu just closes.
   surface.addEventListener('contextmenu', (e: MouseEvent) => {
     e.preventDefault()
-    const target = pickTarget(cam, traffic, pointIn(e), undefined, selected)
+    const target = pickTarget(cam, mine(), pointIn(e), undefined, selected)
     if (target === null) {
       tagMenu.close()
       return
@@ -472,6 +473,7 @@ function start(
   // clearance can be refused, one readback format, one thing to test.
 
   const applyContext: ApplyContext = {
+    sectorRadiusNM: airport.sector.radiusNM,
     floorFt: airport.sector.floorFt,
     ceilingFt: airport.sector.ceilingFt,
     speedLimitKts: airport.sector.speedLimitKts,
@@ -592,10 +594,20 @@ function start(
   // main menu is up.
   let controller: LogonDetails | null = null
 
-  /** How many have been landed this session. */
-  let landed = 0
-  /** And how many crossed the boundary without being landed. */
-  let left = 0
+  /**
+   * The score, and the two counts behind it. One value rather than three
+   * loose counters, so what a session came to is a single thing.
+   */
+  let score: Score = NO_SCORE
+
+  /** Nothing exists beyond this: see data/airport.ts. */
+  const outerLimit = outerLimitNM(airport)
+
+  /** Traffic the controller may actually touch. */
+  const mine = (): readonly Aircraft[] =>
+    traffic.filter((a) => isInSector(a, airport.sector.radiusNM))
+
+  const signed = (n: number): string => (n > 0 ? `+${n}` : String(n))
 
   // ---- the loop --------------------------------------------------------
 
@@ -614,24 +626,28 @@ function start(
       // indistinguishable from a bug, and one of them used to happen five
       // miles outside the only boundary the scope draws.
       const flown: Aircraft[] = []
-      for (const a of traffic.map((x) => stepAircraft(x, dt, clock.elapsedSeconds))) {
-        const departure = departureOf(a, airport.sector.radiusNM)
+      for (const stepped of traffic.map((x) => stepAircraft(x, dt, clock.elapsedSeconds))) {
+        // Crossing in is what makes an aircraft the controller's, and it is
+        // the only moment at which that changes.
+        const a = enterSector(stepped, airport.sector.radiusNM)
+        const departure = departureOf(a, airport.sector.radiusNM, outerLimit)
+        if (departure === null) {
+          flown.push(a)
+          continue
+        }
+
+        score = scoreDeparture(score, departure)
+        const worth = signed(pointsFor(departure))
         if (departure === 'landed') {
-          landed += 1
           commandConsole.write(
-            `${a.callsign} landed ${a.clearedApproach?.runway ?? ''}`.trimEnd(),
+            `${a.callsign} landed ${a.clearedApproach?.runway ?? ''} ${worth}`.replace('  ', ' '),
             'readback',
           )
-          continue
-        }
-        if (departure === 'left') {
-          left += 1
+        } else {
           // Refused rather than noted: an arrival that leaves the sector
           // unlanded is one you lost, and the log should read like it.
-          commandConsole.write(`${a.callsign} left the sector unlanded`, 'reject')
-          continue
+          commandConsole.write(`${a.callsign} left the sector unlanded ${worth}`, 'reject')
         }
-        flown.push(a)
       }
 
       // The spawner sees the world as it is after the step, so a fix that
@@ -659,7 +675,13 @@ function start(
           clock: loop.clock,
           speed: loop.speed,
           paused: loop.paused,
-          traffic: { spawned: spawner.spawned, held: spawner.deferred, landed, left },
+          traffic: {
+          spawned: spawner.spawned,
+          held: spawner.deferred,
+          landed: score.landed,
+          left: score.lost,
+          points: score.points,
+        },
           controller,
         },
         { aircraft: traffic, selected, drag: currentDrag() },

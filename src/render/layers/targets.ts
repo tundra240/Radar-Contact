@@ -38,6 +38,18 @@ const TRAIL_FADE_FLOOR = 0.18
 
 const TRAIL_DOT_PX = 1.6
 
+/**
+ * How strongly traffic outside the area of responsibility is drawn.
+ *
+ * It is on the display to be seen and planned around, and it will not take
+ * an instruction, so it must not look like it would. Dimmed rather than
+ * hidden: knowing what is about to arrive is most of knowing what to do
+ * with what is already here.
+ */
+const UNCONTROLLED_ALPHA = 0.45
+
+const alphaFor = (a: Aircraft): number => (a.entered ? 1 : UNCONTROLLED_ALPHA)
+
 /* The data block's metrics, shared by the draw and the hit test. */
 const BLOCK_FONT_PX = 10
 const BLOCK_LINE_PX = 11
@@ -65,8 +77,14 @@ export function drawTargets(
 ): void {
   // Two passes so that no target's data block can be buried under a
   // neighbour's trail, however close the two pass.
-  for (const a of traffic) drawTrail(g, cam, a)
-  for (const a of traffic) drawTarget(g, cam, a, a.callsign === selected)
+  for (const a of traffic) drawTrail(g, cam, a, alphaFor(a))
+  for (const a of traffic) {
+    const alpha = alphaFor(a)
+    g.globalAlpha = alpha
+    drawTarget(g, cam, a, a.callsign === selected)
+    // Back to full strength for whatever is drawn next, here or after.
+    if (alpha !== 1) g.globalAlpha = 1
+  }
 }
 
 /**
@@ -76,14 +94,19 @@ export function drawTargets(
  * than as a row of dots, and it is also how speed is judged by eye -- the
  * dots of a fast aircraft are spaced further apart.
  */
-function drawTrail(g: CanvasRenderingContext2D, cam: Camera, a: Aircraft): void {
+function drawTrail(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  a: Aircraft,
+  baseAlpha = 1,
+): void {
   if (a.trail.length === 0) return
 
   g.fillStyle = theme.trail
   const oldest = a.trail.length
   for (let i = 0; i < a.trail.length; i += 1) {
     const age = (i + 1) / oldest
-    g.globalAlpha = 1 - age * (1 - TRAIL_FADE_FLOOR)
+    g.globalAlpha = baseAlpha * (1 - age * (1 - TRAIL_FADE_FLOOR))
     const p = cam.worldToScreen(a.trail[i] as { x: number; y: number })
     g.beginPath()
     g.arc(p.x, p.y, TRAIL_DOT_PX, 0, Math.PI * 2)

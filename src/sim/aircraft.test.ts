@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { bearingDeg, distanceNM } from '../core/geo'
 import { makeRng } from '../core/rng'
-import { loadAirport } from '../data/airport'
+import { loadAirport, outerLimitNM } from '../data/airport'
 import raw from '../data/egll.json'
 import {
   TRAIL_INTERVAL_SECONDS,
   TRAIL_POINTS,
   advancePosition,
   departureOf,
+  enterSector,
   distanceFlownNM,
   stepAircraft,
   stepTrail,
@@ -34,6 +35,7 @@ const base: Aircraft = {
   clearedApproach: null,
   hold: null,
   originFix: 'LAM',
+  entered: true,
   trail: [],
   trailAt: 0,
   spawnedAt: 0,
@@ -281,7 +283,6 @@ describe('the flow, end to end', () => {
         : new Spawner({ airport, rng: makeRng(opts.seed) })
 
     const step = 0.05
-    const handoffRadius = airport.sector.radiusNM + 5
     let traffic: readonly Aircraft[] = []
     let handedOff = 0
     let emptyAfterFirst = 0
@@ -298,8 +299,10 @@ describe('the flow, end to end', () => {
         timeOfDaySeconds: (12 * 3600 + elapsed) % 86400,
       }
 
-      const flown = traffic.map((a) => stepAircraft(a, step, elapsed))
-      let kept = flown.filter((a) => distanceNM(ORIGIN, a.pos) <= handoffRadius)
+      const flown = traffic
+        .map((a) => stepAircraft(a, step, elapsed))
+        .map((a) => enterSector(a, airport.sector.radiusNM))
+      let kept = flown.filter((a) => departureOf(a, airport.sector.radiusNM, outerLimitNM(airport)) === null)
       handedOff += flown.length - kept.length
 
       // A controller, once a minute: take whatever is lowest in a stack and

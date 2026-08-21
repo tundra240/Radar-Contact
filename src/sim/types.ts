@@ -117,6 +117,16 @@ export interface Aircraft {
   /** The feeder fix this arrival entered on. */
   readonly originFix: string | null
   /**
+   * Whether this aircraft has been inside the area of responsibility yet.
+   *
+   * Arrivals are released outside it and fly in, so being outside the
+   * boundary means one of two opposite things -- not yours yet, or gone --
+   * and nothing about the position distinguishes them. This does. It also
+   * answers the only question the interface asks about an aircraft before
+   * it will accept a clearance for it.
+   */
+  readonly entered: boolean
+  /**
    * Past positions, newest first. One point per radar sweep rather than one
    * per simulation step, or a twenty-hertz simulation would bank a thousand
    * points a minute for a trail six long.

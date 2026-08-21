@@ -137,6 +137,14 @@ export function stepAircraft(
 export type Departure = 'landed' | 'left'
 
 /**
+ * Inside the area of responsibility, and therefore the controller's to
+ * work. Traffic outside it can be seen and not touched.
+ */
+export function isInSector(a: Aircraft, sectorRadiusNM: number): boolean {
+  return distanceNM(ORIGIN_NM, a.pos) <= sectorRadiusNM
+}
+
+/**
  * Whether this aircraft is finished with the sector, and why.
  *
  * One rule, in one place, so that both reasons are accounted for. The
@@ -144,11 +152,30 @@ export type Departure = 'landed' | 'left'
  * actually draws -- because a target that vanishes five miles outside the
  * only line on the display looks exactly like a bug, and for a while it
  * was indistinguishable from one.
+ *
+ * `entered` is what separates the two opposite meanings of being outside
+ * the boundary. Arrivals are released beyond it and fly in, so position
+ * alone cannot tell an aircraft that has not arrived from one that has
+ * gone.
  */
-export function departureOf(a: Aircraft, sectorRadiusNM: number): Departure | null {
+export function departureOf(
+  a: Aircraft,
+  sectorRadiusNM: number,
+  outerLimitNM = Number.POSITIVE_INFINITY,
+): Departure | null {
   if (a.navMode === 'LANDED') return 'landed'
-  if (distanceNM(ORIGIN_NM, a.pos) > sectorRadiusNM) return 'left'
+  if (a.entered && !isInSector(a, sectorRadiusNM)) return 'left'
+  // A backstop for the other direction. Inbound traffic that turns away
+  // never enters, so the rule above can never fire for it and it would fly
+  // outward for ever, counted in the cap and drawn on a zoomed-out scope.
+  // Nothing exists beyond the ring arrivals are released on.
+  if (distanceNM(ORIGIN_NM, a.pos) > outerLimitNM) return 'left'
   return null
+}
+
+/** Marks an inbound aircraft as the controller's, the first time it is. */
+export function enterSector(a: Aircraft, sectorRadiusNM: number): Aircraft {
+  return !a.entered && isInSector(a, sectorRadiusNM) ? { ...a, entered: true } : a
 }
 
 export function distanceFlownNM(gsKts: number, dtSeconds: number): number {

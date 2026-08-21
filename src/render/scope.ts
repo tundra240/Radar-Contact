@@ -32,6 +32,13 @@ import { airspaceColour, fonts, formatLevel, theme } from './theme'
 
 const ORIGIN: Vec2NM = { x: 0, y: 0 }
 
+/**
+ * How far the map outside the area of responsibility is washed back towards
+ * the ground colour. Enough that the boundary is unmistakable at a glance;
+ * not so much that you cannot see a neighbouring field or traffic coming.
+ */
+const OUTSIDE_VEIL = 0.55
+
 /** What the status bar needs from the loop, and nothing more. */
 export interface ScopeStatus {
   readonly clock: Clock
@@ -45,6 +52,8 @@ export interface ScopeStatus {
     readonly landed: number
     /** And lost off the boundary unlanded, which is the other half of it. */
     readonly left: number
+    /** The score itself. */
+    readonly points: number
   }
   /** Who is working the position, or null before anyone has logged on. */
   readonly controller: { readonly initials: string; readonly position: string } | null
@@ -89,10 +98,6 @@ export function drawScope(
   if (overlays.airspaceLabels) drawAirspaceLabels(g, cam, volumes)
 
   if (overlays.rangeRings) drawRangeRings(g, cam, airport)
-  // The edge of the area of responsibility is not optional: it is the
-  // boundary of the job, not decoration.
-  drawSectorBoundary(g, cam, airport)
-  drawCardinals(g, cam, airport)
 
   if (overlays.aerodromes) {
     for (const neighbour of airport.airports) {
@@ -125,6 +130,17 @@ export function drawScope(
   for (const rwy of airport.runways) {
     drawRunway(g, cam, airport, rwy)
   }
+
+  // Everything the controller does not own, dimmed -- drawn after the whole
+  // map so that all of it is covered, and before the traffic so that none of
+  // the traffic is.
+  drawOutside(g, cam, airport)
+
+  // The edge of the area of responsibility is not optional: it is the
+  // boundary of the job, not decoration. Drawn over the wash so that the
+  // one line that matters most is also the crispest on the display.
+  drawSectorBoundary(g, cam, airport)
+  drawCardinals(g, cam, airport)
 
   // Above every overlay and below the chrome: traffic is the top layer of
   // the radar picture, but it is still inside the display.
@@ -604,6 +620,31 @@ function drawRangeRings(
   }
 }
 
+/**
+ * Dims the map outside the area of responsibility.
+ *
+ * The map does not stop at the boundary -- there is a country out there,
+ * and the airspace of four other airfields -- but only one part of it is
+ * the controller's. Washing the rest back towards the ground colour says
+ * which is which without hiding anything: a neighbouring field is still
+ * there to be seen, and so is traffic on its way in.
+ */
+function drawOutside(g: CanvasRenderingContext2D, cam: Camera, airport: Airport): void {
+  const centre = cam.worldToScreen(ORIGIN)
+
+  g.globalAlpha = OUTSIDE_VEIL
+  g.fillStyle = theme.bg
+  g.beginPath()
+  // The whole display with the sector punched out of it: one path, filled
+  // odd-even, which needs no clipping and no second pass.
+  g.rect(0, 0, cam.width, cam.height)
+  g.arc(centre.x, centre.y, cam.nmToPx(airport.sector.radiusNM), 0, Math.PI * 2)
+  g.fill('evenodd')
+  // Set back rather than saved and restored: everything after this is drawn
+  // at full strength, and a leaked alpha would dim the traffic too.
+  g.globalAlpha = 1
+}
+
 function drawSectorBoundary(
   g: CanvasRenderingContext2D,
   cam: Camera,
@@ -1014,6 +1055,9 @@ function drawStatusBar(
     // Simulated time, not wall clock: it runs at whatever rate the loop is
     // set to, and stops when the loop is paused.
     { label: 'TIME', value: formatClock(status.clock.timeOfDaySeconds) },
+    // First after the clock, because it is the only number here that is a
+    // verdict on how the session is going.
+    { label: 'SCORE', value: String(status.traffic.points) },
     {
       label: 'RATE',
       value: status.paused ? 'PAUSED' : formatSpeed(status.speed),

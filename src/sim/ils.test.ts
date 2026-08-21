@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { TICK_MS } from '../core/loop'
 import { advance, angleDelta, bearingDeg, distanceNM } from '../core/geo'
 import { applyAll, type ApplyContext } from '../commands/apply'
-import { loadAirport } from '../data/airport'
+import { loadAirport, outerLimitNM } from '../data/airport'
 import raw from '../data/egll.json'
-import { departureOf, stepAircraft } from './aircraft'
+import { departureOf, enterSector, stepAircraft } from './aircraft'
 import { Spawner } from './spawner'
 import {
   AIM_LEAD_NM,
@@ -61,6 +61,7 @@ function ac(over: Partial<Aircraft> = {}): Aircraft {
     clearedApproach: ILS,
     hold: null,
     originFix: 'BIG',
+    entered: true,
     trail: [],
     trailAt: 0,
     spawnedAt: 0,
@@ -378,6 +379,7 @@ describe('a whole session', () => {
       },
       holdFor: () => null,
       approachFor: (id) => (id === '27R' ? app : null),
+      sectorRadiusNM: airport.sector.radiusNM,
     }
 
     const spawner = new Spawner({ airport, seed: 4242 })
@@ -400,15 +402,19 @@ describe('a whole session', () => {
 
       let world: Aircraft[] = []
       for (const a of traffic.map((x) => stepAircraft(x, DT, clock.elapsedSeconds))) {
-        // The same rule main.ts applies, rather than a second copy of it.
-        const departure = departureOf(a, airport.sector.radiusNM)
+        // The same three rules main.ts applies, rather than copies of them.
+        const flown = enterSector(a, airport.sector.radiusNM)
+        const departure = departureOf(flown, airport.sector.radiusNM, outerLimitNM(airport))
         if (departure === 'landed') landed += 1
-        if (departure === null) world.push(a)
+        if (departure === null) world.push(flown)
       }
 
       // Once a second, work one thing per aircraft, as a controller would.
       if (i % 20 === 0) {
         world = world.map((a) => {
+          // Traffic outside the boundary takes no instructions, so there is
+          // nothing to do with it but watch it come in.
+          if (!a.entered) return a
           const geom = approachGeometry(a.pos, app)
           const side = geom.offsetNM >= 0 ? 1 : -1
           // A gate thirteen miles out and two and a half to one side: the

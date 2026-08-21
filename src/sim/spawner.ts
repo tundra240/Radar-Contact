@@ -1,5 +1,5 @@
 import type { Clock } from '../core/loop'
-import { advance, bearingDeg, distanceNM, normalizeHeading, type Vec2NM } from '../core/geo'
+import { advance, bearingDeg, distanceNM, type Vec2NM } from '../core/geo'
 import { makeRng, type Rng } from '../core/rng'
 import type { Airport, Navaid } from '../data/airport'
 import { FlightGenerator } from './flightgen'
@@ -36,16 +36,7 @@ const ARP: Vec2NM = { x: 0, y: 0 }
  */
 const STACK_STEP_FT = 1000
 
-/**
- * How far inside the sector boundary an arrival must appear.
- *
- * Not a theoretical guard. LAM's fix is 25 NM out, so with a twelve mile
- * entry its arrivals appear at 37 NM against a 40 NM boundary -- three
- * miles of headroom. Raise `entryDistanceNM` a little and they would be
- * released outside the boundary and removed on the tick they appeared,
- * which on the scope is indistinguishable from targets vanishing at random.
- */
-const ENTRY_INSIDE_NM = 2
+
 
 /** A place to put an arrival: which fix, and which level of its stack. */
 interface Slot {
@@ -264,13 +255,22 @@ export class Spawner {
    * routing to the fix when you first see it rather than materialising on
    * top of it.
    */
+  /**
+   * Where an arrival appears: outside the boundary, on the radial through
+   * its fix.
+   *
+   * Measured from the boundary rather than from the fix, so every feed
+   * hands traffic over at the same range whether its fix is ten miles out
+   * or twenty-five. An arrival is therefore visible, and identifiable, for
+   * a couple of minutes before it becomes the controller's to work.
+   */
   private entryPoint(fix: Navaid): Vec2NM {
-    // The inbound leg is radial to the field, so going back up it is going
-    // straight out -- which means the room available is simply what is left
-    // between the fix and the boundary.
-    const room = this.airport.sector.radiusNM - ENTRY_INSIDE_NM - distanceNM(ARP, fix.posNM)
-    const outNM = Math.max(0, Math.min(this.airport.traffic.entryDistanceNM, room))
-    return advance(fix.posNM, normalizeHeading(this.inboundTrue(fix) + 180), outNM)
+    const sector = this.airport.sector
+    return advance(
+      ARP,
+      bearingDeg(ARP, fix.posNM),
+      sector.radiusNM + this.airport.traffic.entryDistanceNM,
+    )
   }
 
   /**
@@ -388,6 +388,8 @@ export class Spawner {
       clearedApproach: null,
       hold,
       originFix: fix.name,
+      // Released outside the boundary: it is not the controller's yet.
+      entered: false,
       trail: [],
       trailAt: clock.elapsedSeconds,
       spawnedAt: clock.elapsedSeconds,

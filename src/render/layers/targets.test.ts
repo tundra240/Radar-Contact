@@ -36,6 +36,7 @@ interface Line {
   to: { x: number; y: number }
   style: string
   dashed: boolean
+  alpha: number
 }
 interface Label {
   s: string
@@ -43,6 +44,7 @@ interface Label {
   y: number
   style: string
   align: string
+  alpha: number
 }
 
 function recorder(): {
@@ -86,7 +88,13 @@ function recorder(): {
       const from = path[0]
       const to = path[path.length - 1]
       if (from && to && path.length >= 2) {
-        lines.push({ from, to, style: String(stub['strokeStyle']), dashed: dash.length > 0 })
+        lines.push({
+          from,
+          to,
+          style: String(stub['strokeStyle']),
+          dashed: dash.length > 0,
+          alpha: Number(stub['globalAlpha']),
+        })
       }
     },
     fill: noop,
@@ -97,6 +105,7 @@ function recorder(): {
         y,
         style: String(stub['fillStyle']),
         align: String(stub['textAlign']),
+        alpha: Number(stub['globalAlpha']),
       })
     },
     fillRect: noop,
@@ -144,6 +153,7 @@ function plane(over: Partial<Aircraft> = {}): Aircraft {
     clearedApproach: null,
     hold: null,
     originFix: 'LAM',
+    entered: true,
     trail: [],
     trailAt: 0,
     spawnedAt: 0,
@@ -539,5 +549,67 @@ describe('picking out of a stack', () => {
   it('still finds nothing on empty scope, whatever is selected', () => {
     const c = cam()
     expect(pickTarget(c, stack, { x: 40, y: 760 }, undefined, 'TWO2')).toBe(null)
+  })
+})
+
+describe('traffic outside the area of responsibility', () => {
+  const render = (traffic: readonly Aircraft[]) => {
+    const cam = new Camera({ x: 0, y: 0 }, 60, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const rec = recorder()
+    drawTargets(rec.ctx, cam, traffic, null)
+    return { ...rec, cam }
+  }
+
+  it('draws it dimmer than traffic that is yours', () => {
+    // It is there to be seen and planned around, and it will not take an
+    // instruction, so it must not look like it would.
+    const mine = render([plane({ callsign: 'MINE', entered: true })])
+    const coming = render([plane({ callsign: 'COMING', entered: false, pos: { x: 48, y: 0 } })])
+    const alphaOf = (labels: Label[]): number => labels[0]?.alpha ?? -1
+    expect(alphaOf(coming.labels)).toBeLessThan(alphaOf(mine.labels))
+    expect(alphaOf(coming.labels)).toBeGreaterThan(0)
+  })
+
+  it('still draws it, rather than hiding it', () => {
+    // Knowing what is about to arrive is most of knowing what to do with
+    // what is already here.
+    const r = render([plane({ callsign: 'COMING', entered: false })])
+    expect(r.rects.length).toBeGreaterThan(0)
+    expect(r.labels.some((l) => l.s === 'COMING')).toBe(true)
+  })
+
+  it('dims its trail too, without flattening the fade', () => {
+    const trail = [
+      { x: -1, y: 0 },
+      { x: -2, y: 0 },
+      { x: -3, y: 0 },
+    ]
+    const coming = render([plane({ entered: false, trail })])
+    const mine = render([plane({ entered: true, trail })])
+    for (let i = 0; i < trail.length; i += 1) {
+      expect(coming.dots[i]?.alpha).toBeLessThan(mine.dots[i]?.alpha as number)
+    }
+    // And the fade with age survives the dimming.
+    expect(coming.dots[2]?.alpha).toBeLessThan(coming.dots[0]?.alpha as number)
+  })
+
+  it('hands the canvas back at full strength', () => {
+    // A leaked alpha would dim the chrome, the readouts and everything else
+    // drawn after the traffic.
+    const r = render([
+      plane({ callsign: 'COMING', entered: false }),
+      plane({ callsign: 'MINE', entered: true, pos: { x: 5, y: 5 } }),
+    ])
+    expect(r.alphaAtEnd()).toBe(1)
+  })
+
+  it('does not dim the one that is yours just because a neighbour is not', () => {
+    const r = render([
+      plane({ callsign: 'COMING', entered: false, pos: { x: 48, y: 0 } }),
+      plane({ callsign: 'MINE', entered: true, pos: { x: 5, y: 5 } }),
+    ])
+    const mine = r.labels.find((l) => l.s === 'MINE')
+    expect(mine?.alpha).toBe(1)
   })
 })

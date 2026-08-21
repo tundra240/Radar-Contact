@@ -44,6 +44,7 @@ function ac(over: Partial<Aircraft> = {}): Aircraft {
     clearedApproach: null,
     hold: LAM,
     originFix: 'LAM',
+    entered: true,
     trail: [],
     trailAt: 0,
     spawnedAt: 0,

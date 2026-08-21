@@ -1,0 +1,45 @@
+import type { Departure } from './aircraft'
+
+/**
+ * The score.
+ *
+ * Two events move it, because two things happen to an arrival: it lands, or
+ * it leaves without landing. That is the whole of it until conflicts are
+ * detected, and it is deliberately not more -- a score built out of things
+ * the simulation does not yet model would be a number that means nothing.
+ *
+ * Kept as a value rather than a counter object so a session's score is a
+ * thing you can hold, compare and replay to, in the same spirit as the
+ * seeded traffic.
+ */
+
+/** Landing one is the job. */
+export const LANDING_POINTS = 100
+
+/**
+ * Losing one costs less than landing one earns, so a session where you
+ * land most of the traffic still climbs. It is a penalty, not a punishment.
+ */
+export const LOST_PENALTY = 50
+
+export interface Score {
+  readonly points: number
+  readonly landed: number
+  readonly lost: number
+}
+
+export const NO_SCORE: Score = { points: 0, landed: 0, lost: 0 }
+
+/** What one departure is worth, positive or negative. */
+export function pointsFor(departure: Departure): number {
+  return departure === 'landed' ? LANDING_POINTS : -LOST_PENALTY
+}
+
+/** The score after one more aircraft has finished with the sector. */
+export function scoreDeparture(score: Score, departure: Departure): Score {
+  return {
+    points: score.points + pointsFor(departure),
+    landed: score.landed + (departure === 'landed' ? 1 : 0),
+    lost: score.lost + (departure === 'left' ? 1 : 0),
+  }
+}

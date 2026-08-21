@@ -19,6 +19,7 @@ const base: Aircraft = {
   clearedApproach: null,
   hold: null,
   originFix: 'LAM',
+  entered: true,
   trail: [],
   trailAt: 0,
   spawnedAt: 0,
@@ -532,5 +533,65 @@ describe('what a strip says that the scope does not', () => {
     h.bay.update([ac({ callsign: 'HELD1', navMode: 'HOLD', pos: { x: 14, y: 0 } })], null)
     expect(text('HELD1', '.strip-gap')).toBe('IN STACK')
     expect(text('HELD1', '.strip-fld')).toBe('FLD 14.0')
+  })
+})
+
+describe('inbound traffic', () => {
+  const text = (callsign: string, sel: string): string => {
+    const strip = strips().find((s) => s.dataset['callsign'] === callsign)
+    if (!strip) throw new Error(`no strip for ${callsign}`)
+    return strip.querySelector(sel)?.textContent ?? ''
+  }
+
+  const roster = [
+    ac({ callsign: 'MINE1', entered: true, pos: { x: 10, y: 0 } }),
+    ac({ callsign: 'HELD2', entered: true, navMode: 'HOLD', pos: { x: 20, y: 0 } }),
+    ac({ callsign: 'COMING3', entered: false, pos: { x: 48, y: 0 } }),
+  ]
+
+  it('lists it under everything the controller owns', () => {
+    h.bay.update(roster, null)
+    expect(callsigns()).toEqual(['MINE1', 'HELD2', 'COMING3'])
+  })
+
+  it('says it is inbound rather than faking a gap or a stack', () => {
+    h.bay.update(roster, null)
+    expect(text('COMING3', '.strip-gap')).toBe('INBOUND')
+    expect(text('HELD2', '.strip-gap')).toBe('IN STACK')
+  })
+
+  it('gives it no sequence number, because it is not sequenced', () => {
+    h.bay.update(roster, null)
+    expect(text('COMING3', '.strip-seq')).toBe('--')
+    expect(text('MINE1', '.strip-seq')).toBe('1')
+  })
+
+  it('still says how far out it is, which is the useful part', () => {
+    h.bay.update(roster, null)
+    expect(text('COMING3', '.strip-fld')).toBe('FLD 48.0')
+  })
+
+  it('counts it apart from the sequence and the stack', () => {
+    h.bay.update(roster, null)
+    expect(document.querySelector('.strip-count')?.textContent).toBe('1 SEQ / 1 HOLD / 1 IN')
+  })
+
+  it('leaves the count alone when nothing is inbound', () => {
+    // The third figure only earns its space when there is something in it.
+    h.bay.update([roster[0] as Aircraft], null)
+    expect(document.querySelector('.strip-count')?.textContent).toBe('1 SEQ / 0 HOLD')
+  })
+
+  it('moves it into the sequence when it crosses in', () => {
+    h.bay.update(roster, null)
+    const before = strips().find((s) => s.dataset['callsign'] === 'COMING3')
+    h.bay.update(
+      roster.map((a) => (a.callsign === 'COMING3' ? ac({ ...a, entered: true, pos: { x: 4, y: 0 } }) : a)),
+      null,
+    )
+    expect(callsigns()[0]).toBe('COMING3')
+    expect(text('COMING3', '.strip-seq')).toBe('1')
+    // Same element, moved: it is the same aircraft.
+    expect(strips().find((s) => s.dataset['callsign'] === 'COMING3')).toBe(before)
   })
 })

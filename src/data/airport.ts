@@ -109,9 +109,10 @@ export interface TrafficConfig {
    */
   readonly entrySpeedKts: number
   /**
-   * How far outside its fix an arrival appears, along the hold's inbound
-   * leg -- so it is routing to the fix when you first see it rather than
-   * materialising on top of it.
+   * How far OUTSIDE the sector boundary an arrival appears, on the radial
+   * through its fix -- so every feed hands traffic over at the same range,
+   * and an arrival is visible for a couple of minutes before it becomes the
+   * controller's to work.
    */
   readonly entryDistanceNM: number
   readonly maxConcurrent: number
@@ -1068,6 +1069,15 @@ function arcPoints(
  * A point on the extended centreline, `distNM` before the threshold on the
  * approach side. Distance 0 is the threshold itself.
  */
+/**
+ * The furthest anything exists from the field: the ring arrivals are
+ * released on, plus a little. Beyond it there is nothing to see and nothing
+ * to control, so the world lets go of it.
+ */
+export function outerLimitNM(airport: Airport): number {
+  return airport.sector.radiusNM + airport.traffic.entryDistanceNM + 5
+}
+
 export function centrelinePoint(runway: Runway, distNM: number): Vec2NM {
   return advance(runway.thresholdNM, runway.bearingTrue + 180, distNM)
 }
