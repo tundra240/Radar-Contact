@@ -69,7 +69,8 @@ canvas {
   --warn: #a00000;
 }
 
-.controls {
+/* One button in the corner of the scope, with its panel hanging under it. */
+.menu {
   position: absolute;
   top: 12px;
   right: 12px;
@@ -111,9 +112,27 @@ canvas {
   outline-offset: -4px;
 }
 
-.overlay-panel {
-  width: 208px;
-  padding: 0 0 6px;
+/* ----------------------------------------------------------------- menu
+
+   One panel behind one button, in three sections: the simulation rate, the
+   display scheme, and the overlay layers. Same idiom as the rest of the
+   furniture -- a caption strip, sunken key-style buttons for the choices,
+   square indicators for the switches -- with sections divided by a groove,
+   which is how a dialog of this era separated groups.                   */
+
+/* A toolbar toggle of this era stayed pressed in while its panel showed. */
+.menu-button.is-open {
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.menu-panel {
+  width: 212px;
+  /* Scrolls rather than runs off the bottom on a short window. */
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  padding: 0 0 7px;
   border: 0;
   border-radius: 0;
   font-size: 11px;
@@ -124,14 +143,14 @@ canvas {
     inset -1px -1px 0 0 var(--bevel-shadow);
 }
 
-.overlay-panel[hidden] {
+.menu-panel[hidden] {
   display: none;
 }
 
 /* Caption strip: a flat saturated bar with light lettering, which is the
    single most period detail in the interface. */
-.overlay-title {
-  margin: 2px 2px 6px;
+.menu-title {
+  margin: 2px 2px 0;
   padding: 4px 7px;
   font-size: 9px;
   font-weight: bold;
@@ -141,10 +160,82 @@ canvas {
   background: var(--title-bar);
 }
 
-.overlay-density {
+.menu-section {
+  padding: 7px 7px 0;
+}
+
+/* The groove: a shadow line with a light line directly under it. */
+.menu-section + .menu-section {
+  margin-top: 7px;
+  padding-top: 8px;
+  border-top: 1px solid var(--bevel-shadow);
+  box-shadow: inset 0 1px 0 0 var(--bevel-light);
+}
+
+.menu-heading {
+  margin-bottom: 5px;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--chrome-dim);
+}
+
+.menu-rates,
+.menu-choices {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 5px;
+}
+
+.menu-key {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 5px 2px;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+  cursor: pointer;
+}
+
+.menu-key:active {
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+/* The set rate and the active scheme read as held down and take the
+   caption colours, so the current state is legible at a glance instead of
+   by comparing four buttons with each other. */
+.menu-key.is-active {
+  color: var(--title-text);
+  background: var(--title-bar);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.menu-key:focus-visible {
+  outline: 1px dotted var(--chrome-text);
+  outline-offset: -3px;
+}
+
+.menu-pause {
+  flex: 0 0 30px;
+  font-weight: bold;
+}
+
+.menu-preset {
   display: block;
-  width: calc(100% - 14px);
-  margin: 0 7px 7px;
+  width: 100%;
+  margin-bottom: 5px;
   padding: 5px 6px;
   border: 0;
   border-radius: 0;
@@ -160,17 +251,16 @@ canvas {
   cursor: pointer;
 }
 
-.overlay-density:active {
+.menu-preset:active {
   box-shadow:
     inset 1px 1px 0 0 var(--bevel-shadow),
     inset -1px -1px 0 0 var(--bevel-light);
 }
 
-.overlay-row {
+.menu-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 7px;
   padding: 2px 0;
   font-size: 10px;
   letter-spacing: 0.04em;
@@ -181,7 +271,7 @@ canvas {
 
 /* Square sunken indicator with a solid block when set, rather than the
    platform checkbox, which would break the period entirely. */
-.overlay-row input {
+.menu-row input {
   appearance: none;
   -webkit-appearance: none;
   flex: 0 0 auto;
@@ -197,13 +287,13 @@ canvas {
   cursor: pointer;
 }
 
-.overlay-row input:checked {
+.menu-row input:checked {
   background:
     linear-gradient(var(--accent), var(--accent)) center / 6px 6px no-repeat,
     var(--well);
 }
 
-.overlay-row input:focus-visible {
+.menu-row input:focus-visible {
   outline: 1px dotted var(--chrome-text);
   outline-offset: 1px;
 }
@@ -433,68 +523,4 @@ canvas {
   box-shadow:
     inset 1px 1px 0 0 var(--bevel-shadow),
     inset -1px -1px 0 0 var(--bevel-light);
-}
-
-/* --------------------------------------------------------- time control
-
-   Pause and the four simulation rates. The active rate is shown pressed in
-   and picks up the caption colours, so the current state reads without
-   having to compare four buttons.                                       */
-
-.time-control {
-  display: flex;
-  gap: 3px;
-  padding: 4px;
-  background: var(--face);
-  box-shadow:
-    inset 1px 1px 0 0 var(--bevel-light),
-    inset -1px -1px 0 0 var(--bevel-shadow);
-}
-
-.time-button {
-  min-width: 32px;
-  padding: 4px 4px;
-  border: 0;
-  border-radius: 0;
-  font-family: inherit;
-  font-size: 9px;
-  line-height: 1;
-  letter-spacing: 0.06em;
-  color: var(--accent);
-  background: var(--face);
-  box-shadow:
-    inset 1px 1px 0 0 var(--bevel-light),
-    inset -1px -1px 0 0 var(--bevel-shadow);
-  cursor: pointer;
-}
-
-.time-button:active {
-  box-shadow:
-    inset 1px 1px 0 0 var(--bevel-shadow),
-    inset -1px -1px 0 0 var(--bevel-light);
-}
-
-.time-button.is-active {
-  color: var(--title-text);
-  background: var(--title-bar);
-  box-shadow:
-    inset 1px 1px 0 0 var(--bevel-shadow),
-    inset -1px -1px 0 0 var(--bevel-light);
-}
-
-.time-button:focus-visible {
-  outline: 1px dotted var(--chrome-text);
-  outline-offset: -3px;
-}
-
-.time-pause {
-  min-width: 26px;
-  font-weight: bold;
-}
-
-/* Sound sits with the time controls but is a different kind of thing, so
-   it gets a little air. */
-.time-sound {
-  margin-left: 5px;
-  min-width: 34px;
 }
