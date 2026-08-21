@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Clock } from '../core/loop'
-import { advance as advancePos, distanceNM } from '../core/geo'
+import { advance as advancePos, bearingDeg, distanceNM } from '../core/geo'
 import { makeRng } from '../core/rng'
 import { loadAirport } from '../data/airport'
 import raw from '../data/egll.json'
@@ -35,7 +35,7 @@ function fly(
 
   for (let s = 0; s <= seconds; s += step) {
     const clock = clockAt(s)
-    const born = spawner.update(clock, world)
+    const born = spawner.update(step, clock, world)
     world.push(...born)
     all.push(...born)
     if (move) {
@@ -84,17 +84,20 @@ describe('timing', () => {
   it('holds the first arrival back until the opening delay', () => {
     const first = airport.traffic.firstSpawnSeconds
     const spawner = makeSpawner()
-    expect(spawner.update(clockAt(first - 1), [])).toHaveLength(0)
-    expect(spawner.update(clockAt(first), [])).toHaveLength(1)
+    // A second short of the opening delay, then the second that completes it.
+    expect(spawner.update(first - 1, clockAt(first - 1), [])).toHaveLength(0)
+    expect(spawner.update(1, clockAt(first), [])).toHaveLength(1)
   })
 
-  it('runs on simulated time, so a stopped clock produces nothing', () => {
-    // This is what makes it follow the rate control and stop when paused.
+  it('runs on the simulation step, so a stopped clock produces nothing', () => {
+    // This is what makes it follow the rate control and stop when paused:
+    // with no step to bank, the accumulator never reaches the interval.
     const spawner = makeSpawner()
-    const frozen = clockAt(airport.traffic.firstSpawnSeconds)
-    expect(spawner.update(frozen, [])).toHaveLength(1)
-    for (let i = 0; i < 100; i += 1) {
-      expect(spawner.update(frozen, [])).toHaveLength(0)
+    const first = airport.traffic.firstSpawnSeconds
+    const frozen = clockAt(first)
+    expect(spawner.update(first, frozen, [])).toHaveLength(1)
+    for (let i = 0; i < 500; i += 1) {
+      expect(spawner.update(0, frozen, [])).toHaveLength(0)
     }
   })
 
@@ -177,13 +180,23 @@ describe('entry state', () => {
     }
   })
 
-  it('lets faster types cruise above the limit altitude', () => {
-    const above = all.filter((a) => a.altFt >= airport.sector.speedLimitBelowFt)
-    expect(above.length).toBeGreaterThan(0)
-    for (const a of above) {
-      const type = airport.aircraftTypes.find((t) => t.type === a.type)
-      expect(a.gsKts, a.callsign).toBe(type?.cruiseKts)
+  it('enters at the standard speed, capped by the type and the sector', () => {
+    const t2 = airport.traffic
+    const sector = airport.sector
+    for (const a of all) {
+      const type = airport.aircraftTypes.find((x) => x.type === a.type)
+      let expected = Math.min(t2.entrySpeedKts, type?.cruiseKts ?? Infinity)
+      if (a.altFt < sector.speedLimitBelowFt) {
+        expected = Math.min(expected, sector.speedLimitKts)
+      }
+      expect(a.gsKts, `${a.callsign} ${a.type} at ${a.altFt}`).toBe(expected)
     }
+  })
+
+  it('uses the standard entry speed in practice', () => {
+    // Every type cruises faster than the standard entry speed, so in this
+    // configuration every arrival enters at it.
+    for (const a of all) expect(a.gsKts, a.callsign).toBe(airport.traffic.entrySpeedKts)
   })
 
   it('tracks the hold inbound leg, which points at the field', () => {
@@ -260,13 +273,19 @@ describe('flow management', () => {
     }))
 
     const due = clockAt(airport.traffic.firstSpawnSeconds)
-    expect(spawner.update(due, blockers)).toHaveLength(0)
+    expect(
+      spawner.update(airport.traffic.firstSpawnSeconds, due, blockers),
+    ).toHaveLength(0)
     expect(spawner.deferred).toBeGreaterThan(0)
   })
 
   it('releases again once the fix is clear', () => {
     const spawner = makeSpawner()
-    const first = spawner.update(clockAt(airport.traffic.firstSpawnSeconds), [])
+    const first = spawner.update(
+      airport.traffic.firstSpawnSeconds,
+      clockAt(airport.traffic.firstSpawnSeconds),
+      [],
+    )
     expect(first).toHaveLength(1)
 
     // Nothing in the world at all: the only bar is the per-fix cooldown.
@@ -301,12 +320,12 @@ describe('flow management', () => {
 
   it('reports how long until the next arrival', () => {
     const spawner = makeSpawner()
-    expect(spawner.nextInSeconds(clockAt(0))).toBeCloseTo(
-      airport.traffic.firstSpawnSeconds,
-      6,
-    )
-    spawner.update(clockAt(airport.traffic.firstSpawnSeconds), [])
-    expect(spawner.nextInSeconds(clockAt(airport.traffic.firstSpawnSeconds))).toBeGreaterThan(0)
+    const first = airport.traffic.firstSpawnSeconds
+    expect(spawner.nextInSeconds()).toBeCloseTo(first, 6)
+    spawner.update(first / 2, clockAt(first / 2), [])
+    expect(spawner.nextInSeconds()).toBeCloseTo(first / 2, 6)
+    spawner.update(first / 2, clockAt(first), [])
+    expect(spawner.nextInSeconds()).toBeGreaterThan(0)
   })
 })
 
@@ -331,5 +350,162 @@ describe('reproducibility', () => {
     const a = fly(new Spawner({ airport }), 900).all.map((x) => x.callsign)
     const b = fly(makeSpawner(airport.traffic.seed), 900).all.map((x) => x.callsign)
     expect(a).toEqual(b)
+  })
+})
+
+describe('the cadence accumulator', () => {
+  it('banks small steps the same as one large one', () => {
+    // The point of accumulating the step rather than comparing timestamps:
+    // the result cannot depend on how the simulation happens to be diced up.
+    const first = airport.traffic.firstSpawnSeconds
+    const coarse = makeSpawner(11)
+    expect(coarse.update(first, clockAt(first), [])).toHaveLength(1)
+
+    const fine = makeSpawner(11)
+    let released = 0
+    for (let i = 0; i < first * 20; i += 1) {
+      released += fine.update(0.05, clockAt((i + 1) * 0.05), []).length
+    }
+    expect(released).toBe(1)
+  })
+
+  it('keeps the gap inside the configured band', () => {
+    // The cadence is stated as a range, so jitter varies it within that
+    // rather than taking it outside.
+    const t = airport.traffic
+    const { all } = fly(makeSpawner(99), 5400)
+    expect(all.length).toBeGreaterThan(20)
+
+    const gaps: number[] = []
+    for (let i = 1; i < all.length; i += 1) {
+      gaps.push((all[i]?.spawnedAt ?? 0) - (all[i - 1]?.spawnedAt ?? 0))
+    }
+    // Gaps longer than the band mean an arrival was held, which is a
+    // different mechanism; the floor is what the band has to guarantee.
+    for (const g of gaps) {
+      expect(g, `gap of ${g.toFixed(1)}s`).toBeGreaterThanOrEqual(t.minIntervalSeconds - 0.06)
+    }
+    const unheld = gaps.filter((g) => g <= t.initialIntervalSeconds + 0.06)
+    expect(unheld.length).toBeGreaterThan(gaps.length / 2)
+  })
+
+  it('runs one arrival every thirty to sixty seconds', () => {
+    expect(airport.traffic.minIntervalSeconds).toBe(30)
+    expect(airport.traffic.initialIntervalSeconds).toBe(60)
+  })
+})
+
+describe('inward heading', () => {
+  it('points every arrival at the airport reference point', () => {
+    const { all } = fly(makeSpawner(7), 1800)
+    expect(all.length).toBeGreaterThan(5)
+
+    for (const a of all) {
+      const fix = airport.navaids.find((n) => n.name === a.originFix)
+      expect(fix, a.originFix ?? 'none').toBeDefined()
+      if (!fix) continue
+      // Computed from the fix to the origin, which is the ARP.
+      const inward = bearingDeg(fix.posNM, { x: 0, y: 0 })
+      expect(a.hdg, `${a.callsign} from ${fix.name}`).toBeCloseTo(inward, 6)
+    }
+  })
+
+  it('closes the distance to the field rather than opening it', () => {
+    // The heading is only useful if flying it actually brings the aircraft
+    // in, so this checks the geometry rather than the number.
+    const { all } = fly(makeSpawner(7), 1800)
+    for (const a of all) {
+      const fix = airport.navaids.find((n) => n.name === a.originFix)
+      if (!fix) continue
+      const before = distanceNM({ x: 0, y: 0 }, fix.posNM)
+      const after = distanceNM({ x: 0, y: 0 }, advancePos(fix.posNM, a.hdg, 1))
+      expect(after, `${a.callsign} from ${fix.name}`).toBeLessThan(before)
+    }
+  })
+})
+
+describe('on command', () => {
+  it('releases immediately without waiting for the cadence', () => {
+    const spawner = makeSpawner()
+    // Nothing banked at all, so the automatic path would produce nothing.
+    expect(spawner.update(0, clockAt(0), [])).toHaveLength(0)
+    const born = spawner.spawnNow(clockAt(0), [])
+    expect(born).toHaveLength(1)
+    expect(spawner.spawned).toBe(1)
+  })
+
+  it('ignores the per-fix cooldown that only paces the automatic flow', () => {
+    const spawner = makeSpawner()
+    const first = spawner.spawnNow(clockAt(0), [])
+    expect(first).toHaveLength(1)
+    // Straight away again: the cooldown would have blocked the automatic
+    // path, but a deliberate command should still place one.
+    const second = spawner.spawnNow(clockAt(0), first)
+    expect(second).toHaveLength(1)
+    expect(second[0]?.originFix).not.toBe(first[0]?.originFix)
+  })
+
+  it('still refuses to put an aircraft on top of another', () => {
+    // A manual trigger must not be able to manufacture a separation loss.
+    const spawner = makeSpawner()
+    const blockers: Aircraft[] = spawner.entryFixes.map((fix, i) => ({
+      callsign: `BLK${i}`,
+      type: 'A320',
+      wake: 'M',
+      pos: fix.posNM,
+      altFt: 9000,
+      hdg: 270,
+      gsKts: 220,
+      vsFpm: 0,
+      clearedHdg: 270,
+      clearedAltFt: 9000,
+      clearedSpdKts: 220,
+      navMode: 'VECTOR',
+      clearedApproach: null,
+      originFix: fix.name,
+      trail: [],
+      spawnedAt: 0,
+    }))
+    expect(spawner.spawnNow(clockAt(0), blockers)).toHaveLength(0)
+    expect(spawner.deferred).toBeGreaterThan(0)
+  })
+
+  it('respects the concurrency cap', () => {
+    // Parked well clear of every fix, so the cap is the only thing that can
+    // refuse. With traffic sitting on the fixes instead it is the spacing
+    // rule that stops it, which is a different mechanism.
+    const spawner = makeSpawner()
+    const full: Aircraft[] = Array.from(
+      { length: airport.traffic.maxConcurrent },
+      (_unused, i) => ({
+        callsign: `FULL${i}`,
+        type: 'A320',
+        wake: 'M',
+        pos: { x: -35 - i, y: -35 },
+        altFt: 9000,
+        hdg: 270,
+        gsKts: 220,
+        vsFpm: 0,
+        clearedHdg: 270,
+        clearedAltFt: 9000,
+        clearedSpdKts: 220,
+        navMode: 'VECTOR',
+        clearedApproach: null,
+        originFix: null,
+        trail: [],
+        spawnedAt: 0,
+      }),
+    )
+    expect(spawner.spawnNow(clockAt(0), full)).toHaveLength(0)
+    // One fewer and there is room again.
+    expect(spawner.spawnNow(clockAt(0), full.slice(1))).toHaveLength(1)
+  })
+
+  it('resets the cadence, so an automatic arrival does not follow at once', () => {
+    const spawner = makeSpawner()
+    spawner.spawnNow(clockAt(0), [])
+    expect(spawner.nextInSeconds()).toBeGreaterThanOrEqual(
+      airport.traffic.minIntervalSeconds,
+    )
   })
 })

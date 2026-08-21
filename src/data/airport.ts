@@ -98,6 +98,12 @@ export interface TrafficConfig {
   readonly rampMinutes: number
   /** Fraction either side of the interval, so arrivals are not metronomic. */
   readonly intervalJitter: number
+  /**
+   * Standard entry groundspeed. Capped by the type's cruise, so a slower
+   * aircraft is never made to exceed it, and by the sector speed limit
+   * below the limit altitude.
+   */
+  readonly entrySpeedKts: number
   readonly maxConcurrent: number
   /** A fix with traffic this close is not given another arrival. */
   readonly minFixSpacingNM: number
@@ -168,12 +174,12 @@ export interface AirspaceVolume {
 
 /* --------------------------------------------------------------- geography
 
-   The map the airspace sits on: the shoreline, and the lateral limit of the
-   flight information region. Neither is an airspace volume -- there is no
-   class and no vertical extent to either -- so they are their own section
-   rather than being forced into the airspace schema.                     */
+   The map the airspace sits on: the shoreline, the Thames, and the lateral
+   limit of the flight information region. None of them is an airspace volume
+   -- there is no class and no vertical extent to any of them -- so they are
+   their own section rather than being forced into the airspace schema.    */
 
-export type GeographyKind = 'coastline' | 'fir'
+export type GeographyKind = 'coastline' | 'river' | 'fir'
 
 /**
  * Where a geographic line came from. Deliberately a different vocabulary
@@ -194,6 +200,16 @@ export interface GeoPath {
   readonly pointsNM: readonly Vec2NM[]
   readonly minNM: Vec2NM
   readonly maxNM: Vec2NM
+  /**
+   * True width of the feature at each point, in NM, or null where the
+   * source has no width to give.
+   *
+   * Only rivers carry this. A coastline has no width -- it is the edge of
+   * something -- and neither does a FIR boundary. The Thames is a 60 m
+   * stream at Windsor and over a kilometre wide at Gravesend, and drawing
+   * it at one width throws away the most recognisable thing about it.
+   */
+  readonly widthsNM: readonly number[] | null
 }
 
 export interface GeographyFeature {
@@ -563,6 +579,7 @@ function parseTraffic(raw: unknown, knownTypes: ReadonlySet<string>): TrafficCon
     minIntervalSeconds: min,
     rampMinutes: num(o['rampMinutes'], 'traffic.rampMinutes'),
     intervalJitter: jitter,
+    entrySpeedKts: num(o['entrySpeedKts'], 'traffic.entrySpeedKts'),
     maxConcurrent,
     minFixSpacingNM: num(o['minFixSpacingNM'], 'traffic.minFixSpacingNM'),
     minFixSpacingSeconds: num(o['minFixSpacingSeconds'], 'traffic.minFixSpacingSeconds'),
@@ -790,8 +807,11 @@ function parseGeography(
   const o = obj(raw, path)
 
   const kind = str(o['kind'], `${path}.kind`)
-  if (kind !== 'coastline' && kind !== 'fir') {
-    throw new ConfigError(`${path}.kind`, `must be "coastline" or "fir" (got ${kind})`)
+  if (kind !== 'coastline' && kind !== 'river' && kind !== 'fir') {
+    throw new ConfigError(
+      `${path}.kind`,
+      `must be "coastline", "river" or "fir" (got ${kind})`,
+    )
   }
 
   const derivation = str(o['derivation'], `${path}.derivation`)
@@ -804,8 +824,31 @@ function parseGeography(
     if (pts.length < 2) {
       throw new ConfigError(`${path}.paths[${i}]`, 'must have at least 2 points')
     }
+
+    const widthsM: number[] = []
+    const pointsNM = pts.map((v, j) => {
+      const where = `${path}.paths[${i}][${j}]`
+      const w = obj(v, where)['w']
+      // All or nothing: a partial width profile would silently draw part of
+      // a river at true width and the rest as a hairline.
+      if (w !== undefined) {
+        const metres = num(w, `${where}.w`)
+        if (metres <= 0) throw new ConfigError(`${where}.w`, 'must be positive')
+        widthsM.push(metres)
+      }
+      return projection.toWorld(latLon(v, where))
+    })
+
+    if (widthsM.length !== 0 && widthsM.length !== pointsNM.length) {
+      throw new ConfigError(
+        `${path}.paths[${i}]`,
+        'must give a width for every point or for none',
+      )
+    }
+
     return geoPath(
-      pts.map((v, j) => projection.toWorld(latLon(v, `${path}.paths[${i}][${j}]`))),
+      pointsNM,
+      widthsM.length === 0 ? null : widthsM.map((m) => m / M_PER_NM),
     )
   })
 
@@ -820,7 +863,10 @@ function parseGeography(
 }
 
 /** Wraps a projected polyline with the bounding box the renderer culls on. */
-function geoPath(pointsNM: readonly Vec2NM[]): GeoPath {
+function geoPath(
+  pointsNM: readonly Vec2NM[],
+  widthsNM: readonly number[] | null,
+): GeoPath {
   let minX = Infinity
   let minY = Infinity
   let maxX = -Infinity
@@ -835,6 +881,7 @@ function geoPath(pointsNM: readonly Vec2NM[]): GeoPath {
     pointsNM,
     minNM: { x: minX, y: minY },
     maxNM: { x: maxX, y: maxY },
+    widthsNM,
   }
 }
 

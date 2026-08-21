@@ -265,13 +265,13 @@ function start(
   const SYNC_EVERY_TICKS = 4
 
   const loop = new GameLoop({
-    tick: (_dt, clock) => {
+    tick: (dt, clock) => {
       simAdvanced = true
       // Day 1: world.tick goes here, between the spawner and the strips.
       // Until it exists the traffic the spawner releases stays where it is
       // put, which is why the flow stalls once every fix is occupied -- the
       // HELD counter on the status bar is the spacing rule doing its job.
-      const arrivals = spawner.update(clock, traffic)
+      const arrivals = spawner.update(dt, clock, traffic)
       if (arrivals.length > 0) traffic = [...traffic, ...arrivals]
       if (clock.ticks % SYNC_EVERY_TICKS === 0) syncStrips()
     },
@@ -288,8 +288,23 @@ function start(
     },
   })
 
+  // Release an arrival on command, for when the scope is quiet or to line
+  // up a particular situation without waiting for the cadence.
+  window.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key !== 'n' && e.key !== 'N') return
+    const arrivals = spawner.spawnNow(loop.clock, traffic)
+    if (arrivals.length === 0) return
+    traffic = [...traffic, ...arrivals]
+    syncStrips()
+    requestDraw()
+  })
+
   window.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key !== ' ') return
+    // A focused checkbox keeps the space bar, because it is the only way
+    // to set one from the keyboard, and the menu is full of them. Anything
+    // else focused means space is meant for the clock.
+    if (e.target instanceof HTMLInputElement && e.target.type === 'checkbox') return
     // Otherwise space scrolls the page or re-triggers a focused button.
     e.preventDefault()
     loop.togglePaused()
