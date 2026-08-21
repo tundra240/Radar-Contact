@@ -13,6 +13,8 @@ import {
   type NeighbourAirport,
   type Runway,
 } from '../data/airport'
+import type { Aircraft } from '../sim/types'
+import { drawTargets } from './layers/targets'
 import { OVERLAY_ITEMS, countEnabled, densityOf, type Overlays } from './overlays'
 import { airspaceColour, fonts, formatLevel, theme } from './theme'
 
@@ -42,12 +44,22 @@ export interface ScopeStatus {
   readonly controller: { readonly initials: string; readonly position: string } | null
 }
 
+/** The traffic picture: everything on frequency, and which one is selected. */
+export interface ScopeContacts {
+  readonly aircraft: readonly Aircraft[]
+  /** Callsign of the target under the controller's hand, if any. */
+  readonly selected: string | null
+}
+
+const NO_CONTACTS: ScopeContacts = { aircraft: [], selected: null }
+
 export function drawScope(
   g: CanvasRenderingContext2D,
   cam: Camera,
   airport: Airport,
   overlays: Overlays,
   status: ScopeStatus,
+  contacts: ScopeContacts = NO_CONTACTS,
 ): void {
   g.fillStyle = theme.bg
   g.fillRect(0, 0, cam.width, cam.height)
@@ -93,6 +105,10 @@ export function drawScope(
   for (const rwy of airport.runways) {
     drawRunway(g, cam, airport, rwy)
   }
+
+  // Above every overlay and below the chrome: traffic is the top layer of
+  // the radar picture, but it is still inside the display.
+  drawTargets(g, cam, contacts.aircraft, contacts.selected)
 
   drawHud(g, cam, airport, overlays, status)
   drawScreenFrame(g, cam)

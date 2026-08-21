@@ -36,6 +36,14 @@ export interface Palette {
   readonly navaidFreq: string
   readonly hold: string
 
+  /**
+   * Traffic. The boldest ink in every palette, because the map is context
+   * and the traffic is the job. The trail is the same mark one step
+   * quieter, so a history never competes with the target it belongs to.
+   */
+  readonly target: string
+  readonly trail: string
+
   readonly neighbour: string
   readonly neighbourLabel: string
 
@@ -116,6 +124,11 @@ export const palettes = {
     navaidFreq: '#5f5a48',
     hold: '#8a4e00',
 
+    // VGA dark green: the one bold ink the rest of this palette leaves
+    // free, so traffic cannot be mistaken for a runway or a boundary.
+    target: '#0e4a1c',
+    trail: '#5f7a66',
+
     neighbour: '#46422f',
     neighbourLabel: '#3a3625',
 
@@ -170,6 +183,9 @@ export const palettes = {
     // Phosphor amber, for the fixes traffic is actually holding at.
     hold: '#ffb000',
 
+    target: '#40ff80',
+    trail: '#217a42',
+
     neighbour: '#5a6b7a',
     neighbourLabel: '#8092a0',
 
@@ -222,6 +238,9 @@ export const palettes = {
     navaidLabel: '#ffc860',
     navaidFreq: '#96702a',
     hold: '#fff2cc',
+
+    target: '#ffe9bd',
+    trail: '#a87516',
 
     neighbour: '#96702a',
     neighbourLabel: '#c2913a',

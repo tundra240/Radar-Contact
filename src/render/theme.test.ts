@@ -165,6 +165,17 @@ describe('palette legibility', () => {
       it('keeps primary text and runways well clear of the ground', () => {
         expect(contrast(p.text, p.bg), 'text').toBeGreaterThanOrEqual(4.5)
         expect(contrast(p.runway, p.bg), 'runway').toBeGreaterThanOrEqual(4.5)
+        // Traffic is read more often than anything else on the display, so
+        // it is held to the text threshold rather than the symbol one.
+        expect(contrast(p.target, p.bg), 'target').toBeGreaterThanOrEqual(4.5)
+      })
+
+      it('keeps the trail visible but quieter than the target', () => {
+        const trail = contrast(p.trail, p.bg)
+        expect(trail, 'trail too invisible').toBeGreaterThan(1.5)
+        // A history that competes with the target turns a scope into a
+        // smear. Dimmer than the target is the whole requirement.
+        expect(trail, 'trail louder than target').toBeLessThan(contrast(p.target, p.bg))
       })
 
       it('keeps every symbology colour readable on the ground', () => {

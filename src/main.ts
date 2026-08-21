@@ -257,7 +257,6 @@ function start(
 
   const bay = new StripBay({
     mount: shell,
-    demo: true,
     quickDescendFt: airport.sector.interceptAltMaxFt,
     quickSpeedKts: 160,
     defaultRunway: airport.arrivalRunways[0]?.id ?? '27R',
@@ -331,13 +330,20 @@ function start(
       if (!dirty && !simAdvanced) return
       dirty = false
       simAdvanced = false
-      drawScope(ctx, cam, airport, overlays, {
-        clock: loop.clock,
-        speed: loop.speed,
-        paused: loop.paused,
-        traffic: { spawned: spawner.spawned, held: spawner.deferred },
-        controller,
-      })
+      drawScope(
+        ctx,
+        cam,
+        airport,
+        overlays,
+        {
+          clock: loop.clock,
+          speed: loop.speed,
+          paused: loop.paused,
+          traffic: { spawned: spawner.spawned, held: spawner.deferred },
+          controller,
+        },
+        { aircraft: traffic, selected },
+      )
     },
   })
 

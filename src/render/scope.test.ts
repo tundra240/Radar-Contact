@@ -4,7 +4,8 @@ import { loadAirport, runwayScaleAt } from '../data/airport'
 import raw from '../data/egll.json'
 import { drawScope } from './scope'
 import { OVERLAY_ITEMS, OVERLAY_PRESETS, type Overlays } from './overlays'
-import type { ScopeStatus } from './scope'
+import type { ScopeContacts, ScopeStatus } from './scope'
+import type { Aircraft } from '../sim/types'
 import { PALETTE_ORDER, palettes, setPalette } from './theme'
 
 /**
@@ -54,6 +55,7 @@ function recorder(): {
       path = []
     },
     closePath: noop,
+    rect: noop,
     moveTo: (x: number, y: number) => {
       path.push({ x, y })
     },
@@ -973,5 +975,78 @@ describe('the map underneath', () => {
     // The total is read off OVERLAY_ITEMS, so it cannot go stale.
     const { labels } = render(1400, 800, 80)
     expect(labels.some((s) => s.includes(`/${OVERLAY_ITEMS.length}`))).toBe(true)
+  })
+})
+
+/* ------------------------------------------------------------- traffic */
+
+/**
+ * The scope is wired to the simulation through one argument. These tests
+ * are about that seam: given contacts, the radar picture must contain
+ * them, and given none it must be exactly what it was before.
+ */
+describe('traffic on the scope', () => {
+  function plane(over: Partial<Aircraft> = {}): Aircraft {
+    return {
+      callsign: 'BAW42',
+      type: 'A320',
+      wake: 'M',
+      pos: { x: 8, y: 8 },
+      altFt: 9000,
+      hdg: 225,
+      gsKts: 250,
+      vsFpm: -1500,
+      clearedHdg: 225,
+      clearedAltFt: 5000,
+      clearedSpdKts: 220,
+      navMode: 'VECTOR',
+      clearedApproach: null,
+      originFix: 'LAM',
+      trail: [
+        { x: 9, y: 9 },
+        { x: 10, y: 10 },
+      ],
+      trailAt: 0,
+      spawnedAt: 0,
+      ...over,
+    }
+  }
+
+  function withTraffic(contacts: ScopeContacts) {
+    const cam = new Camera({ x: 0, y: 0 }, 30, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.full, STATUS, contacts)
+    return { ...rec, cam, labels: rec.texts.map((t) => t.s) }
+  }
+
+  it('puts the callsign and level on the display', () => {
+    const { labels } = withTraffic({ aircraft: [plane()], selected: null })
+    expect(labels).toContain('BAW42')
+    expect(labels).toContain('090v050')
+  })
+
+  it('draws the target where the coordinate pipeline says it is', () => {
+    const r = withTraffic({ aircraft: [plane({ pos: { x: 8, y: 8 } })] as Aircraft[], selected: null })
+    const p = r.cam.worldToScreen({ x: 8, y: 8 })
+    const block = at(r.texts, 'BAW42')
+    // The block sits beside the target, not somewhere else on the scope.
+    expect(Math.hypot(block.x - p.x, block.y - p.y)).toBeLessThan(40)
+  })
+
+  it('shows nothing extra on an empty scope', () => {
+    const empty = withTraffic({ aircraft: [], selected: null })
+    const none = render(1000, 600, 30)
+    expect(empty.labels).toEqual(none.labels)
+  })
+
+  it('draws traffic above the airspace it is flying through', () => {
+    // The callsign is written after the airspace labels, so it cannot be
+    // hidden underneath one.
+    const r = withTraffic({ aircraft: [plane()], selected: null })
+    const callsign = r.texts.findIndex((t) => t.s === 'BAW42')
+    const airspace = r.texts.findIndex((t) => t.s.includes('CTA') || t.s.includes('TMA'))
+    expect(callsign).toBeGreaterThan(-1)
+    if (airspace > -1) expect(callsign).toBeGreaterThan(airspace)
   })
 })
