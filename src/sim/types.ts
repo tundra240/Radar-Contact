@@ -1,4 +1,4 @@
-import type { Vec2NM } from '../core/geo'
+import { distanceNM, type Vec2NM } from '../core/geo'
 import type { TurnDirection, WakeCategory } from '../data/airport'
 
 /**
@@ -49,6 +49,17 @@ export interface HoldClearance {
   readonly turns: TurnDirection
   readonly legMins: number
 }
+
+/**
+ * Beyond this from its fix, an aircraft carrying a hold is still on its way
+ * there rather than established in the pattern.
+ *
+ * A racetrack is about five miles across at holding speed and six and a
+ * half at the fastest an arrival enters, so this clears the widest pattern
+ * without needing the geometry -- and an arrival appears a good deal
+ * further out than that, so the two states are never confused.
+ */
+const JOINING_NM = 7
 
 /** Which way the Mode C readout is moving. */
 export type AltitudeTrend = 'climb' | 'descend' | 'level'
@@ -118,7 +129,14 @@ export function statusText(a: Aircraft): string {
       // The hold it was sent to, not the one it arrived over -- they are
       // usually the same fix and occasionally are not.
       const fix = a.hold?.fix ?? a.originFix
-      return fix === null || fix === undefined ? 'HOLDING' : `HOLDING ${fix}`
+      if (fix === null || fix === undefined) return 'HOLDING'
+      // Arrivals route to their fix before they get there, and "HOLDING"
+      // for something twelve miles away would be a lie about the one thing
+      // the controller is deciding: whether it needs dealing with yet.
+      if (a.hold !== null && distanceNM(a.pos, a.hold.posNM) > JOINING_NM) {
+        return `TO ${fix}`
+      }
+      return `HOLDING ${fix}`
     }
     case 'VECTOR':
       return 'VECTORING'

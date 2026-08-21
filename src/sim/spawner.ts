@@ -1,9 +1,9 @@
 import type { Clock } from '../core/loop'
-import { bearingDeg, distanceNM, type Vec2NM } from '../core/geo'
+import { advance, bearingDeg, distanceNM, normalizeHeading, type Vec2NM } from '../core/geo'
 import { makeRng, type Rng } from '../core/rng'
 import type { Airport, Navaid } from '../data/airport'
 import { FlightGenerator } from './flightgen'
-import type { Aircraft } from './types'
+import type { Aircraft, HoldClearance } from './types'
 
 /**
  * Arrival traffic flow.
@@ -27,6 +27,20 @@ import type { Aircraft } from './types'
 
 /** World origin, which is the airport reference point. */
 const ARP: Vec2NM = { x: 0, y: 0 }
+
+/**
+ * Levels in a stack are a thousand feet apart, so two aircraft holding
+ * over the same fix are never at the same level. This is also the vertical
+ * distance that counts as separated when deciding whether the entry gate
+ * is clear.
+ */
+const STACK_STEP_FT = 1000
+
+/** A place to put an arrival: which fix, and which level of its stack. */
+interface Slot {
+  readonly fix: Navaid
+  readonly altFt: number
+}
 
 export interface SpawnerOptions {
   readonly airport: Airport
@@ -125,13 +139,13 @@ export class Spawner {
       return []
     }
 
-    const fix = this.chooseFix(clock, existing, { ignoreCooldown: false })
-    if (!fix) {
+    const slot = this.chooseSlot(clock, existing, { ignoreCooldown: false })
+    if (!slot) {
       this.hold()
       return []
     }
 
-    return [this.release(fix, clock, existing)]
+    return [this.release(slot, clock, existing)]
   }
 
   /**
@@ -149,18 +163,18 @@ export class Spawner {
       return []
     }
 
-    const fix = this.chooseFix(clock, existing, { ignoreCooldown: true })
-    if (!fix) {
+    const slot = this.chooseSlot(clock, existing, { ignoreCooldown: true })
+    if (!slot) {
       this.deferCount += 1
       return []
     }
 
-    return [this.release(fix, clock, existing)]
+    return [this.release(slot, clock, existing)]
   }
 
-  private release(fix: Navaid, clock: Clock, existing: readonly Aircraft[]): Aircraft {
-    const aircraft = this.build(fix, clock, existing)
-    this.lastUsedAt.set(fix.name, clock.elapsedSeconds)
+  private release(slot: Slot, clock: Clock, existing: readonly Aircraft[]): Aircraft {
+    const aircraft = this.build(slot, clock, existing)
+    this.lastUsedAt.set(slot.fix.name, clock.elapsedSeconds)
     this.spawnCount += 1
     // A release resets the cadence either way, so a manual one is not
     // immediately followed by an automatic one.
@@ -187,35 +201,142 @@ export class Spawner {
   }
 
   /**
-   * An eligible fix has no traffic close to it and has not just been used.
-   * Returns null when every fix is busy, which is the signal to hold.
+   * A place to put an arrival: a fix, and a level in its stack.
+   *
+   * Both, together, because they are not independent. An arrival holds over
+   * its fix rather than passing through it, so what makes a fix usable is
+   * not that the airspace over it is empty -- it will not be, for long --
+   * but that there is a level free in the stack.
+   *
+   * Returns null when every fix is full, which is the signal to hold the
+   * release back.
    */
-  private chooseFix(
+  private chooseSlot(
     clock: Clock,
     existing: readonly Aircraft[],
     opts: { ignoreCooldown: boolean },
-  ): Navaid | null {
+  ): Slot | null {
     const t = this.airport.traffic
-    const eligible = this.fixes.filter((fix) => {
+    const slots: Slot[] = []
+
+    for (const fix of this.fixes) {
       if (!opts.ignoreCooldown) {
         const last = this.lastUsedAt.get(fix.name)
-        if (last !== undefined && clock.elapsedSeconds - last < t.minFixSpacingSeconds) {
-          return false
-        }
+        if (last !== undefined && clock.elapsedSeconds - last < t.minFixSpacingSeconds) continue
       }
-      return !existing.some((a) => distanceNM(a.pos, fix.posNM) < t.minFixSpacingNM)
-    })
 
-    if (eligible.length === 0) return null
-    return this.rng.pick(eligible)
+      const altFt = this.entryLevel(fix, existing)
+      if (altFt === null) continue
+
+      // Nothing already sitting where this one would appear, at this
+      // level. Traffic a thousand feet away is separated -- that is the
+      // entire point of a stack -- so only a conflict at the same level
+      // blocks the release, and the four fixes do not throttle each other
+      // through airspace they share.
+      const gate = this.entryPoint(fix)
+      const blocked = existing.some(
+        (a) =>
+          distanceNM(a.pos, gate) < t.minFixSpacingNM &&
+          Math.abs(a.altFt - altFt) < STACK_STEP_FT,
+      )
+      if (blocked) continue
+
+      slots.push({ fix, altFt })
+    }
+
+    if (slots.length === 0) return null
+    return this.rng.pick(slots)
   }
 
-  private build(fix: Navaid, clock: Clock, existing: readonly Aircraft[]): Aircraft {
+  /**
+   * Where an arrival appears: out along the hold's inbound leg, so it is
+   * routing to the fix when you first see it rather than materialising on
+   * top of it.
+   */
+  private entryPoint(fix: Navaid): Vec2NM {
+    return advance(
+      fix.posNM,
+      normalizeHeading(this.inboundTrue(fix) + 180),
+      this.airport.traffic.entryDistanceNM,
+    )
+  }
+
+  /**
+   * The track flown towards the fix. Off the published hold where there is
+   * one, and from the geometry where there is not, so a fix without a
+   * pattern still produces an arrival pointed at the field.
+   */
+  private inboundTrue(fix: Navaid): number {
+    return fix.hold?.inboundTrue ?? bearingDeg(fix.posNM, ARP)
+  }
+
+  /** The pattern an arrival carries to its fix, if that fix has one. */
+  private clearanceFor(fix: Navaid): HoldClearance | null {
+    if (fix.hold === null) return null
+    return {
+      fix: fix.name,
+      posNM: fix.posNM,
+      inboundTrue: fix.hold.inboundTrue,
+      turns: fix.hold.turns,
+      legMins: fix.hold.legMins,
+    }
+  }
+
+  /**
+   * The level an arrival joins the stack at, or null when it is full.
+   *
+   * A stack is entered from the top: an arrival goes in above everything
+   * already holding, and is descended through the layers as the ones below
+   * it are taken out. If the band is exhausted upwards but there are gaps
+   * lower down -- because an aircraft was pulled out of the middle -- it
+   * takes the lowest gap instead. Refusing an arrival while a level sits
+   * empty would starve the flow to no purpose.
+   */
+  private entryLevel(fix: Navaid, existing: readonly Aircraft[]): number | null {
+    const levels = this.stackLevels(fix)
+    if (levels.length === 0) return null
+
+    const used = new Set<number>()
+    for (const a of existing) {
+      // Holding at THIS fix, by the clearance it is carrying. An aircraft
+      // vectored out of the hold releases its level in the same moment,
+      // because the clearance is what goes.
+      if (a.hold?.fix !== fix.name) continue
+      // Where it is going, not where it is: an aircraft descending to 7,000
+      // owns 7,000 from the moment it is told to.
+      used.add(Math.round(a.clearedAltFt / STACK_STEP_FT) * STACK_STEP_FT)
+    }
+
+    const free = levels.filter((ft) => !used.has(ft))
+    if (free.length === 0) return null
+    const top = used.size === 0 ? -Infinity : Math.max(...used)
+    return free.find((ft) => ft > top) ?? (free[0] as number)
+  }
+
+  /** Every thousand-foot level inside the fix's band and the sector. */
+  private stackLevels(fix: Navaid): readonly number[] {
+    const band = fix.entry
+    const sector = this.airport.sector
+    const floor = Math.max(band?.minAltFt ?? sector.floorFt, sector.floorFt)
+    const ceiling = Math.min(band?.maxAltFt ?? sector.ceilingFt, sector.ceilingFt)
+
+    const out: number[] = []
+    for (
+      let ft = Math.ceil(floor / STACK_STEP_FT) * STACK_STEP_FT;
+      ft <= ceiling;
+      ft += STACK_STEP_FT
+    ) {
+      out.push(ft)
+    }
+    return out
+  }
+
+  private build(slot: Slot, clock: Clock, existing: readonly Aircraft[]): Aircraft {
     const airport = this.airport
+    const { fix, altFt } = slot
     // Who the flight is comes from the generator; where and how it enters
     // is this module's business.
     const flight = this.flights.next(this.rng, new Set(existing.map((a) => a.callsign)))
-    const altFt = this.entryAltitude(fix)
 
     // Groundspeed only for now: indicated airspeed and the wind that
     // separates the two are not modelled yet, so the sector speed limit is
@@ -228,29 +349,32 @@ export class Spawner {
       gsKts = Math.min(gsKts, airport.sector.speedLimitKts)
     }
 
-    // Inbound heading, computed from the fix to the airport reference
-    // point, so an arrival is flying towards the field the moment it
-    // appears. Taken from geometry rather than off the hold, so a fix
-    // without a published hold still works.
-    const hdg = bearingDeg(fix.posNM, ARP)
+    // An arrival arrives already holding: it appears out along the hold's
+    // inbound leg, tracks direct to the fix, and enters the pattern when it
+    // gets there -- all of which sim/hold.ts does from the clearance alone,
+    // with no entry procedure to choose. So traffic parks itself over the
+    // right fix at the right level and waits to be dealt with, which is
+    // what an approach controller is actually handed.
+    const hold = this.clearanceFor(fix)
+    const hdg = this.inboundTrue(fix)
 
     return {
       callsign: flight.callsign,
       type: flight.type,
       wake: flight.wake,
-      pos: fix.posNM,
+      pos: this.entryPoint(fix),
       altFt,
       hdg,
       gsKts,
       vsFpm: 0,
-      // Arrives level, tracking the hold's inbound leg towards the field,
-      // and under nobody's instruction yet beyond what it is already doing.
-      clearedHdg: hdg,
+      // Nobody has vectored it. In the hold it is navigating itself, so a
+      // cleared heading would be a vector on the strip that nothing flies.
+      clearedHdg: hold === null ? hdg : null,
       clearedAltFt: altFt,
       clearedSpdKts: gsKts,
-      navMode: 'VECTOR',
+      navMode: hold === null ? 'VECTOR' : 'HOLD',
       clearedApproach: null,
-      hold: null,
+      hold,
       originFix: fix.name,
       trail: [],
       trailAt: clock.elapsedSeconds,
@@ -258,17 +382,4 @@ export class Spawner {
     }
   }
 
-  /** A whole thousand inside the fix's band, kept within the sector. */
-  private entryAltitude(fix: Navaid): number {
-    const band = fix.entry
-    const sector = this.airport.sector
-    const floor = Math.max(band?.minAltFt ?? sector.floorFt, sector.floorFt)
-    const ceiling = Math.min(band?.maxAltFt ?? sector.ceilingFt, sector.ceilingFt)
-    if (ceiling <= floor) return floor
-
-    const lowest = Math.ceil(floor / 1000)
-    const highest = Math.floor(ceiling / 1000)
-    if (highest < lowest) return floor
-    return this.rng.range(lowest, highest) * 1000
-  }
 }

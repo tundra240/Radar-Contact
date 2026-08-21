@@ -139,9 +139,16 @@ npm run dev        # http://localhost:5173
 On the scope: drag to pan, wheel to zoom, `R` to reset the view, space to pause, `D` to cycle
 the display schemes, and `M` to open the menu (`O` does too).
 
-Arrivals are released onto the four holds by `sim/spawner.ts`, on a timer that tightens as the
-session goes on, and fly from there. The `TRAFFIC n HELD n` readout on the status bar shows how
-many are airborne and how many the spawner is holding back because no fix is clear.
+Arrivals are released by `sim/spawner.ts` on a timer that tightens as the session goes on. Each
+one appears twelve miles out along its hold's inbound leg, tracks **direct to its VOR, and
+enters the hold when it gets there** -- so traffic parks itself over the four fixes, stacked in
+1,000 ft layers, and waits for you. Nothing crosses the sector unless you send it somewhere.
+
+The spawner picks a fix *and* a level, so two aircraft holding over the same VOR are never at
+the same altitude, and vectoring one out frees its level for the next arrival. A sector nobody
+works fills to the concurrency cap and then holds releases back, which is why the
+`TRAFFIC n HELD n` readout climbs -- there is genuinely nowhere to put them until you clear a
+stack.
 
 ### Issuing clearances
 

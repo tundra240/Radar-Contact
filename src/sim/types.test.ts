@@ -98,3 +98,33 @@ describe('statusText', () => {
 })
 
 
+
+describe('statusText for a hold', () => {
+  const pattern = {
+    fix: 'LAM',
+    posNM: { x: 13, y: 9 },
+    inboundTrue: 245,
+    turns: 'right' as const,
+    legMins: 1,
+  }
+
+  it('says HOLDING once it is in the pattern', () => {
+    const held = { ...base, navMode: 'HOLD' as const, hold: pattern, pos: { x: 14, y: 10 } }
+    expect(statusText(held)).toBe('HOLDING LAM')
+  })
+
+  it('says TO while it is still routing to the fix', () => {
+    // An arrival appears a dozen miles out. Calling that "holding" would
+    // mislead about the one thing being decided: whether it needs dealing
+    // with yet.
+    const joining = { ...base, navMode: 'HOLD' as const, hold: pattern, pos: { x: 25, y: 20 } }
+    expect(statusText(joining)).toBe('TO LAM')
+  })
+
+  it('falls back to the entry fix when there is no pattern on the record', () => {
+    expect(statusText({ ...base, navMode: 'HOLD' as const, hold: null, originFix: 'BIG' }))
+      .toBe('HOLDING BIG')
+    expect(statusText({ ...base, navMode: 'HOLD' as const, hold: null, originFix: null }))
+      .toBe('HOLDING')
+  })
+})

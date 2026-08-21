@@ -677,21 +677,50 @@ third of a pixel at 40 NM.
 ### The arrival spawner
 
 `sim/spawner.ts` reads the holding fixes and their entry bands from the airport config and
-releases arrivals onto them. Two things make it a flow manager rather than a metronome:
+releases arrivals onto them.
 
-- **It will not stack an arrival on top of existing traffic.** A fix with an aircraft within
-  `minFixSpacingNM`, or one used inside `minFixSpacingSeconds`, is skipped; if no fix is
-  clear, or the sector is at `maxConcurrent`, the arrival is held and retried. Spawning
-  regardless would hand the controller a separation loss that existed before they touched
-  anything, which is the worst kind of unfair.
+**An arrival arrives already holding.** It appears `entryDistanceNM` out along its hold's
+inbound leg, tracks direct to the fix, and enters the pattern when it gets there -- all of
+which `sim/hold.ts` does from the clearance alone, with no entry procedure to choose. So the
+controller is handed what an approach controller is actually handed: traffic parked over four
+fixes, at assigned levels, waiting to be dealt with. Nothing crosses the sector unless somebody
+sends it somewhere.
+
+That changed what "is this fix usable" means, because the airspace over a fix is now occupied
+by design. The spawner picks a **slot** -- a fix *and* a level in its stack -- not just a fix:
+
+- **Levels are a thousand feet apart and one aircraft each.** A level is occupied by whoever is
+  holding at that fix, read off the clearance they are carrying, and by their *cleared* level
+  rather than their current one, so an aircraft descending to 7,000 owns 7,000 from the moment
+  it is told to. Vectoring an aircraft out of the hold frees its level in the same instant,
+  because the clearance is what goes.
+- **A stack is entered from the top**, and fills the lowest gap instead once the band is
+  exhausted upwards -- refusing an arrival while a level sits empty would starve the flow to no
+  purpose.
+- **The gate check is vertical as well as lateral.** An arrival is refused if traffic is within
+  `minFixSpacingNM` of where it would appear *and* within a thousand feet of it. Checking
+  laterally alone would have the four stacks throttling each other through airspace they are
+  separated in, which is the entire point of a stack.
+- **It still refuses rather than spawning regardless.** No slot, or the sector at
+  `maxConcurrent`, and the arrival is held and retried. Spawning anyway would hand the
+  controller a separation loss that existed before they touched anything, which is the worst
+  kind of unfair.
 - **It runs on the tick clock, not the wall clock.** So it follows the rate control, stops
   dead when paused, and produces the same stream for a given seed however the session was
   played.
 
+A consequence worth stating plainly: a sector nobody works fills to `maxConcurrent` and stops.
+That is correct. The releases being held back are held back because there is genuinely nowhere
+to put them, and the flow resumes the moment traffic is taken out of a stack -- there is an
+end-to-end test that vectors the lowest aircraft out once a minute and asserts exactly that.
+
 The interval ramps from `initialIntervalSeconds` down to `minIntervalSeconds` over
-`rampMinutes`, with jitter either side so arrivals are not metronomic. Entry altitude is a
-whole thousand inside the fix's band, clamped to the sector; groundspeed is the type's cruise,
-reduced to the sector limit below the limit altitude.
+`rampMinutes`, with jitter either side so arrivals are not metronomic. Groundspeed is the
+type's cruise, reduced to the sector limit below the limit altitude.
+
+`statusText` distinguishes `TO LAM` from `HOLDING LAM` on a distance threshold clear of the
+widest pattern, because an arrival still a dozen miles from its fix is not holding yet, and
+whether something needs dealing with yet is the question the strip is there to answer.
 
 Aircraft types and airlines are weighted, so the arrival stream is mostly A320-family with
 British Airways prominent, which is what actually fills Heathrow. Those weights, the entry

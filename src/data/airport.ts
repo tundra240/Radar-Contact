@@ -106,6 +106,12 @@ export interface TrafficConfig {
    * below the limit altitude.
    */
   readonly entrySpeedKts: number
+  /**
+   * How far outside its fix an arrival appears, along the hold's inbound
+   * leg -- so it is routing to the fix when you first see it rather than
+   * materialising on top of it.
+   */
+  readonly entryDistanceNM: number
   readonly maxConcurrent: number
   /** A fix with traffic this close is not given another arrival. */
   readonly minFixSpacingNM: number
@@ -599,6 +605,7 @@ function parseTraffic(raw: unknown, knownTypes: ReadonlySet<string>): TrafficCon
     rampMinutes: num(o['rampMinutes'], 'traffic.rampMinutes'),
     intervalJitter: jitter,
     entrySpeedKts: num(o['entrySpeedKts'], 'traffic.entrySpeedKts'),
+    entryDistanceNM: num(o['entryDistanceNM'], 'traffic.entryDistanceNM'),
     maxConcurrent,
     minFixSpacingNM: num(o['minFixSpacingNM'], 'traffic.minFixSpacingNM'),
     minFixSpacingSeconds: num(o['minFixSpacingSeconds'], 'traffic.minFixSpacingSeconds'),

@@ -17663,6 +17663,7 @@
         ]
       }
     ],
-    "entrySpeedKts": 220
+    "entrySpeedKts": 220,
+    "entryDistanceNM": 12
   }
 }

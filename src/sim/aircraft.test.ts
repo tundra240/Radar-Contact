@@ -273,11 +273,11 @@ describe('the flow, end to end', () => {
    * has crossed the sector, then let the spawner see the world as it now
    * is. Nothing here is a stand-in.
    */
-  function runSector(seconds: number, seed?: number) {
+  function runSector(seconds: number, opts: { seed?: number; work?: boolean } = {}) {
     const spawner =
-      seed === undefined
+      opts.seed === undefined
         ? new Spawner({ airport })
-        : new Spawner({ airport, rng: makeRng(seed) })
+        : new Spawner({ airport, rng: makeRng(opts.seed) })
 
     const step = 0.05
     const handoffRadius = airport.sector.radiusNM + 5
@@ -285,6 +285,7 @@ describe('the flow, end to end', () => {
     let handedOff = 0
     let emptyAfterFirst = 0
     let peak = 0
+    let worked = 0
     let firstSeen = false
     const counts: number[] = []
 
@@ -297,8 +298,26 @@ describe('the flow, end to end', () => {
       }
 
       const flown = traffic.map((a) => stepAircraft(a, step, elapsed))
-      const kept = flown.filter((a) => distanceNM(ORIGIN, a.pos) <= handoffRadius)
+      let kept = flown.filter((a) => distanceNM(ORIGIN, a.pos) <= handoffRadius)
       handedOff += flown.length - kept.length
+
+      // A controller, once a minute: take whatever is lowest in a stack and
+      // send it on its way. Crude, but it is the thing the simulation
+      // cannot do for itself, and without it nothing ever leaves a hold.
+      if (opts.work === true && i % (20 * 60) === 0) {
+        const next = kept
+          .filter((a) => a.navMode === 'HOLD')
+          .sort((x, y) => x.altFt - y.altFt)[0]
+        if (next !== undefined) {
+          const away = bearingDeg(ORIGIN, next.pos)
+          kept = kept.map((a) =>
+            a.callsign === next.callsign
+              ? { ...a, navMode: 'VECTOR' as const, hold: null, clearedHdg: away }
+              : a,
+          )
+          worked += 1
+        }
+      }
 
       const arrivals = spawner.update(step, clock, kept)
       traffic = arrivals.length > 0 ? [...kept, ...arrivals] : kept
@@ -309,19 +328,39 @@ describe('the flow, end to end', () => {
       counts.push(traffic.length)
     }
 
-    return { spawner, traffic, handedOff, emptyAfterFirst, peak, counts }
+    return { spawner, traffic, handedOff, emptyAfterFirst, peak, counts, worked }
   }
 
-  it('keeps releasing arrivals instead of stalling at four', () => {
-    // Before the physics step every fix stayed occupied, so the spacing
-    // rule refused to release a fifth aircraft and the flow stopped dead.
-    const { spawner } = runSector(1800)
-    expect(spawner.spawned).toBeGreaterThan(20)
+  it('fills the stacks and then waits, with nobody working the traffic', () => {
+    // Arrivals hold over their fixes until they are dealt with, so a
+    // sector left alone fills to the cap and stops. That is the intended
+    // behaviour, not a stall: the spawner is holding releases back because
+    // there is genuinely nowhere to put them.
+    const { spawner, traffic } = runSector(3600)
+    expect(spawner.spawned).toBe(airport.traffic.maxConcurrent)
+    expect(spawner.deferred).toBeGreaterThan(0)
+    expect(traffic.every((a) => a.navMode === 'HOLD')).toBe(true)
   })
 
-  it('hands traffic off the other side', () => {
-    const { handedOff } = runSector(1800)
+  it('every one of them ends up in a hold at its own fix', () => {
+    const { traffic } = runSector(3600)
+    expect(traffic.length).toBeGreaterThan(4)
+    for (const a of traffic) {
+      expect(a.hold?.fix, a.callsign).toBe(a.originFix)
+      // And parked over it rather than still routing in: the pattern is
+      // about five miles across at holding speed.
+      const fix = a.hold
+      if (!fix) throw new Error('no hold')
+      expect(distanceNM(a.pos, fix.posNM), a.callsign).toBeLessThan(8)
+    }
+  })
+
+  it('keeps releasing as fast as the stacks are cleared', () => {
+    // The loop that matters: hold, get dealt with, leave, be replaced.
+    const { spawner, handedOff, worked } = runSector(3600, { work: true })
+    expect(worked).toBeGreaterThan(20)
     expect(handedOff).toBeGreaterThan(5)
+    expect(spawner.spawned).toBeGreaterThan(airport.traffic.maxConcurrent)
   })
 
   it('never leaves the scope empty once traffic has started', () => {
@@ -329,8 +368,8 @@ describe('the flow, end to end', () => {
     expect(emptyAfterFirst).toBe(0)
   })
 
-  it('settles at a workload rather than filling up or draining', () => {
-    const { peak, counts } = runSector(1800)
+  it('settles at a workload once someone is working it', () => {
+    const { peak, counts } = runSector(3600, { work: true })
     expect(peak).toBeLessThanOrEqual(airport.traffic.maxConcurrent)
 
     // Over the second half of the run it should be holding a steady few
@@ -352,8 +391,12 @@ describe('the flow, end to end', () => {
   })
 
   it('is reproducible for a seed', () => {
-    const a = runSector(600, 31).traffic.map((x) => `${x.callsign}@${x.pos.x.toFixed(3)}`)
-    const b = runSector(600, 31).traffic.map((x) => `${x.callsign}@${x.pos.x.toFixed(3)}`)
+    const a = runSector(600, { seed: 31 }).traffic.map(
+      (x) => `${x.callsign}@${x.pos.x.toFixed(3)}`,
+    )
+    const b = runSector(600, { seed: 31 }).traffic.map(
+      (x) => `${x.callsign}@${x.pos.x.toFixed(3)}`,
+    )
     expect(a).toEqual(b)
     expect(a.length).toBeGreaterThan(0)
   })

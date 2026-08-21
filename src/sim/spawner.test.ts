@@ -53,6 +53,48 @@ function fly(
   return { world, all }
 }
 
+/** An aircraft parked exactly where a test needs one. */
+function parked(
+  callsign: string,
+  pos: { readonly x: number; readonly y: number },
+  altFt: number,
+  over: Partial<Aircraft> = {},
+): Aircraft {
+  return {
+    callsign,
+    type: 'A320',
+    wake: 'M',
+    pos,
+    altFt,
+    hdg: 270,
+    gsKts: 220,
+    vsFpm: 0,
+    clearedHdg: 270,
+    clearedAltFt: altFt,
+    clearedSpdKts: 220,
+    navMode: 'VECTOR',
+    clearedApproach: null,
+    hold: null,
+    originFix: null,
+    trail: [],
+    trailAt: 0,
+    spawnedAt: 0,
+    ...over,
+  }
+}
+
+/** Where an arrival for this fix appears: out along its inbound leg. */
+function gateOf(fix: { posNM: { x: number; y: number }; hold: { inboundTrue: number } | null }) {
+  const inbound = fix.hold?.inboundTrue ?? 0
+  return advancePos(fix.posNM, (inbound + 180) % 360, airport.traffic.entryDistanceNM)
+}
+
+/** The level an empty stack at this fix hands out first: its bottom. */
+function bottomOf(fix: { entry: { minAltFt: number } | null }): number {
+  const floor = Math.max(fix.entry?.minAltFt ?? 0, airport.sector.floorFt)
+  return Math.ceil(floor / 1000) * 1000
+}
+
 function makeSpawner(seed?: number): Spawner {
   return seed === undefined
     ? new Spawner({ airport })
@@ -203,19 +245,45 @@ describe('entry state', () => {
     for (const a of all) {
       const fix = airport.navaids.find((n) => n.name === a.originFix)
       expect(a.hdg, a.callsign).toBeCloseTo(fix?.hold?.inboundTrue ?? -1, 6)
-      // Under nobody's instruction yet beyond what it is already doing.
-      expect(a.clearedHdg, a.callsign).toBe(a.hdg)
       expect(a.clearedAltFt, a.callsign).toBe(a.altFt)
       expect(a.clearedSpdKts, a.callsign).toBe(a.gsKts)
+      // No cleared heading: in the hold it is navigating itself, so a
+      // vector on the strip would be one nothing is flying.
+      expect(a.clearedHdg, a.callsign).toBeNull()
     }
   })
 
-  it('arrives level, being vectored, with nothing behind it', () => {
+  it('appears out along the inbound leg, not on top of the fix', () => {
+    // The point of the whole thing: you see it routing to its VOR, rather
+    // than materialising over it.
+    for (const a of all) {
+      const fix = airport.navaids.find((n) => n.name === a.originFix)
+      if (!fix) throw new Error(`no fix for ${a.callsign}`)
+      expect(distanceNM(a.pos, fix.posNM), a.callsign)
+        .toBeCloseTo(airport.traffic.entryDistanceNM, 5)
+      // And pointing at it, so it is closing rather than drifting.
+      expect(bearingDeg(a.pos, fix.posNM), a.callsign).toBeCloseTo(a.hdg, 4)
+    }
+  })
+
+  it('arrives level, already holding, with nothing behind it', () => {
     for (const a of all) {
       expect(a.vsFpm, a.callsign).toBe(0)
-      expect(a.navMode, a.callsign).toBe('VECTOR')
+      // Holding from the moment it appears: it flies itself to the fix and
+      // enters the pattern with no instruction from anybody.
+      expect(a.navMode, a.callsign).toBe('HOLD')
+      expect(a.hold?.fix, a.callsign).toBe(a.originFix)
       expect(a.clearedApproach, a.callsign).toBeNull()
       expect(a.trail.length, a.callsign).toBe(0)
+    }
+  })
+
+  it('carries the published pattern for its own fix', () => {
+    for (const a of all) {
+      const fix = airport.navaids.find((n) => n.name === a.originFix)
+      expect(a.hold?.turns, a.callsign).toBe(fix?.hold?.turns)
+      expect(a.hold?.legMins, a.callsign).toBe(fix?.hold?.legMins)
+      expect(a.hold?.inboundTrue, a.callsign).toBeCloseTo(fix?.hold?.inboundTrue ?? -1, 6)
     }
   })
 
@@ -244,41 +312,62 @@ describe('entry state', () => {
 })
 
 describe('flow management', () => {
-  it('will not release an arrival on top of traffic at the fix', () => {
+  it('will not release an arrival on top of traffic at the entry gate', () => {
     // Otherwise the controller inherits a separation loss they had no hand
-    // in creating.
+    // in creating. The gate is where the arrival appears, so that is where
+    // the check belongs -- traffic over the fix itself is a stack, and a
+    // stack is the normal state of affairs now.
     const spawner = makeSpawner()
-    const lam = airport.navaids.find((n) => n.name === 'LAM')
-    expect(lam).toBeDefined()
-    if (!lam) return
-
-    // Park an aircraft on every fix, so nothing is eligible.
-    const blockers: Aircraft[] = spawner.entryFixes.map((fix, i) => ({
-      callsign: `BLK${i}`,
-      type: 'A320',
-      wake: 'M',
-      pos: fix.posNM,
-      altFt: 9000,
-      hdg: 270,
-      gsKts: 250,
-      vsFpm: 0,
-      clearedHdg: 270,
-      clearedAltFt: 9000,
-      clearedSpdKts: 250,
-      navMode: 'VECTOR',
-      clearedApproach: null,
-      hold: null,
-      originFix: fix.name,
-      trail: [],
-      trailAt: 0,
-      spawnedAt: 0,
-    }))
+    const blockers = spawner.entryFixes.map((fix, i) =>
+      parked(`BLK${i}`, gateOf(fix), bottomOf(fix)),
+    )
 
     const due = clockAt(airport.traffic.firstSpawnSeconds)
-    expect(
-      spawner.update(airport.traffic.firstSpawnSeconds, due, blockers),
-    ).toHaveLength(0)
+    expect(spawner.update(airport.traffic.firstSpawnSeconds, due, blockers)).toHaveLength(0)
     expect(spawner.deferred).toBeGreaterThan(0)
+  })
+
+  it('releases past a gate blocker that is a thousand feet away', () => {
+    // Vertical separation is the entire point of a stack. Refusing to
+    // release under traffic two thousand feet above would throttle the flow
+    // for a conflict that does not exist.
+    const spawner = makeSpawner()
+    const blockers = spawner.entryFixes.map((fix, i) =>
+      parked(`BLK${i}`, gateOf(fix), bottomOf(fix) + 2000),
+    )
+
+    const due = clockAt(airport.traffic.firstSpawnSeconds)
+    expect(spawner.update(airport.traffic.firstSpawnSeconds, due, blockers)).toHaveLength(1)
+  })
+
+  it('will not release into a stack with no level left', () => {
+    // Filling one fix only, so the concurrency cap cannot be what refuses:
+    // this is the stack rule on its own.
+    const spawner = makeSpawner()
+    const lam = spawner.entryFixes.find((n) => n.name === 'LAM')
+    if (!lam || lam.hold === null || lam.entry === null) throw new Error('no LAM hold')
+
+    const pattern = {
+      fix: 'LAM',
+      posNM: lam.posNM,
+      inboundTrue: lam.hold.inboundTrue,
+      turns: lam.hold.turns,
+      legMins: lam.hold.legMins,
+    }
+    const levels: number[] = []
+    for (let ft = bottomOf(lam); ft <= lam.entry.maxAltFt; ft += 1000) levels.push(ft)
+    expect(levels.length).toBeGreaterThan(1)
+
+    const full = levels.map((ft, i) =>
+      parked(`LAM${i}`, lam.posNM, ft, { navMode: 'HOLD', hold: pattern, originFix: 'LAM' }),
+    )
+    expect(full.length).toBeLessThan(airport.traffic.maxConcurrent)
+
+    // Every release now has to go somewhere else.
+    for (let i = 0; i < 12; i += 1) {
+      const released = spawner.spawnNow(clockAt(i * 120), full)
+      expect(released[0]?.originFix, `attempt ${i}`).not.toBe('LAM')
+    }
   })
 
   it('releases again once the fix is clear', () => {
@@ -450,26 +539,9 @@ describe('on command', () => {
   it('still refuses to put an aircraft on top of another', () => {
     // A manual trigger must not be able to manufacture a separation loss.
     const spawner = makeSpawner()
-    const blockers: Aircraft[] = spawner.entryFixes.map((fix, i) => ({
-      callsign: `BLK${i}`,
-      type: 'A320',
-      wake: 'M',
-      pos: fix.posNM,
-      altFt: 9000,
-      hdg: 270,
-      gsKts: 220,
-      vsFpm: 0,
-      clearedHdg: 270,
-      clearedAltFt: 9000,
-      clearedSpdKts: 220,
-      navMode: 'VECTOR',
-      clearedApproach: null,
-      hold: null,
-      originFix: fix.name,
-      trail: [],
-      trailAt: 0,
-      spawnedAt: 0,
-    }))
+    const blockers = spawner.entryFixes.map((fix, i) =>
+      parked(`BLK${i}`, gateOf(fix), bottomOf(fix)),
+    )
     expect(spawner.spawnNow(clockAt(0), blockers)).toHaveLength(0)
     expect(spawner.deferred).toBeGreaterThan(0)
   })
@@ -560,5 +632,70 @@ describe('the seed', () => {
   it('reports the seed it is running, so a session can be written down', () => {
     expect(new Spawner({ airport, seed: 777 }).seed).toBe(777)
     expect(new Spawner({ airport }).seed).toBe(airport.traffic.seed)
+  })
+})
+
+describe('the stack', () => {
+  /**
+   * Arrivals hold over their fix now, so two of them at the same fix have
+   * to be at different levels or the controller is handed an overlap they
+   * had no part in. Nothing moves in this run, so every arrival is still
+   * sitting in its stack at the end of it.
+   */
+  const { all } = fly(makeSpawner(), 3600, { move: false })
+
+  const byFix = (): Map<string, Aircraft[]> => {
+    const out = new Map<string, Aircraft[]>()
+    for (const a of all) {
+      if (a.originFix === null) continue
+      out.set(a.originFix, [...(out.get(a.originFix) ?? []), a])
+    }
+    return out
+  }
+
+  it('puts more than one aircraft over at least one fix', () => {
+    // Otherwise the rest of this proves nothing.
+    const stacked = [...byFix().values()].filter((list) => list.length > 1)
+    expect(stacked.length).toBeGreaterThan(0)
+  })
+
+  it('never gives two aircraft at a fix the same level', () => {
+    for (const [fix, list] of byFix()) {
+      const levels = list.map((a) => a.clearedAltFt)
+      expect(new Set(levels).size, fix).toBe(levels.length)
+    }
+  })
+
+  it('enters each one above the last, the way a stack fills', () => {
+    for (const [fix, list] of byFix()) {
+      const levels = list.map((a) => a.clearedAltFt)
+      for (let i = 1; i < levels.length; i += 1) {
+        expect(levels[i], `${fix} #${i}`).toBeGreaterThan(levels[i - 1] as number)
+      }
+    }
+  })
+
+  it('spaces the levels a thousand feet apart, on the thousand', () => {
+    for (const [fix, list] of byFix()) {
+      for (const a of list) {
+        expect(a.clearedAltFt % 1000, `${fix} ${a.callsign}`).toBe(0)
+      }
+      const levels = [...list.map((a) => a.clearedAltFt)].sort((x, y) => x - y)
+      for (let i = 1; i < levels.length; i += 1) {
+        expect((levels[i] as number) - (levels[i - 1] as number), fix)
+          .toBeGreaterThanOrEqual(1000)
+      }
+    }
+  })
+
+  it('keeps every level inside the published entry band for its fix', () => {
+    for (const [name, list] of byFix()) {
+      const fix = airport.navaids.find((n) => n.name === name)
+      if (!fix?.entry) throw new Error(`no entry band for ${name}`)
+      for (const a of list) {
+        expect(a.altFt, `${name} ${a.callsign}`).toBeGreaterThanOrEqual(fix.entry.minAltFt)
+        expect(a.altFt, `${name} ${a.callsign}`).toBeLessThanOrEqual(fix.entry.maxAltFt)
+      }
+    }
   })
 })
