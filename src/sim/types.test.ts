@@ -23,6 +23,7 @@ const base: Aircraft = {
   clearedSpdKts: 200,
   navMode: 'VECTOR',
   clearedApproach: null,
+  hold: null,
   originFix: 'LAM',
   trail: [],
   trailAt: 0,

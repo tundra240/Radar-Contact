@@ -236,6 +236,7 @@ export class Spawner {
       clearedSpdKts: gsKts,
       navMode: 'VECTOR',
       clearedApproach: null,
+      hold: null,
       originFix: fix.name,
       trail: [],
       trailAt: clock.elapsedSeconds,

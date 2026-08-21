@@ -1,5 +1,6 @@
 import { advance, angleDelta, normalizeHeading, type Vec2NM } from '../core/geo'
 import { autopilot, STANDARD_RATES, type Rates } from './autopilot'
+import { holdSteer } from './hold'
 import type { Aircraft } from './types'
 
 /**
@@ -84,7 +85,12 @@ export function stepAircraft(
   elapsedSeconds: number,
   rates: Rates = STANDARD_RATES,
 ): Aircraft {
-  const flown = autopilot(a, dtSeconds, rates)
+  // A holding aircraft navigates itself: the pattern picks the heading and
+  // the controller's cleared heading is set aside until a vector ends the
+  // hold. Level and speed are untouched, because a hold is a track and not
+  // a different aeroplane.
+  const steer = holdSteer(a)
+  const flown = autopilot(steer === null ? a : { ...a, clearedHdg: steer }, dtSeconds, rates)
   const pos = advancePosition(a.pos, a.hdg, flown.hdg, flown.gsKts, dtSeconds)
   const trail = stepTrail(a, a.pos, elapsedSeconds)
 

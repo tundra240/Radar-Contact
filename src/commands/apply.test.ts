@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { autopilot } from '../sim/autopilot'
-import type { Aircraft } from '../sim/types'
+import type { Aircraft, HoldClearance } from '../sim/types'
 import { parseCommandLine } from './parse'
 import { applyAll, applyCommand, type ApplyContext } from './apply'
 import type { Command } from './types'
@@ -26,6 +26,7 @@ const base: Aircraft = {
   clearedSpdKts: 240,
   navMode: 'VECTOR',
   clearedApproach: null,
+  hold: null,
   originFix: 'LAM',
   trail: [],
   trailAt: 0,
@@ -34,7 +35,24 @@ const base: Aircraft = {
 
 const ac = (over: Partial<Aircraft> = {}): Aircraft => ({ ...base, ...over })
 
-// EGLL's sector, and an A320's envelope.
+// EGLL's sector, an A320's envelope, and two of the four real holds.
+const HOLDS: Record<string, HoldClearance> = {
+  LAM: {
+    fix: 'LAM',
+    posNM: { x: 13.1, y: 9.4 },
+    inboundTrue: 249,
+    turns: 'right',
+    legMins: 1,
+  },
+  BIG: {
+    fix: 'BIG',
+    posNM: { x: 12.6, y: -8.9 },
+    inboundTrue: 302,
+    turns: 'right',
+    legMins: 1,
+  },
+}
+
 const ctx: ApplyContext = {
   floorFt: 1500,
   ceilingFt: 15000,
@@ -42,6 +60,7 @@ const ctx: ApplyContext = {
   speedLimitBelowFt: 10000,
   envelopeFor: (type) =>
     type === 'A320' ? { minSpeedKts: 140, maxSpeedKts: 250 } : null,
+  holdFor: (fix) => HOLDS[fix] ?? null,
 }
 
 function accept(command: Command, aircraft = base) {
@@ -204,10 +223,56 @@ describe('speed', () => {
   })
 })
 
+describe('holding', () => {
+  it('puts the aircraft in the hold and carries the pattern with it', () => {
+    const r = accept({ kind: 'hold', callsign: 'BAW178', fix: 'LAM' })
+    expect(r.aircraft.navMode).toBe('HOLD')
+    expect(r.aircraft.hold).toEqual(HOLDS['LAM'])
+    expect(r.readback).toBe('BAW178 HOLD AT LAM')
+  })
+
+  it('drops the cleared heading, which nothing is flying any more', () => {
+    const vectored = ac({ clearedHdg: 270 })
+    expect(accept({ kind: 'hold', callsign: 'BAW178', fix: 'LAM' }, vectored).aircraft.clearedHdg)
+      .toBe(null)
+  })
+
+  it('refuses a fix with no published hold, rather than inventing one', () => {
+    expect(refuse({ kind: 'hold', callsign: 'BAW178', fix: 'DET' })).toBe('DET has no published hold')
+  })
+
+  it('moves an aircraft from one hold to the other', () => {
+    const holding = accept({ kind: 'hold', callsign: 'BAW178', fix: 'LAM' }).aircraft
+    const moved = accept({ kind: 'hold', callsign: 'BAW178', fix: 'BIG' }, holding).aircraft
+    expect(moved.hold?.fix).toBe('BIG')
+  })
+
+  it('lets a vector take it out of the hold, pattern and all', () => {
+    const holding = accept({ kind: 'hold', callsign: 'BAW178', fix: 'LAM' }).aircraft
+    const out = accept({ kind: 'heading', callsign: 'BAW178', deg: 270 }, holding).aircraft
+    expect(out.navMode).toBe('VECTOR')
+    // Leaving the pattern on the record would steer it straight back round.
+    expect(out.hold).toBe(null)
+    expect(out.clearedHdg).toBe(270)
+  })
+
+  it('leaves the hold alone for a level or a speed', () => {
+    // Descending an aircraft in the hold is routine and must not take it
+    // out of the pattern.
+    const holding = accept({ kind: 'hold', callsign: 'BAW178', fix: 'LAM' }).aircraft
+    const lower = accept({ kind: 'altitude', callsign: 'BAW178', ft: 7000 }, holding).aircraft
+    expect(lower.navMode).toBe('HOLD')
+    expect(lower.hold?.fix).toBe('LAM')
+
+    const slower = accept({ kind: 'speed', callsign: 'BAW178', kts: 200 }, holding).aircraft
+    expect(slower.navMode).toBe('HOLD')
+    expect(slower.hold?.fix).toBe('LAM')
+  })
+})
+
 describe('the instructions that are not flyable yet', () => {
   it('says so plainly rather than accepting and doing nothing', () => {
     expect(refuse({ kind: 'approach', callsign: 'BAW178', runway: '27R' })).toMatch(/not flyable yet/)
-    expect(refuse({ kind: 'hold', callsign: 'BAW178', fix: 'LAM' })).toMatch(/not flyable yet/)
     expect(refuse({ kind: 'handoff', callsign: 'BAW178' })).toMatch(/nobody to hand off to/)
   })
 })

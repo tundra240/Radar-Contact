@@ -1001,6 +1001,7 @@ describe('traffic on the scope', () => {
       clearedSpdKts: 220,
       navMode: 'VECTOR',
       clearedApproach: null,
+      hold: null,
       originFix: 'LAM',
       trail: [
         { x: 9, y: 9 },
@@ -1048,5 +1049,88 @@ describe('traffic on the scope', () => {
     const airspace = r.texts.findIndex((t) => t.s.includes('CTA') || t.s.includes('TMA'))
     expect(callsign).toBeGreaterThan(-1)
     if (airspace > -1) expect(callsign).toBeGreaterThan(airspace)
+  })
+})
+
+describe('hold patterns', () => {
+  // The racetrack is stroked in the hold colour, and so is the stub it
+  // stands in for, so the two are told apart by shape: a stub is two points
+  // and a racetrack is a couple of dozen.
+  const holdStrokes = (r: { strokes: Stroke[] }) =>
+    r.strokes.filter((s) => s.style === palettes.beige.hold)
+  const racetracks = (r: { strokes: Stroke[] }) =>
+    holdStrokes(r).filter((s) => s.points.length > 8)
+  const stubs = (r: { strokes: Stroke[] }) =>
+    holdStrokes(r).filter((s) => s.points.length === 2)
+
+  it('draws one racetrack per holding fix', () => {
+    const { cam, ...rest } = render(1000, 600, 30)
+    void cam
+    expect(racetracks(rest)).toHaveLength(airport.holdingFixes.length)
+  })
+
+  it('hangs the pattern off its fix', () => {
+    // Every point of the ring is within a few miles of the fix it belongs
+    // to, which is what catches a pattern drawn about the wrong point.
+    const r = render(1000, 600, 30)
+    const fixes = airport.holdingFixes.map((f) => r.cam.worldToScreen(f.posNM))
+    for (const ring of racetracks(r)) {
+      const near = fixes.some((f) =>
+        ring.points.every((p) => Math.hypot(p.x - f.x, p.y - f.y) < r.cam.nmToPx(7)),
+      )
+      expect(near).toBe(true)
+    }
+  })
+
+  it('re-strokes the inbound leg heavier than the ring', () => {
+    // With two parallel legs, which one is flown towards the fix is the
+    // only thing that says which way round the pattern goes.
+    const r = render(1000, 600, 30)
+    const ring = racetracks(r)[0]
+    const leg = stubs(r)[0]
+    expect(ring).toBeDefined()
+    expect(leg).toBeDefined()
+    expect(Number(leg?.width)).toBeGreaterThan(Number(ring?.width))
+  })
+
+  it('puts the fix symbol on top of its own pattern', () => {
+    // Drawn before the navaids, so the hexagon is not buried.
+    const r = render(1000, 600, 30)
+    const firstRing = r.strokes.findIndex((s) => s.style === palettes.beige.hold && s.points.length > 8)
+    const firstNavaid = r.strokes.findIndex((s) => s.style === palettes.beige.navaid)
+    expect(firstRing).toBeGreaterThanOrEqual(0)
+    expect(firstNavaid).toBeGreaterThan(firstRing)
+  })
+
+  it('switches off from the overlay menu', () => {
+    const off = render(1000, 600, 30, { ...OVERLAY_PRESETS.full, holdPatterns: false })
+    expect(racetracks(off)).toHaveLength(0)
+  })
+
+  it('falls back to the stub when the pattern is off', () => {
+    // The inbound direction stays readable either way: the fix never loses
+    // its mark entirely.
+    const off = render(1000, 600, 30, { ...OVERLAY_PRESETS.full, holdPatterns: false })
+    expect(stubs(off)).toHaveLength(airport.holdingFixes.length)
+  })
+
+  it('falls back to the stub when zoomed too far out to draw one', () => {
+    // A 3.7 NM leg at the zoom ceiling is a handful of pixels, and a
+    // squashed oval reads worse than a stub.
+    const out = render(1000, 600, 80)
+    expect(racetracks(out)).toHaveLength(0)
+    expect(stubs(out)).toHaveLength(airport.holdingFixes.length)
+  })
+
+  it('keeps the holds out of the minimal picture entirely', () => {
+    const minimal = render(1000, 600, 30, OVERLAY_PRESETS.minimal)
+    expect(racetracks(minimal)).toHaveLength(0)
+  })
+
+  it('follows the palette', () => {
+    setPalette('amber')
+    const r = render(1000, 600, 30)
+    expect(r.strokes.some((s) => s.style === palettes.amber.hold && s.points.length > 8)).toBe(true)
+    setPalette('beige')
   })
 })

@@ -1,5 +1,5 @@
 import type { Vec2NM } from '../core/geo'
-import type { WakeCategory } from '../data/airport'
+import type { TurnDirection, WakeCategory } from '../data/airport'
 
 /**
  * The aircraft model.
@@ -33,6 +33,23 @@ export type NavMode =
   | 'LANDED'
   | 'HANDOFF'
 
+/**
+ * A holding pattern as it was cleared.
+ *
+ * The whole racetrack is copied onto the aircraft rather than looked up
+ * from the airport every tick, which is what lets the flight model know
+ * nothing about the world: a hold, like a heading, is just a clearance the
+ * aeroplane is carrying.
+ */
+export interface HoldClearance {
+  readonly fix: string
+  readonly posNM: Vec2NM
+  /** The inbound leg: the track flown TOWARD the fix, degrees true. */
+  readonly inboundTrue: number
+  readonly turns: TurnDirection
+  readonly legMins: number
+}
+
 /** Which way the Mode C readout is moving. */
 export type AltitudeTrend = 'climb' | 'descend' | 'level'
 
@@ -56,6 +73,8 @@ export interface Aircraft {
   readonly navMode: NavMode
   /** Runway identifier once an approach clearance has been issued. */
   readonly clearedApproach: string | null
+  /** The pattern being flown while `navMode` is HOLD, and null otherwise. */
+  readonly hold: HoldClearance | null
 
   /* bookkeeping */
   /** The feeder fix this arrival entered on. */
@@ -95,8 +114,12 @@ export function modeC(altFt: number): string {
  */
 export function statusText(a: Aircraft): string {
   switch (a.navMode) {
-    case 'HOLD':
-      return a.originFix ? `HOLDING ${a.originFix}` : 'HOLDING'
+    case 'HOLD': {
+      // The hold it was sent to, not the one it arrived over -- they are
+      // usually the same fix and occasionally are not.
+      const fix = a.hold?.fix ?? a.originFix
+      return fix === null || fix === undefined ? 'HOLDING' : `HOLDING ${fix}`
+    }
     case 'VECTOR':
       return 'VECTORING'
     case 'LOC_ARMED':

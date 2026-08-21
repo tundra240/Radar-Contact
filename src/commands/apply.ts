@@ -1,5 +1,5 @@
 import { normalizeHeading } from '../core/geo'
-import type { Aircraft } from '../sim/types'
+import type { Aircraft, HoldClearance } from '../sim/types'
 import type { Command } from './types'
 
 /**
@@ -35,6 +35,8 @@ export interface ApplyContext {
   readonly speedLimitBelowFt: number
   /** Null for a type the config does not carry, which skips the check. */
   readonly envelopeFor: (type: string) => Envelope | null
+  /** Null for a fix with no published hold, which refuses the clearance. */
+  readonly holdFor: (fix: string) => HoldClearance | null
 }
 
 export type Outcome =
@@ -56,13 +58,13 @@ export function applyCommand(
       return altitude(command.ft, aircraft, ctx)
     case 'speed':
       return speed(command.kts, aircraft, ctx)
-    // The approach and hold logic is Day 2 work, and the handoff needs
-    // somewhere to hand off to. Saying so is better than accepting a
-    // clearance and quietly doing nothing with it.
+    case 'hold':
+      return hold(command.fix, aircraft, ctx)
+    // The approach logic is Day 2 work, and the handoff needs somewhere to
+    // hand off to. Saying so is better than accepting a clearance and
+    // quietly doing nothing with it.
     case 'approach':
       return { ok: false, reason: `approach clearances are not flyable yet` }
-    case 'hold':
-      return { ok: false, reason: `holding instructions are not flyable yet` }
     case 'handoff':
       return { ok: false, reason: `there is nobody to hand off to yet` }
   }
@@ -79,6 +81,9 @@ function heading(deg: number, a: Aircraft): Outcome {
       // A vector takes an aircraft out of the hold. Nothing else about a
       // heading changes the phase of flight.
       navMode: a.navMode === 'HOLD' ? 'VECTOR' : a.navMode,
+      // And the pattern goes with it, or the next tick would steer the
+      // aircraft straight back round it.
+      hold: a.navMode === 'HOLD' ? null : a.hold,
     },
     readback: `${a.callsign} HEADING ${pad3(to)}`,
   }
@@ -139,6 +144,26 @@ function speed(kts: number, a: Aircraft, ctx: ApplyContext): Outcome {
     ok: true,
     aircraft: { ...a, clearedSpdKts: to },
     readback: `${a.callsign} SPEED ${to} KT`,
+  }
+}
+
+function hold(fix: string, a: Aircraft, ctx: ApplyContext): Outcome {
+  const clearance = ctx.holdFor(fix)
+  if (clearance === null) {
+    return { ok: false, reason: `${fix} has no published hold` }
+  }
+
+  return {
+    ok: true,
+    aircraft: {
+      ...a,
+      navMode: 'HOLD',
+      hold: clearance,
+      // The controller has stopped vectoring. Leaving a cleared heading on
+      // the record would show a vector on the strip that nothing is flying.
+      clearedHdg: null,
+    },
+    readback: `${a.callsign} HOLD AT ${clearance.fix}`,
   }
 }
 

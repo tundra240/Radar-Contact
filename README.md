@@ -193,9 +193,17 @@ desktop with a tan tube), **dark** (a colour CRT), and **amber** (a monochrome p
 `D` still cycles them without opening the menu, because that is a by-eye choice.
 
 **Overlays.** How much context is drawn -- coastline, the Thames, the FIR boundary, airspace,
-traffic zones, other aerodromes, other navaids, labels, range rings, centrelines -- with
-minimal / standard / full presets. The runways being worked, the holding fixes and the sector
-boundary are always drawn: they are the job rather than decoration.
+traffic zones, other aerodromes, other navaids, **hold patterns**, labels, range rings,
+centrelines -- with minimal / standard / full presets. The runways being worked, the holding
+fixes and the sector boundary are always drawn: they are the job rather than decoration.
+
+**Hold patterns** draws the racetrack at each of the four fixes, sized from the real geometry:
+a one-minute leg at 220 kt is 3.7 NM, and a rate-one turn at that speed gives a 1.2 NM radius,
+so the pattern comes out about 3.7 by 2.3 NM. That is a thin sliver rather than the fat oval a
+chart draws, because a chart is not to scale. The inbound leg is stroked heavier so you can see
+which way round it goes. With the layer off -- or zoomed too far out for the racetrack to be
+more than a smudge -- each fix keeps a short stub along its inbound leg instead, so the inbound
+direction is always readable.
 
 ## Where things are
 

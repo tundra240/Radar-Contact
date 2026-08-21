@@ -465,10 +465,49 @@ at 3 deg/sec, 1500 fpm and 1.5 kt/sec. An integration test runs the whole chain,
 line through the parser and the gate into the autopilot, and asserts the aircraft is actually
 turning ten seconds later.
 
-Approach, hold and handoff commands **parse but are refused**, with a reason saying they are
-not flyable yet. The alternative -- accepting a clearance and doing nothing with it -- would be
+Approach and handoff commands **parse but are refused**, with a reason saying they are not
+flyable yet. The alternative -- accepting a clearance and doing nothing with it -- would be
 worse than the refusal, and the parser supporting them now means the console and the tag menu
 already speak the same language for when `ils.ts` arrives.
+
+### Holding
+
+`sim/hold.ts` flies the racetrack, and **stores nothing**. Which of the four legs an aircraft
+is on -- inbound, turning outbound, outbound, turning inbound -- is read back out of where it
+is and which way it is pointing, every tick, from the pattern it is carrying:
+
+    inbound          heading within 90 deg of the inbound track, fix still ahead
+    turningOutbound  heading within 90 deg of the inbound track, fix behind
+    outbound         heading reciprocal-ish, less than one leg run off the fix
+    turningInbound   heading reciprocal-ish, a full leg run off the fix
+
+The alternative -- a stored leg plus a stored timer -- is state that has to be initialised on
+entry, advanced every tick, and cleared by every command that ends the hold. Miss any one of
+those and an aircraft circles a leg it finished ten minutes ago. Derived state cannot fall out
+of step with the aeroplane, and it means an aircraft told to hold **from anywhere, on any
+heading** joins the pattern without an entry procedure having to be chosen for it.
+
+Three consequences worth stating:
+
+- **The turns are not drawn, they are flown.** Aiming the aeroplane at the next track and
+  letting the autopilot's 3 deg/sec do the rest produces the two parallel legs and the two
+  half-circles, at the right width, for nothing. At 220 kt the pattern comes out 3.7 NM long
+  and 2.3 NM wide, and a circuit takes four minutes -- a minute inbound, a minute round, a
+  minute outbound, a minute round. A test flies twenty minutes of it and asserts exactly five
+  right-hand circuits, no drift, and the fix crossed every 240 seconds.
+- **A forced turn is led, not commanded.** The autopilot always takes the short way to what it
+  is given, and a 180 degree reversal has no short way. So the hold hands it a heading a
+  quarter-turn ahead and re-aims as the nose comes round, which makes the short way the
+  published way and removes the ambiguity.
+- **Legs are timed, so their length follows the speed.** `legMins` at the aircraft's current
+  groundspeed, which is the real behaviour: slow an aircraft in the hold and its pattern
+  shrinks.
+
+The clearance carries the whole pattern -- fix, position, inbound track, turn direction, leg
+time -- rather than a fix name the flight model would have to look up. That is what keeps
+`sim/` free of any knowledge of the airport: a hold, like a heading, is just something the
+aeroplane is carrying. A vector clears it, or the next tick would steer the aircraft straight
+back round the pattern.
 
 ### The tag menu
 
@@ -490,7 +529,7 @@ Two rules hold it together:
   `applyCommand` and asserts none of them is refused, because a menu that teaches limits the
   simulation does not have is worse than no menu.
 - **It does not decide what is flyable.** Every kind in the `Command` union appears, including
-  the three that are still refused. `applyCommand` is the one authority on that and it answers
+  the two that are still refused. `applyCommand` is the one authority on that and it answers
   in the console; greying items out here would put the same knowledge in two places, and the
   second copy would go stale the day approaches start working.
 

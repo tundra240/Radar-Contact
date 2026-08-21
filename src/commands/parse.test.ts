@@ -171,9 +171,10 @@ describe('refusals are specific', () => {
   })
 })
 
-describe('the instructions that are not flyable yet', () => {
-  // Parsed, so the console and the strip buttons speak the same language;
-  // refused by commands/apply.ts, which is where "not yet" belongs.
+describe('the rest of the instruction set', () => {
+  // Parsing and flying are separate questions. A hold parses and flies; an
+  // approach parses and is refused by commands/apply.ts, which is where
+  // "not yet" belongs.
   it('parses an approach clearance', () => {
     expect(commands('BAW178 ILS 27R')[0]).toEqual({
       kind: 'approach',

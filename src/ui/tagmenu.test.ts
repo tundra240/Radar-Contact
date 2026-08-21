@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { applyCommand, type ApplyContext, type Envelope } from '../commands/apply'
 import type { Command } from '../commands/types'
-import type { Aircraft } from '../sim/types'
+import type { Aircraft, HoldClearance } from '../sim/types'
 import {
   TagMenu,
   altitudeChoices,
@@ -31,6 +31,16 @@ const ENVELOPES: Record<string, Envelope> = {
 
 const envelopeFor = (type: string): Envelope | null => ENVELOPES[type] ?? null
 
+/** The four real EGLL holds, as the airport config carries them. */
+const HOLDS: Record<string, HoldClearance> = {
+  LAM: { fix: 'LAM', posNM: { x: 13.1, y: 9.4 }, inboundTrue: 249, turns: 'right', legMins: 1 },
+  BIG: { fix: 'BIG', posNM: { x: 12.6, y: -8.9 }, inboundTrue: 302, turns: 'right', legMins: 1 },
+  BNN: { fix: 'BNN', posNM: { x: -6.9, y: 14.6 }, inboundTrue: 116, turns: 'right', legMins: 1 },
+  OCK: { fix: 'OCK', posNM: { x: -5.6, y: -9.7 }, inboundTrue: 30, turns: 'right', legMins: 1 },
+}
+
+const holdFor = (fix: string): HoldClearance | null => HOLDS[fix] ?? null
+
 function ac(over: Partial<Aircraft> = {}): Aircraft {
   return {
     callsign: 'BAW178',
@@ -46,6 +56,7 @@ function ac(over: Partial<Aircraft> = {}): Aircraft {
     clearedSpdKts: 240,
     navMode: 'VECTOR',
     clearedApproach: null,
+    hold: null,
     originFix: 'LAM',
     trail: [],
     trailAt: 0,
@@ -166,7 +177,7 @@ describe('readout', () => {
  * teaches limits the simulation does not have -- is worse than no menu.
  */
 describe('every offer is accepted by commands/apply', () => {
-  const ctx: ApplyContext = { ...LIMITS, envelopeFor }
+  const ctx: ApplyContext = { ...LIMITS, envelopeFor, holdFor }
 
   it('accepts every level in the list', () => {
     for (const ft of altitudeChoices(LIMITS)) {
@@ -182,6 +193,13 @@ describe('every offer is accepted by commands/apply', () => {
       expect(applyCommand({ kind: 'heading', callsign: a.callsign, deg }, a, ctx).ok, `${deg}`).toBe(
         true,
       )
+    }
+  })
+
+  it('accepts every hold the menu lists', () => {
+    for (const fix of Object.keys(HOLDS)) {
+      const out = applyCommand({ kind: 'hold', callsign: 'BAW178', fix }, ac(), ctx)
+      expect(out.ok, fix).toBe(true)
     }
   })
 

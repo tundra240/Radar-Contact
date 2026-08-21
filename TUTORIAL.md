@@ -9,9 +9,10 @@ overlays and the rest of the interface are in [README.md](README.md); the code l
 [ARCHITECTURE.md](ARCHITECTURE.md).
 
 > **What is live today.** The scope, the map, the four holds and their geometry are drawn from
-> real data. Arrivals appear over the holds and fly, and they take headings, altitudes and
-> speeds. Approach clearances and the ILS are not built yet, so nothing lands: an aircraft
-> vectored to the centreline will fly through it. Every figure below marked *(config)* is read
+> real data. Arrivals appear over the holds and fly, and they take headings, altitudes, speeds
+> and holding instructions -- an aircraft sent to a hold flies the real racetrack and stays
+> there until you vector it out. Approach clearances and the ILS are not built yet, so nothing
+> lands: an aircraft vectored to the centreline will fly through it. Every figure below marked *(config)* is read
 > live from `src/data/egll.json`, so it is what the game actually enforces.
 
 ---
@@ -59,6 +60,7 @@ matter and you can give one instruction or all three.
 | Climb | `C90`, `CLIMB 9000` | Same field, said the other way |
 | Descend | `D30`, `DES 3000` | Same again |
 | Speed | `S180`, `SPD 180` | Reduce or increase to 180 kt |
+| Hold | `HOLD LAM` | Enter the published hold at LAM |
 
 Four things worth knowing:
 

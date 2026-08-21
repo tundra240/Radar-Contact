@@ -373,6 +373,20 @@ function start(
         ? null
         : { minSpeedKts: t.approachKts, maxSpeedKts: t.cruiseKts }
     },
+    holdFor: (fix) => {
+      const wanted = fix.trim().toUpperCase()
+      const navaid = airport.navaids.find((n) => n.name.toUpperCase() === wanted)
+      if (navaid === undefined || navaid.hold === null) return null
+      // The whole pattern travels with the clearance, so the flight model
+      // never has to reach back into the airport for it.
+      return {
+        fix: navaid.name,
+        posNM: navaid.posNM,
+        inboundTrue: navaid.hold.inboundTrue,
+        turns: navaid.hold.turns,
+        legMins: navaid.hold.legMins,
+      }
+    },
   }
 
   const commandConsole = new CommandConsole({

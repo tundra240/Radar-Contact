@@ -3,12 +3,13 @@ import raw from './egll.json'
 import {
   centrelinePoint,
   glideslopeAltFt,
+  holdRacetrack,
   loadAirport,
   type Airport,
   type Navaid,
   type Runway,
 } from './airport'
-import { angleDelta, bearingDeg, distanceNM } from '../core/geo'
+import { angleDelta, bearingDeg, distanceNM, type Vec2NM } from '../core/geo'
 
 const egll: Airport = loadAirport(raw)
 
@@ -816,5 +817,132 @@ describe('geography validation', () => {
 
   it('rejects two features sharing an id', () => {
     expect(load((g) => { g[1]!['id'] = 'coastline' })).toThrow(/duplicate "coastline"/)
+  })
+})
+
+describe('hold racetracks', () => {
+  const fixAt: Vec2NM = { x: 0, y: 0 }
+  const pattern = (
+    over: Partial<{ turns: 'left' | 'right'; legMins: number; inboundTrue: number }> = {},
+    speedKts = 220,
+  ) =>
+    holdRacetrack(
+      fixAt,
+      { turns: 'right', legMins: 1, inboundTrue: 270, inboundIsDerived: true, ...over },
+      { speedKts },
+    )
+
+  const span = (ring: readonly Vec2NM[]) => {
+    const xs = ring.map((p) => p.x)
+    const ys = ring.map((p) => p.y)
+    return {
+      minX: Math.min(...xs),
+      maxX: Math.max(...xs),
+      minY: Math.min(...ys),
+      maxY: Math.max(...ys),
+    }
+  }
+
+  it('starts at the beginning of the inbound leg and reaches the fix', () => {
+    // The fix is at the downstream END of the inbound leg, which is why the
+    // symbol sits at one end of the pattern and not in the middle.
+    const ring = pattern()
+    expect(ring[1]).toEqual(fixAt)
+    // Inbound 270 is flown westwards, so the leg begins to the east.
+    expect(ring[0]?.x).toBeCloseTo(3.667, 2)
+    expect(ring[0]?.y).toBeCloseTo(0, 6)
+    expect(bearingDeg(ring[0] as Vec2NM, fixAt)).toBeCloseTo(270, 6)
+  })
+
+  it('makes the legs a minute of flying', () => {
+    // 220 kt for one minute is 3.67 NM.
+    expect(distanceNM(pattern()[0] as Vec2NM, fixAt)).toBeCloseTo(3.667, 2)
+    // And two minutes is twice that.
+    expect(distanceNM(pattern({ legMins: 2 })[0] as Vec2NM, fixAt)).toBeCloseTo(7.333, 2)
+  })
+
+  it('makes the turns a rate-one turn at that speed', () => {
+    // 3 deg/sec at 220 kt is a 1.167 NM radius, so the pattern is 2.33 NM
+    // across. That it is a thin sliver rather than the fat oval on a chart
+    // is the point: charts are not to scale.
+    const s = span(pattern())
+    expect(s.maxY - s.minY).toBeCloseTo(2.334, 2)
+    expect(s.maxX - s.minX).toBeCloseTo(3.667 + 2.334, 2)
+  })
+
+  it('scales both dimensions with the speed', () => {
+    const slow = span(pattern({}, 110))
+    const fast = span(pattern({}, 220))
+    expect(fast.maxY - fast.minY).toBeCloseTo((slow.maxY - slow.minY) * 2, 2)
+  })
+
+  it('puts a right-hand pattern on the right of the inbound track', () => {
+    // Flying west, a right turn goes north, so the outbound leg is north of
+    // the inbound one and nothing is south of it.
+    const s = span(pattern({ turns: 'right' }))
+    expect(s.minY).toBeCloseTo(0, 6)
+    expect(s.maxY).toBeGreaterThan(2)
+  })
+
+  it('and a left-hand pattern on the left', () => {
+    const s = span(pattern({ turns: 'left' }))
+    expect(s.maxY).toBeCloseTo(0, 6)
+    expect(s.minY).toBeLessThan(-2)
+  })
+
+  it('follows the inbound track round the compass', () => {
+    // Inbound 000 is flown northwards, so the leg begins to the south and a
+    // right-hand pattern lies to the east.
+    const s = span(pattern({ inboundTrue: 0 }))
+    expect(s.minY).toBeLessThan(-3)
+    expect(s.maxY).toBeGreaterThan(1)
+    expect(s.minX).toBeCloseTo(0, 6)
+    expect(s.maxX).toBeGreaterThan(2)
+  })
+
+  it('closes: the last point leads back to the first', () => {
+    // The ring is closed by the renderer, so the geometry must not repeat
+    // its first point -- and the gap it leaves has to be one short chord.
+    const ring = pattern()
+    const first = ring[0] as Vec2NM
+    const last = ring[ring.length - 1] as Vec2NM
+    expect(last).not.toEqual(first)
+    const chord = distanceNM(ring[3] as Vec2NM, ring[4] as Vec2NM)
+    expect(distanceNM(last, first)).toBeCloseTo(chord, 3)
+  })
+
+  it('keeps every point within the pattern it should occupy', () => {
+    // Nothing wanders: every point is inside the bounding box a leg plus
+    // two radii allows, which catches an arc swept the wrong way.
+    const ring = pattern()
+    for (const p of ring) {
+      expect(distanceNM(fixAt, p)).toBeLessThanOrEqual(3.667 + 2.334 + 1e-9)
+    }
+  })
+
+  it('takes the arc resolution as an option', () => {
+    expect(pattern().length).toBe(26)
+    const coarse = holdRacetrack(
+      fixAt,
+      { turns: 'right', legMins: 1, inboundTrue: 270, inboundIsDerived: true },
+      { speedKts: 220, arcSteps: 4 },
+    )
+    expect(coarse.length).toBe(10)
+  })
+
+  it('draws a real pattern for every hold in the config', () => {
+    for (const fix of egll.holdingFixes) {
+      if (fix.hold === null) continue
+      const ring = holdRacetrack(fix.posNM, fix.hold, {
+        speedKts: egll.render.holdSpeedKts,
+      })
+      expect(ring.length, fix.name).toBeGreaterThan(20)
+      // The pattern hangs off the fix, so the fix is one of its points.
+      expect(ring.some((p) => distanceNM(p, fix.posNM) < 1e-9), fix.name).toBe(true)
+      // And it is small enough to sit inside the sector alongside the fix.
+      for (const p of ring) {
+        expect(distanceNM(fix.posNM, p), fix.name).toBeLessThan(7)
+      }
+    }
   })
 })

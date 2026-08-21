@@ -124,6 +124,7 @@ function plane(over: Partial<Aircraft> = {}): Aircraft {
     clearedSpdKts: 240,
     navMode: 'VECTOR',
     clearedApproach: null,
+    hold: null,
     originFix: 'LAM',
     trail: [],
     trailAt: 0,
