@@ -3,6 +3,15 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   // Relative base so the built site works from a subpath (e.g. GitHub Pages).
   base: './',
+  server: {
+    watch: {
+      // Audio assets are watched for no benefit -- they cannot hot-reload --
+      // and a locked or still-being-written media file makes the watcher
+      // throw EBUSY on Windows, which is an unhandled error that takes the
+      // whole dev server down. Excluding them keeps the server up.
+      ignored: ['**/*.wav', '**/*.mp3', '**/*.ogg', '**/*.flac'],
+    },
+  },
   build: {
     outDir: 'dist',
     target: 'es2022',
