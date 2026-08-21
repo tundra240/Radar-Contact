@@ -1,5 +1,6 @@
 import type { Clock } from '../core/loop'
 import { advance, bearingDeg, distanceNM, type Vec2NM } from '../core/geo'
+import { exitRangeNM } from './airspace'
 import { makeRng, type Rng } from '../core/rng'
 import type { Airport, Navaid } from '../data/airport'
 import { FlightGenerator } from './flightgen'
@@ -67,6 +68,8 @@ export class Spawner {
   /** The gap being waited out. Re-chosen after every release. */
   private waitSeconds: number
   private readonly lastUsedAt = new Map<string, number>()
+  /** Entry points never move, and finding one walks the boundary. */
+  private readonly gates = new Map<string, Vec2NM>()
   private spawnCount = 0
   private deferCount = 0
 
@@ -265,21 +268,19 @@ export class Spawner {
    * a couple of minutes before it becomes the controller's to work.
    */
   private entryPoint(fix: Navaid): Vec2NM {
-    const sector = this.airport.sector
-    return advance(
-      ARP,
-      bearingDeg(ARP, fix.posNM),
-      sector.radiusNM + this.airport.traffic.entryDistanceNM,
-    )
-  }
+    const cached = this.gates.get(fix.name)
+    if (cached !== undefined) return cached
 
-  /**
-   * The track flown towards the fix. Off the published hold where there is
-   * one, and from the geometry where there is not, so a fix without a
-   * pattern still produces an arrival pointed at the field.
-   */
-  private inboundTrue(fix: Navaid): number {
-    return fix.hold?.inboundTrue ?? bearingDeg(fix.posNM, ARP)
+    // Out along the radial through the fix until the airspace ends, then
+    // the configured distance beyond it. Measured against the real boundary
+    // rather than a radius, so every feed hands traffic over the same
+    // distance outside the airspace however far out its own edge lies --
+    // which at Heathrow ranges from seventeen miles to thirty-five.
+    const radial = bearingDeg(ARP, fix.posNM)
+    const edge = exitRangeNM(this.airport.controlZone, ARP, radial)
+    const gate = advance(ARP, radial, edge + this.airport.traffic.entryDistanceNM)
+    this.gates.set(fix.name, gate)
+    return gate
   }
 
   /** The pattern an arrival carries to its fix, if that fix has one. */
@@ -368,13 +369,17 @@ export class Spawner {
     // right fix at the right level and waits to be dealt with, which is
     // what an approach controller is actually handed.
     const hold = this.clearanceFor(fix)
-    const hdg = this.inboundTrue(fix)
+    const at = this.entryPoint(fix)
+    // Pointed at its fix from wherever it appears, which is no longer the
+    // same as the hold's inbound leg: a hold turned to fit the airspace
+    // faces a different way from the radial the arrival comes down.
+    const hdg = bearingDeg(at, fix.posNM)
 
     return {
       callsign: flight.callsign,
       type: flight.type,
       wake: flight.wake,
-      pos: this.entryPoint(fix),
+      pos: at,
       altFt,
       hdg,
       gsKts,

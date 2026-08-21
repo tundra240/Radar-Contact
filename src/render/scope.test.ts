@@ -135,6 +135,18 @@ function render(
   return { ...rec, cam, labels: rec.texts.map((t) => t.s) }
 }
 
+/**
+ * The strokes that are the airspace boundary.
+ *
+ * Matched on the geometry rather than on a colour: it is the only thing
+ * drawn as a closed ring with exactly as many points as one of the
+ * published outlines.
+ */
+function boundaryStrokes(strokes: Stroke[]): Stroke[] {
+  const sizes = new Set(airport.controlFootprint.map((ring) => ring.length))
+  return strokes.filter((s) => sizes.has(s.points.length))
+}
+
 function at(texts: Text[], s: string): Text {
   const t = texts.find((x) => x.s === s)
   if (!t) throw new Error(`no label ${s}`)
@@ -342,14 +354,15 @@ describe('overlay control', () => {
   it('draws the operational picture even at minimum density', () => {
     // What must survive every setting: the runways being worked, their
     // centrelines, the holds, and the sector boundary.
-    const { labels, arcs } = render(1000, 600, 30, OVERLAY_PRESETS.minimal)
+    const { labels, strokes } = render(1000, 600, 30, OVERLAY_PRESETS.minimal)
     expect(labels).toContain('27R')
     expect(labels).toContain('27L')
     for (const hold of ['LAM', 'BIG', 'BNN', 'OCK']) {
       expect(labels, hold).toContain(hold)
     }
-    // 40 NM sector boundary at 10 px per NM.
-    expect(arcs.some((a) => Math.round(a.r) === 400)).toBe(true)
+    // And the edge of the airspace, which is now the published outline
+    // rather than a circle: a closed stroke with as many points as the ring.
+    expect(boundaryStrokes(strokes).length).toBeGreaterThan(0)
   })
 
   it('drops the context layers at minimum density', () => {
@@ -386,10 +399,11 @@ describe('overlay control', () => {
     expect(dashes.length).toBeGreaterThan(0)
   })
 
-  it('turns range rings off without losing the sector boundary', () => {
-    const { arcs } = render(1000, 600, 30, only({ rangeRings: false }))
-    expect(arcs.some((a) => Math.round(a.r) === 400)).toBe(true)
-    expect(arcs.some((a) => Math.round(a.r) === 100)).toBe(false)
+  it('turns range rings off without losing the airspace boundary', () => {
+    const off = render(1000, 600, 30, only({ rangeRings: false }))
+    expect(boundaryStrokes(off.strokes).length).toBeGreaterThan(0)
+    // The 10 NM ring is gone with the rest of them.
+    expect(off.arcs.some((a) => Math.round(a.r) === 100)).toBe(false)
   })
 
   it('turns extended centrelines off', () => {

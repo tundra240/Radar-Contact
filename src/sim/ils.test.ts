@@ -354,6 +354,8 @@ describe('a whole session', () => {
    */
   it('lands traffic through the real command path', () => {
     const airport = loadAirport(raw)
+/** Hoisted: it walks every vertex of the airspace, and never changes. */
+const OUTER_LIMIT_NM = outerLimitNM(airport)
     const rwy = airport.arrivalRunways.find((r) => r.id === '27R')
     if (!rwy) throw new Error('no 27R in the config')
 
@@ -379,7 +381,7 @@ describe('a whole session', () => {
       },
       holdFor: () => null,
       approachFor: (id) => (id === '27R' ? app : null),
-      sectorRadiusNM: airport.sector.radiusNM,
+      controlZone: airport.controlZone,
     }
 
     const spawner = new Spawner({ airport, seed: 4242 })
@@ -403,8 +405,8 @@ describe('a whole session', () => {
       let world: Aircraft[] = []
       for (const a of traffic.map((x) => stepAircraft(x, DT, clock.elapsedSeconds))) {
         // The same three rules main.ts applies, rather than copies of them.
-        const flown = enterSector(a, airport.sector.radiusNM)
-        const departure = departureOf(flown, airport.sector.radiusNM, outerLimitNM(airport))
+        const flown = enterSector(a, airport.controlZone)
+        const departure = departureOf(flown, airport.controlZone, OUTER_LIMIT_NM)
         if (departure === 'landed') landed += 1
         if (departure === null) world.push(flown)
       }

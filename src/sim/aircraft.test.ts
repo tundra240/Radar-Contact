@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { bearingDeg, distanceNM } from '../core/geo'
 import { makeRng } from '../core/rng'
 import { loadAirport, outerLimitNM } from '../data/airport'
+import type { ControlZone } from './airspace'
 import raw from '../data/egll.json'
 import {
   TRAIL_INTERVAL_SECONDS,
@@ -17,6 +18,8 @@ import { Spawner } from './spawner'
 import type { Aircraft } from './types'
 
 const airport = loadAirport(raw)
+/** Hoisted: it walks every vertex of the airspace, and never changes. */
+const OUTER_LIMIT_NM = outerLimitNM(airport)
 const ORIGIN = { x: 0, y: 0 }
 
 const base: Aircraft = {
@@ -301,8 +304,8 @@ describe('the flow, end to end', () => {
 
       const flown = traffic
         .map((a) => stepAircraft(a, step, elapsed))
-        .map((a) => enterSector(a, airport.sector.radiusNM))
-      let kept = flown.filter((a) => departureOf(a, airport.sector.radiusNM, outerLimitNM(airport)) === null)
+        .map((a) => enterSector(a, airport.controlZone))
+      let kept = flown.filter((a) => departureOf(a, airport.controlZone, OUTER_LIMIT_NM) === null)
       handedOff += flown.length - kept.length
 
       // A controller, once a minute: take whatever is lowest in a stack and
@@ -410,41 +413,94 @@ describe('departureOf', () => {
   /**
    * Why an aircraft comes off the scope, in one place.
    *
-   * The bug this pins down: leaving the sector removed the aircraft with no
-   * message and no counter, and did it five miles outside the only boundary
-   * the scope draws. A target that vanishes silently, in empty space, is
-   * indistinguishable from a crash.
+   * The area of responsibility is published controlled airspace now, so
+   * this is a three-dimensional question. A square standing in for it keeps
+   * the arithmetic obvious; the real shape is tested against the real data
+   * in data/airport.test.ts.
    */
-  const RADIUS = 40
   const ac = (over: Partial<Aircraft>): Aircraft => ({ ...base, ...over })
 
-  it('keeps an aircraft that is still inside the sector', () => {
-    expect(departureOf(ac({ pos: { x: 10, y: 10 } }), RADIUS)).toBeNull()
-    expect(departureOf(ac({ pos: { x: 39, y: 0 } }), RADIUS)).toBeNull()
-  })
+  /** 40 NM square, 2,500 ft to 20,000: a TMA with no zone under it. */
+  const ZONE: ControlZone = [
+    {
+      polygon: [
+        { x: -40, y: -40 },
+        { x: 40, y: -40 },
+        { x: 40, y: 40 },
+        { x: -40, y: 40 },
+      ],
+      floorFt: 2500,
+      ceilingFt: 20000,
+      label: 'TEST TMA',
+    },
+  ]
 
-  it('keeps one exactly on the boundary, so the line itself is inside', () => {
-    expect(departureOf(ac({ pos: { x: RADIUS, y: 0 } }), RADIUS)).toBeNull()
+  it('keeps an aircraft that is inside it', () => {
+    expect(departureOf(ac({ pos: { x: 10, y: 10 }, altFt: 8000 }), ZONE)).toBeNull()
+    expect(departureOf(ac({ pos: { x: 39, y: 0 }, altFt: 8000 }), ZONE)).toBeNull()
   })
 
   it('reports one that has crossed the boundary', () => {
-    expect(departureOf(ac({ pos: { x: RADIUS + 0.1, y: 0 } }), RADIUS)).toBe('left')
+    expect(departureOf(ac({ pos: { x: 41, y: 0 }, altFt: 8000 }), ZONE)).toBe('left')
   })
 
-  it('measures against the boundary it is given, not a hidden margin', () => {
-    // The whole point: the radius passed in is the circle the scope draws.
-    const out = ac({ pos: { x: 42, y: 0 } })
-    expect(departureOf(out, 40)).toBe('left')
-    expect(departureOf(out, 45)).toBeNull()
+  it('reports one that has descended out of it', () => {
+    // The realism the shape brings with it: below the base of the airspace
+    // is outside the airspace, however central the position.
+    expect(departureOf(ac({ pos: { x: 0, y: 0 }, altFt: 2000 }), ZONE)).toBe('left')
+    expect(departureOf(ac({ pos: { x: 0, y: 0 }, altFt: 3000 }), ZONE)).toBeNull()
+  })
+
+  it('reports one that has climbed out of the top', () => {
+    expect(departureOf(ac({ pos: { x: 0, y: 0 }, altFt: 21000 }), ZONE)).toBe('left')
+  })
+
+  it('does not report one that has never been inside', () => {
+    // Arrivals are released outside and fly in, so being outside means two
+    // opposite things and only  separates them.
+    const coming = ac({ pos: { x: 48, y: 0 }, altFt: 8000, entered: false })
+    expect(departureOf(coming, ZONE)).toBeNull()
+  })
+
+  it('removes an inbound aircraft that turns away, past the outer limit', () => {
+    const wandering = ac({ pos: { x: 80, y: 0 }, altFt: 8000, entered: false })
+    expect(departureOf(wandering, ZONE)).toBeNull()
+    expect(departureOf(wandering, ZONE, 60)).toBe('left')
   })
 
   it('reports a landing wherever it happens', () => {
-    // A landed aircraft is at the threshold, well inside, so position must
-    // not be what decides this.
-    expect(departureOf(ac({ navMode: 'LANDED', pos: { x: 1, y: 0 } }), RADIUS)).toBe('landed')
+    expect(departureOf(ac({ navMode: 'LANDED', pos: { x: 1, y: 0 } }), ZONE)).toBe('landed')
   })
 
   it('calls it landed rather than left when it is both', () => {
-    expect(departureOf(ac({ navMode: 'LANDED', pos: { x: 99, y: 0 } }), RADIUS)).toBe('landed')
+    expect(departureOf(ac({ navMode: 'LANDED', pos: { x: 99, y: 0 } }), ZONE)).toBe('landed')
+  })
+})
+
+describe('enterSector', () => {
+  const ZONE: ControlZone = [
+    {
+      polygon: [
+        { x: -40, y: -40 },
+        { x: 40, y: -40 },
+        { x: 40, y: 40 },
+        { x: -40, y: 40 },
+      ],
+      floorFt: 0,
+      ceilingFt: 20000,
+      label: 'TEST CTA',
+    },
+  ]
+  const ac = (over: Partial<Aircraft>): Aircraft => ({ ...base, ...over })
+
+  it('marks an arrival as owned the moment it crosses in', () => {
+    const coming = ac({ pos: { x: 48, y: 0 }, entered: false })
+    expect(enterSector(coming, ZONE).entered).toBe(false)
+    expect(enterSector({ ...coming, pos: { x: 30, y: 0 } }, ZONE).entered).toBe(true)
+  })
+
+  it('leaves an aircraft alone once it has entered', () => {
+    const inside = ac({ pos: { x: 10, y: 0 }, entered: true })
+    expect(enterSector(inside, ZONE)).toBe(inside)
   })
 })

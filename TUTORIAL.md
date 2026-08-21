@@ -29,9 +29,19 @@ There are three ways in, and they all do exactly the same thing.
 
 ### What is yours, and what is not
 
-**The circle is your airspace.** Everything outside it is washed back towards the background:
-still there, still readable -- neighbouring fields, the coast, the airspace next door -- but
-plainly not the bit you are working.
+**Your airspace is the real thing.** Not a circle around the field: the **London CTR** from the
+surface to 2,500 ft, and **London TMA 1** from there up to FL195 -- both straight out of the
+sector file. Everything outside is washed back towards the background: still there, still
+readable, but plainly not the bit you are working.
+
+It is not the same size in every direction, and that matters. To the south-east the boundary is
+nearly 40 NM out; to the south-west it is barely 11. Traffic off BIG has a long run in; traffic
+off BNN is yours almost as soon as you see it.
+
+**And it has a floor.** Below 2,500 ft, controlled airspace is only the CTR -- about 11 miles
+around the field. Try to descend an aircraft below the base of the TMA further out than that and
+the clearance is refused: *"below controlled airspace where it is"*. That is not the game being
+awkward, it is where the airspace stops.
 
 Arrivals appear **outside** that circle and fly in. You can see them coming for a couple of
 minutes, read their callsign and type off the tag, and start planning where they fit. What you

@@ -1,6 +1,15 @@
 import {
+  footprint,
+  inPolygon,
+  isWithinFootprint,
+  reachNM,
+  type ControlVolume,
+  type ControlZone,
+} from '../sim/airspace'
+import {
   FT_PER_NM,
   advance,
+  angleDelta,
   bearingDeg,
   degToRad,
   distanceNM,
@@ -158,12 +167,18 @@ export type AirspaceShape =
   | { readonly kind: 'circle'; readonly centreNM: Vec2NM; readonly radiusNM: number }
   | { readonly kind: 'polygon'; readonly verticesNM: readonly Vec2NM[] }
   /**
-   * Boundary line work: one or more OPEN polylines, stroked without
-   * closure. This is what the VATSIM UK sector file actually contains --
-   * each record is an independent boundary line, and only two of sixty
-   * regions chained into a closed ring. Closing them would invent edges of
-   * up to 30 NM. The trade-off is that a `lines` volume cannot answer
-   * "is this aircraft inside the zone"; that needs ordered closed rings.
+   * Boundary line work: one or more polylines, stroked as they are given.
+   * This is what the VATSIM UK sector file actually contains -- each record
+   * is an independent boundary line, and chaining records together into
+   * regions fails, because the file stores a boundary once and shares it
+   * between the areas either side. Closing across those gaps would invent
+   * edges of up to 30 NM, so it is not attempted.
+   *
+   * Individual records are a different question, and a happier one:
+   * **twenty-nine of the fifty-one are already closed rings in the file**,
+   * including the London CTR and London TMA 1. Those can be asked "is this
+   * aircraft inside", and `controlZone` below is built from the ones that
+   * can.
    */
   | { readonly kind: 'lines'; readonly pathsNM: readonly (readonly Vec2NM[])[] }
 
@@ -282,6 +297,17 @@ export interface Airport {
   readonly navaids: readonly Navaid[]
   readonly airports: readonly NeighbourAirport[]
   readonly airspace: readonly AirspaceVolume[]
+  /**
+   * The area of responsibility: the published controlled airspace over this
+   * field, rather than a radius around it. See sim/airspace.ts.
+   */
+  readonly controlZone: ControlZone
+  /**
+   * The outline of that airspace: the rings to draw, and the shape to mask
+   * the rest of the map outside. Worked out once, because it is asked for
+   * on every frame and the answer never changes.
+   */
+  readonly controlFootprint: readonly (readonly Vec2NM[])[]
   /** Coastline, river and FIR limit. Empty when the config omits it. */
   readonly geography: readonly GeographyFeature[]
   /**
@@ -427,7 +453,9 @@ export function loadAirport(raw: unknown): Airport {
   const runways = arr(root['runways'], 'runways').map((r, i) =>
     parseRunway(r, `runways[${i}]`, projection),
   )
-  const navaids = arr(root['navaids'], 'navaids').map((n, i) =>
+  // Parsed here and refitted below, once the airspace it has to fit inside
+  // has been read.
+  const rawNavaids = arr(root['navaids'], 'navaids').map((n, i) =>
     parseNavaid(n, `navaids[${i}]`, projection),
   )
   const airports = arr(root['airports'], 'airports').map((a, i) =>
@@ -439,7 +467,7 @@ export function loadAirport(raw: unknown): Airport {
   const traffic = parseTraffic(root['traffic'], new Set(aircraftTypes.map((t) => t.type)))
 
   assertUnique(runways.map((r) => r.id), 'runways[].id')
-  assertUnique(navaids.map((n) => n.name), 'navaids[].name')
+  assertUnique(rawNavaids.map((n) => n.name), 'navaids[].name')
   assertUnique(airports.map((a) => a.icao), 'airports[].icao')
   assertUnique(aircraftTypes.map((t) => t.type), 'aircraftTypes[].type')
 
@@ -452,6 +480,8 @@ export function loadAirport(raw: unknown): Airport {
   const airspace = arr(root['airspace'], 'airspace').map((v, i) =>
     parseAirspace(v, `airspace[${i}]`, projection, anchors),
   )
+  const controlZone = deriveControlZone(airspace)
+  const navaids = rawNavaids.map((n) => fitHoldToAirspace(n, controlZone))
   assertUnique(airspace.map((v) => v.id), 'airspace[].id')
 
   // Optional: an airport config without a map around it is still a valid
@@ -501,6 +531,8 @@ export function loadAirport(raw: unknown): Airport {
     navaids,
     airports,
     airspace,
+    controlZone,
+    controlFootprint: footprint(controlZone),
     geography,
     mapBoundsNM,
     aircraftTypes,
@@ -1075,7 +1107,127 @@ function arcPoints(
  * to control, so the world lets go of it.
  */
 export function outerLimitNM(airport: Airport): number {
-  return airport.sector.radiusNM + airport.traffic.entryDistanceNM + 5
+  return reachNM(airport.controlZone, { x: 0, y: 0 }) + airport.traffic.entryDistanceNM + 5
+}
+
+/** Within this, two positions are the same point on the boundary. */
+const RING_TOLERANCE_NM = 0.05
+
+/** Controlled airspace. Class F and G are not the controller's to own. */
+const CONTROLLED_CLASSES = new Set(['A', 'B', 'C', 'D', 'E'])
+
+/**
+ * The area of responsibility, derived from the published airspace.
+ *
+ * Any controlled volume that is a closed ring in the file AND encloses the
+ * airport reference point is part of this field's airspace. That is a rule
+ * rather than a list of names: at Heathrow it picks the London CTR from the
+ * surface to 2,500 ft and London TMA 1 from there to FL195, and it would
+ * pick up a third piece the day the sector file gained one, without anybody
+ * remembering to add it.
+ *
+ * Volumes that merely sit nearby are excluded by the same rule, which is
+ * why Gatwick's CTR and the seven Farnborough CTAs -- all closed rings, all
+ * controlled -- are not in it.
+ */
+/*
+   A nominal racetrack, for deciding which way a derived hold should face.
+   Measured off the flight model at holding speed: a one-minute leg is about
+   four miles and a rate-one reversal about two and a half wide. It does not
+   have to be exact -- it is deciding between orientations, not drawing
+   anything.                                                             */
+const NOMINAL_LEG_NM = 4.2
+const NOMINAL_WIDTH_NM = 2.6
+/** Candidate inbound tracks, in degrees. Five is finer than the question. */
+const ORIENTATION_STEP_DEG = 5
+
+/** Whether a pattern on this inbound track stays inside the airspace. */
+function patternFits(
+  posNM: Vec2NM,
+  inboundTrue: number,
+  turns: TurnDirection,
+  zone: ControlZone,
+): boolean {
+  const outbound = normalizeHeading(inboundTrue + 180)
+  const across = normalizeHeading(inboundTrue + (turns === 'right' ? 90 : -90))
+  // The corners and the middles of the racetrack, plus a mile of slack at
+  // the far end for the reversal itself.
+  for (const along of [0, NOMINAL_LEG_NM / 2, NOMINAL_LEG_NM, NOMINAL_LEG_NM + 1]) {
+    for (const side of [0, NOMINAL_WIDTH_NM / 2, NOMINAL_WIDTH_NM]) {
+      const at = advance(advance(posNM, outbound, along), across, side)
+      if (!isWithinFootprint(zone, at)) return false
+    }
+  }
+  return true
+}
+
+/**
+ * Turns a derived hold to face a way that keeps its pattern in the airspace.
+ *
+ * Published inbound tracks are not in the open dataset, so the default is
+ * the leg that points at the field. At three of Heathrow's four stacks that
+ * is fine. At Bovingdon it is not: the fix sits under two miles from the
+ * edge of the TMA, so a pattern laid radially outward spends more than half
+ * of every circuit outside controlled airspace -- and an aircraft holding
+ * there would be lost for nothing.
+ *
+ * So a derived leg is refitted: of the orientations whose pattern fits, take
+ * the one nearest the field. Nothing published is being overridden -- an
+ * explicit `inboundTrue` in the config still wins outright -- and no
+ * geometry is invented. It replaces one approximation with a better one, and
+ * the result is closer to the real thing: Bovingdon's actual hold is aligned
+ * along the TMA rather than pointed at Heathrow, for exactly this reason.
+ */
+function fitHoldToAirspace(navaid: Navaid, zone: ControlZone): Navaid {
+  const hold = navaid.hold
+  if (hold === null || !hold.inboundIsDerived || zone.length === 0) return navaid
+  if (patternFits(navaid.posNM, hold.inboundTrue, hold.turns, zone)) return navaid
+
+  const toField = bearingDeg(navaid.posNM, { x: 0, y: 0 })
+  let best: number | null = null
+  for (let deg = 0; deg < 360; deg += ORIENTATION_STEP_DEG) {
+    if (!patternFits(navaid.posNM, deg, hold.turns, zone)) continue
+    if (best === null || Math.abs(angleDelta(deg, toField)) < Math.abs(angleDelta(best, toField))) {
+      best = deg
+    }
+  }
+  // Nothing fits: keep pointing at the field and let it protrude. Better a
+  // hold in the wrong place than a hold facing an arbitrary direction.
+  if (best === null) return navaid
+
+  return { ...navaid, hold: { ...hold, inboundTrue: best } }
+}
+
+function deriveControlZone(volumes: readonly AirspaceVolume[]): ControlZone {
+  const zone: ControlVolume[] = []
+
+  for (const volume of volumes) {
+    if (!CONTROLLED_CLASSES.has(volume.airspaceClass)) continue
+
+    const rings =
+      volume.shape.kind === 'polygon'
+        ? [volume.shape.verticesNM]
+        : volume.shape.kind === 'lines'
+          ? volume.shape.pathsNM
+          : []
+
+    for (const ring of rings) {
+      const first = ring[0]
+      const last = ring[ring.length - 1]
+      if (first === undefined || last === undefined || ring.length < 4) continue
+      if (distanceNM(first, last) > RING_TOLERANCE_NM) continue
+      // The reference point is the field, and world space is anchored on it.
+      if (!inPolygon(ring, { x: 0, y: 0 })) continue
+      zone.push({
+        polygon: ring,
+        floorFt: volume.floorFt,
+        ceilingFt: volume.ceilingFt,
+        label: volume.label,
+      })
+    }
+  }
+
+  return zone
 }
 
 export function centrelinePoint(runway: Runway, distNM: number): Vec2NM {

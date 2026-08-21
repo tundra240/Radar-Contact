@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { autopilot } from '../sim/autopilot'
+import type { ControlZone } from '../sim/airspace'
 import type { Aircraft, ApproachClearance, HoldClearance, NavMode } from '../sim/types'
 import { parseCommandLine } from './parse'
 import { applyAll, applyCommand, type ApplyContext } from './apply'
@@ -66,8 +67,30 @@ const ILS_27R: ApproachClearance = {
   interceptAltMaxFt: 3000,
 }
 
+/**
+ * A square of controlled airspace, for tests that only care whether a
+ * position is inside the area of responsibility or outside it. The real
+ * shape is two published rings; a square makes the arithmetic obvious.
+ */
+const square = (halfNM: number): ControlZone => [
+  {
+    polygon: [
+      { x: -halfNM, y: -halfNM },
+      { x: halfNM, y: -halfNM },
+      { x: halfNM, y: halfNM },
+      { x: -halfNM, y: halfNM },
+    ],
+    floorFt: 0,
+    ceilingFt: 20000,
+    label: 'TEST CTA',
+  },
+]
+
+const ZONE = square(40)
+const WIDE_ZONE = square(60)
+
 const ctx: ApplyContext = {
-  sectorRadiusNM: 40,
+  controlZone: ZONE,
   floorFt: 1500,
   ceilingFt: 15000,
   speedLimitKts: 250,
@@ -498,7 +521,7 @@ describe('traffic outside the area of responsibility', () => {
   })
 
   it('takes the boundary from the context rather than assuming one', () => {
-    const wide: ApplyContext = { ...ctx, sectorRadiusNM: 60 }
+    const wide: ApplyContext = { ...ctx, controlZone: WIDE_ZONE }
     expect(applyCommand({ kind: 'heading', callsign: 'BAW178', deg: 270 }, coming, wide).ok)
       .toBe(true)
   })

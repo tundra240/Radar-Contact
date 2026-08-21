@@ -478,7 +478,56 @@ steer it straight back onto the localiser.
 
 ### The area of responsibility
 
-The sector circle is what the controller owns, and three things now follow from it.
+**It is the published airspace, not a radius.** `sim/airspace.ts` holds closed rings with
+vertical limits; `deriveControlZone` in the loader picks them out of the parsed airspace by a
+rule rather than a list of names: **any controlled volume that is a closed ring in the file and
+encloses the airport reference point.** At Heathrow that is exactly two -- the London CTR from
+the surface to 2,500 ft, and London TMA 1 from there to FL195 -- and it would pick up a third
+the day the sector file gained one. Gatwick's CTR and the seven Farnborough CTAs are all closed
+rings and all controlled, and all correctly excluded, because they do not contain the field.
+
+That was possible because of a fact this file had wrong. The note on `AirspaceShape` said a
+`lines` volume "cannot answer is this aircraft inside". What is true is that *chaining separate
+records* into regions fails -- the file stores each boundary once and shares it between the
+areas either side. Individual records are a different question: **twenty-nine of the fifty-one
+are already closed rings**, including both of the ones needed here. The earlier measurement
+asked the harder question and the answer was carried over to the easier one.
+
+Three consequences of using the real shape:
+
+- **The test is three-dimensional**, and that is the realism rather than an accident. Below
+  2,500 ft the only controlled airspace is the CTR, about eleven miles across, so an aircraft at
+  2,000 ft twenty-five miles out is in nobody's airspace. `applyCommand` therefore refuses a
+  level that would put an aircraft below controlled airspace where it is, rather than accepting
+  it and having the world remove the aircraft two minutes later.
+- **It is not the same size in every direction.** The boundary is 39 NM out to the south-east
+  and 11 NM to the south-west. So `entryDistanceNM` is measured along each fix's radial from
+  wherever the boundary actually is -- `exitRangeNM` walks out and takes the LAST crossing, not
+  the first, because a ring of forty-two sides can be left and re-entered along a line.
+- **One outline, not two.** `footprint` drops any ring whose vertices all lie inside another,
+  and the CTR sits entirely inside the TMA laterally. So the boundary is one stroked path and
+  the wash over the rest of the map is one odd-even fill.
+
+**A hold had to be turned to make this work.** Bovingdon sits under two miles inside the edge of
+the TMA, and holds are derived to point at the field, so its racetrack lay radially outward --
+**54% of every circuit outside controlled airspace**, and every aircraft sent there would have
+been lost for nothing. Measured, not guessed. So a *derived* leg is now refitted to the nearest
+orientation whose pattern fits, which turns BNN from 168 to 75 and LAM from 245 to 240 and
+leaves BIG and OCK alone. Nothing published is overridden, no geometry is invented, and the
+result is closer to reality: the real Bovingdon hold is aligned along the TMA for exactly this
+reason. A test asserts every pattern fits.
+
+`sector.radiusNM` survives as the nominal size of the sector -- the cardinals and the range-ring
+context -- and no longer decides anything about control.
+
+**One performance note, because it bit.** The containment test runs for every aircraft on every
+tick of a twenty hertz simulation. Volumes carry a bounding box, worked out once and kept in a
+WeakMap so the type stays plain data, and the vertical limits are checked before the ring. The
+thing that actually cost seconds was worse and dumber: a test harness calling `outerLimitNM`
+inside its per-aircraft loop, which walks every vertex of the airspace. Hoisting it took the sim
+suite from twenty-two seconds to six.
+
+Three further things follow from owning an area of responsibility at all.
 
 **The map outside it is washed back towards the ground colour.** One path -- the whole display
 with the sector punched out of it, filled odd-even -- at partial alpha over the finished map,

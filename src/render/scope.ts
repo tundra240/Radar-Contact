@@ -630,32 +630,49 @@ function drawRangeRings(
  * there to be seen, and so is traffic on its way in.
  */
 function drawOutside(g: CanvasRenderingContext2D, cam: Camera, airport: Airport): void {
-  const centre = cam.worldToScreen(ORIGIN)
-
   g.globalAlpha = OUTSIDE_VEIL
   g.fillStyle = theme.bg
   g.beginPath()
-  // The whole display with the sector punched out of it: one path, filled
+  // The whole display with the airspace punched out of it: one path, filled
   // odd-even, which needs no clipping and no second pass.
   g.rect(0, 0, cam.width, cam.height)
-  g.arc(centre.x, centre.y, cam.nmToPx(airport.sector.radiusNM), 0, Math.PI * 2)
+  for (const ring of airport.controlFootprint) tracePath(g, cam, ring)
   g.fill('evenodd')
   // Set back rather than saved and restored: everything after this is drawn
   // at full strength, and a leaked alpha would dim the traffic too.
   g.globalAlpha = 1
 }
 
+/** One closed ring, in screen space. */
+function tracePath(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  ring: readonly Vec2NM[],
+): void {
+  for (let i = 0; i < ring.length; i += 1) {
+    const p = cam.worldToScreen(ring[i] as Vec2NM)
+    if (i === 0) g.moveTo(p.x, p.y)
+    else g.lineTo(p.x, p.y)
+  }
+  g.closePath()
+}
+
+/**
+ * The edge of the area of responsibility: the published outline of the
+ * airspace, not a circle around the field.
+ */
 function drawSectorBoundary(
   g: CanvasRenderingContext2D,
   cam: Camera,
   airport: Airport,
 ): void {
-  const c = cam.worldToScreen(ORIGIN)
-  g.lineWidth = 1
+  g.lineWidth = 1.4
   g.strokeStyle = theme.ringStrong
-  g.beginPath()
-  g.arc(c.x, c.y, cam.nmToPx(airport.sector.radiusNM), 0, Math.PI * 2)
-  g.stroke()
+  for (const ring of airport.controlFootprint) {
+    g.beginPath()
+    tracePath(g, cam, ring)
+    g.stroke()
+  }
 }
 
 function drawCardinals(

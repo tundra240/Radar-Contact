@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { applyCommand, type ApplyContext, type Envelope } from '../commands/apply'
 import type { Command } from '../commands/types'
 import { headingLabel } from '../core/geo'
+import type { ControlZone } from '../sim/airspace'
 import type { Aircraft, HoldClearance } from '../sim/types'
 import {
   TagMenu,
@@ -40,6 +41,21 @@ const HOLDS: Record<string, HoldClearance> = {
 }
 
 const holdFor = (fix: string): HoldClearance | null => HOLDS[fix] ?? null
+
+/** Everything the tag menu tests use sits well inside this. */
+const ZONE: ControlZone = [
+  {
+    polygon: [
+      { x: -60, y: -60 },
+      { x: 60, y: -60 },
+      { x: 60, y: 60 },
+      { x: -60, y: 60 },
+    ],
+    floorFt: 0,
+    ceilingFt: 20000,
+    label: 'TEST CTA',
+  },
+]
 
 function ac(over: Partial<Aircraft> = {}): Aircraft {
   return {
@@ -178,7 +194,7 @@ describe('readout', () => {
  * teaches limits the simulation does not have -- is worse than no menu.
  */
 describe('every offer is accepted by commands/apply', () => {
-  const ctx: ApplyContext = { ...LIMITS, envelopeFor, holdFor, approachFor: () => null, sectorRadiusNM: 40 }
+  const ctx: ApplyContext = { ...LIMITS, envelopeFor, holdFor, approachFor: () => null, controlZone: ZONE }
 
   it('accepts every level in the list', () => {
     for (const ft of altitudeChoices(LIMITS)) {

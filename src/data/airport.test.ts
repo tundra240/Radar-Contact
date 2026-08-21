@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { isWithinFootprint } from '../sim/airspace'
 import raw from './egll.json'
 import {
   centrelinePoint,
@@ -9,7 +10,7 @@ import {
   type Navaid,
   type Runway,
 } from './airport'
-import { angleDelta, bearingDeg, distanceNM, type Vec2NM } from '../core/geo'
+import { advance, angleDelta, bearingDeg, distanceNM, type Vec2NM } from '../core/geo'
 
 const egll: Airport = loadAirport(raw)
 
@@ -152,16 +153,49 @@ describe('feeder fixes', () => {
     }
   })
 
-  it('derives hold inbound legs pointing at the airport', () => {
+  it('derives hold inbound legs pointing at the airport where it can', () => {
     for (const f of egll.holdingFixes) {
       expect(f.hold, f.name).not.toBeNull()
       if (!f.hold) continue
       expect(f.hold.inboundIsDerived, f.name).toBe(true)
-      // Inbound leg is the reciprocal of the fix's bearing from the field.
-      const towardField = bearingDeg(f.posNM, { x: 0, y: 0 })
-      expect(Math.abs(angleDelta(f.hold.inboundTrue, towardField)), f.name)
-        .toBeLessThan(1e-6)
       expect(f.hold.turns).toBe('right')
+    }
+    // Three of the four stacks have room to face the field exactly.
+    for (const name of ['BIG', 'OCK']) {
+      const fix = egll.holdingFixes.find((x) => x.name === name)
+      const towardField = bearingDeg(fix?.posNM ?? { x: 0, y: 0 }, { x: 0, y: 0 })
+      expect(Math.abs(angleDelta(fix?.hold?.inboundTrue ?? 0, towardField)), name)
+        .toBeLessThan(1e-6)
+    }
+  })
+
+  it('turns a hold that would not fit in the airspace', () => {
+    // Bovingdon sits under two miles inside the edge of the TMA, so a
+    // pattern laid radially outward from it spends half of every circuit
+    // outside controlled airspace. That is the case this exists for.
+    const bnn = egll.holdingFixes.find((x) => x.name === 'BNN')
+    expect(bnn?.hold).toBeDefined()
+    const towardField = bearingDeg(bnn?.posNM ?? { x: 0, y: 0 }, { x: 0, y: 0 })
+    expect(Math.abs(angleDelta(bnn?.hold?.inboundTrue ?? 0, towardField))).toBeGreaterThan(30)
+  })
+
+  it('keeps every hold pattern inside the airspace', () => {
+    // The regression that matters: an aircraft holding where it was sent
+    // must not drift out of controlled airspace and be lost for nothing.
+    const NOMINAL_LEG_NM = 4.2
+    const NOMINAL_WIDTH_NM = 2.6
+    for (const fix of egll.holdingFixes) {
+      const hold = fix.hold
+      if (!hold) continue
+      const outbound = (hold.inboundTrue + 180) % 360
+      const across = (hold.inboundTrue + (hold.turns === 'right' ? 90 : -90) + 360) % 360
+      for (const along of [0, NOMINAL_LEG_NM, NOMINAL_LEG_NM + 1]) {
+        for (const side of [0, NOMINAL_WIDTH_NM]) {
+          const at = advance(advance(fix.posNM, outbound, along), across, side)
+          expect(isWithinFootprint(egll.controlZone, at), `${fix.name} at ${along}/${side}`)
+            .toBe(true)
+        }
+      }
     }
   })
 

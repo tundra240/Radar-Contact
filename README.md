@@ -109,9 +109,16 @@ geometry actually allows it -- inside the beam, within 30 degrees of the course,
 onto the aircraft. From there it flies the path to the numbers and comes off the scope, and the
 `LANDED n LOST n` cell on the status bar counts them against the ones that got away.
 
-**Only your airspace is lit.** The sector circle is the area of responsibility; everything
-outside it is washed back towards the background, so the part of the map you are working is
-obvious at a glance without the rest being hidden.
+**Only your airspace is lit, and it is the real shape.** The area of responsibility is the
+published controlled airspace over the field -- the London CTR from the surface to 2,500 ft and
+London TMA 1 from there to FL195, both closed rings out of the sector file -- not a radius.
+Everything outside is washed back towards the background, so the part of the map you are working
+is obvious at a glance without the rest being hidden.
+
+It is emphatically not circular: the boundary is 39 NM out to the south-east and 11 NM to the
+south-west. And it has a floor -- below 2,500 ft the only controlled airspace is the CTR, so a
+descent below the base of the TMA out in the country is refused rather than quietly losing you
+the aircraft.
 
 **You see traffic before it is yours.** Arrivals are released outside the boundary and fly in,
 drawn dimmed, listed at the bottom of the strip bay as `INBOUND` with no sequence number. Any

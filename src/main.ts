@@ -473,7 +473,7 @@ function start(
   // clearance can be refused, one readback format, one thing to test.
 
   const applyContext: ApplyContext = {
-    sectorRadiusNM: airport.sector.radiusNM,
+    controlZone: airport.controlZone,
     floorFt: airport.sector.floorFt,
     ceilingFt: airport.sector.ceilingFt,
     speedLimitKts: airport.sector.speedLimitKts,
@@ -605,7 +605,7 @@ function start(
 
   /** Traffic the controller may actually touch. */
   const mine = (): readonly Aircraft[] =>
-    traffic.filter((a) => isInSector(a, airport.sector.radiusNM))
+    traffic.filter((a) => isInSector(a, airport.controlZone))
 
   const signed = (n: number): string => (n > 0 ? `+${n}` : String(n))
 
@@ -629,8 +629,8 @@ function start(
       for (const stepped of traffic.map((x) => stepAircraft(x, dt, clock.elapsedSeconds))) {
         // Crossing in is what makes an aircraft the controller's, and it is
         // the only moment at which that changes.
-        const a = enterSector(stepped, airport.sector.radiusNM)
-        const departure = departureOf(a, airport.sector.radiusNM, outerLimit)
+        const a = enterSector(stepped, airport.controlZone)
+        const departure = departureOf(a, airport.controlZone, outerLimit)
         if (departure === null) {
           flown.push(a)
           continue

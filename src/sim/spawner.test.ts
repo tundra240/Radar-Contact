@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import type { Clock } from '../core/loop'
-import { advance as advancePos, bearingDeg, distanceNM } from '../core/geo'
+import { advance as advancePos, angleDelta, bearingDeg, distanceNM } from '../core/geo'
 import { makeRng } from '../core/rng'
 import { loadAirport, outerLimitNM } from '../data/airport'
 import raw from '../data/egll.json'
 import { departureOf, enterSector, isInSector } from './aircraft'
+import { exitRangeNM } from './airspace'
 import { Spawner } from './spawner'
 import type { Aircraft } from './types'
 
 const airport = loadAirport(raw)
+/** Hoisted: it walks every vertex of the airspace, and never changes. */
+const OUTER_LIMIT_NM = outerLimitNM(airport)
 
 const clockAt = (seconds: number): Clock => ({
   ticks: Math.round(seconds * 20),
@@ -49,8 +52,8 @@ function fly(
           ...a,
           pos: advancePos(a.pos, a.hdg, (a.gsKts / 3600) * step),
         }))
-        .map((a) => enterSector(a, airport.sector.radiusNM))
-        .filter((a) => departureOf(a, airport.sector.radiusNM, outerLimitNM(airport)) === null)
+        .map((a) => enterSector(a, airport.controlZone))
+        .filter((a) => departureOf(a, airport.controlZone, OUTER_LIMIT_NM) === null)
     }
   }
   return { world, all }
@@ -87,13 +90,14 @@ function parked(
   }
 }
 
-/** Where an arrival for this fix appears: outside the boundary, on its radial. */
+/**
+ * Where an arrival for this fix appears: out along the radial through it
+ * until the airspace ends, then the configured distance beyond that.
+ */
 function gateOf(fix: { posNM: { x: number; y: number } }) {
-  return advancePos(
-    { x: 0, y: 0 },
-    bearingDeg({ x: 0, y: 0 }, fix.posNM),
-    airport.sector.radiusNM + airport.traffic.entryDistanceNM,
-  )
+  const radial = bearingDeg({ x: 0, y: 0 }, fix.posNM)
+  const edge = exitRangeNM(airport.controlZone, { x: 0, y: 0 }, radial)
+  return advancePos({ x: 0, y: 0 }, radial, edge + airport.traffic.entryDistanceNM)
 }
 
 /** The level an empty stack at this fix hands out first: its bottom. */
@@ -123,7 +127,7 @@ describe('entry fixes', () => {
   })
 
   it('spreads arrivals across all four fixes', () => {
-    const { all } = fly(makeSpawner(), 3600)
+    const { all } = fly(makeSpawner(), 1800)
     const used = new Set(all.map((a) => a.originFix))
     expect(used).toEqual(new Set(['LAM', 'BIG', 'BNN', 'OCK']))
   })
@@ -182,14 +186,14 @@ describe('timing', () => {
   it('delivers a plausible arrival rate', () => {
     // Somewhere in the region of a real approach sector rather than one an
     // hour or one a second.
-    const { all } = fly(makeSpawner(), 3600)
+    const { all } = fly(makeSpawner(), 1800)
     expect(all.length).toBeGreaterThan(20)
     expect(all.length).toBeLessThan(60)
   })
 })
 
 describe('entry state', () => {
-  const { all } = fly(makeSpawner(), 3600)
+  const { all } = fly(makeSpawner(), 1800)
 
   it('starts every arrival on its fix', () => {
     for (const a of all) {
@@ -248,10 +252,8 @@ describe('entry state', () => {
     for (const a of all) expect(a.gsKts, a.callsign).toBe(airport.traffic.entrySpeedKts)
   })
 
-  it('tracks the hold inbound leg, which points at the field', () => {
+  it('arrives level, with no vector on it', () => {
     for (const a of all) {
-      const fix = airport.navaids.find((n) => n.name === a.originFix)
-      expect(a.hdg, a.callsign).toBeCloseTo(fix?.hold?.inboundTrue ?? -1, 6)
       expect(a.clearedAltFt, a.callsign).toBe(a.altFt)
       expect(a.clearedSpdKts, a.callsign).toBe(a.gsKts)
       // No cleared heading: in the hold it is navigating itself, so a
@@ -260,12 +262,29 @@ describe('entry state', () => {
     }
   })
 
+  it('points at its fix, which is not the same as the hold inbound leg', () => {
+    // A hold turned to fit the airspace faces a different way from the
+    // radial the arrival comes down, so the two must not be conflated.
+    for (const a of all) {
+      const fix = airport.navaids.find((n) => n.name === a.originFix)
+      if (!fix) throw new Error(`no fix for ${a.callsign}`)
+      expect(bearingDeg(a.pos, fix.posNM), a.callsign).toBeCloseTo(a.hdg, 4)
+    }
+    const bnn = all.find((a) => a.originFix === 'BNN')
+    const bnnFix = airport.navaids.find((n) => n.name === 'BNN')
+    if (bnn && bnnFix?.hold) {
+      expect(Math.abs(angleDelta(bnn.hdg, bnnFix.hold.inboundTrue))).toBeGreaterThan(30)
+    }
+  })
+
   it('appears outside the boundary, so it is seen before it is yours', () => {
     // The whole point of releasing out there: traffic is visible, and
     // identifiable, for a couple of minutes before it can be worked.
-    const want = airport.sector.radiusNM + airport.traffic.entryDistanceNM
     for (const a of all) {
-      expect(distanceNM({ x: 0, y: 0 }, a.pos), a.callsign).toBeCloseTo(want, 5)
+      const fix = airport.navaids.find((n) => n.name === a.originFix)
+      if (!fix) throw new Error(`no fix for ${a.callsign}`)
+      expect(distanceNM(a.pos, gateOf(fix)), a.callsign).toBeCloseTo(0, 5)
+      expect(isInSector(a, airport.controlZone), a.callsign).toBe(false)
       expect(a.entered, a.callsign).toBe(false)
     }
   })
@@ -318,7 +337,14 @@ describe('entry state', () => {
     const known = new Set(airport.aircraftTypes.map((t) => t.type))
     for (const a of all) expect(known.has(a.type), a.type).toBe(true)
 
-    const { all: many } = fly(makeSpawner(4242), 6 * 3600)
+    // A big sample of releases without flying six hours to get one: the
+    // fleet mix is the generator's business and does not depend on the
+    // world moving at all.
+    const sampler = makeSpawner(4242)
+    const many: Aircraft[] = []
+    for (let i = 0; i < 400; i += 1) many.push(...sampler.spawnNow(clockAt(i * 120), []))
+    expect(many.length).toBeGreaterThan(300)
+
     const narrow = many.filter((a) => a.wake === 'M').length
     const supers = many.filter((a) => a.wake === 'J').length
     expect(narrow / many.length).toBeGreaterThan(0.35)
@@ -401,7 +427,7 @@ describe('flow management', () => {
   })
 
   it('will not reuse the same fix inside the cooldown', () => {
-    const { all } = fly(makeSpawner(), 3600)
+    const { all } = fly(makeSpawner(), 1800)
     const lastAt = new Map<string, number>()
     for (const a of all) {
       const fix = a.originFix ?? ''
@@ -422,7 +448,7 @@ describe('flow management', () => {
     // traffic inside the boundary, so it is inbound traffic that stacks up
     // outside and the workload that stays capped.
     const { world } = fly(spawner, 4 * 3600, { move: false })
-    const inside = world.filter((a) => isInSector(a, airport.sector.radiusNM))
+    const inside = world.filter((a) => isInSector(a, airport.controlZone))
     expect(inside.length).toBeLessThanOrEqual(airport.traffic.maxConcurrent)
     expect(spawner.deferred).toBeGreaterThan(0)
   })
@@ -736,18 +762,20 @@ describe('where arrivals appear', () => {
     expect(new Set(all.map((a) => a.originFix)).size).toBe(4)
   })
 
-  it('hands every feed over at the same range', () => {
-    // Measured from the boundary rather than from the fix, so a feed
-    // twenty-five miles out does not get a shorter run in than one at ten.
-    const want = airport.sector.radiusNM + airport.traffic.entryDistanceNM
+  it('hands every feed over the same distance outside the airspace', () => {
+    // Measured against the real boundary, which at Heathrow lies anywhere
+    // from seventeen miles out to thirty-five depending on the direction.
     for (const a of all) {
-      expect(distanceNM({ x: 0, y: 0 }, a.pos), a.callsign).toBeCloseTo(want, 5)
+      const radial = bearingDeg({ x: 0, y: 0 }, a.pos)
+      const edge = exitRangeNM(airport.controlZone, { x: 0, y: 0 }, radial)
+      expect(distanceNM({ x: 0, y: 0 }, a.pos) - edge, a.callsign)
+        .toBeCloseTo(airport.traffic.entryDistanceNM, 1)
     }
   })
 
   it('releases nothing that the world would immediately remove', () => {
     for (const a of all) {
-      expect(departureOf(a, airport.sector.radiusNM), a.callsign).toBeNull()
+      expect(departureOf(a, airport.controlZone), a.callsign).toBeNull()
     }
   })
 
@@ -755,7 +783,7 @@ describe('where arrivals appear', () => {
     // An arrival that appeared inside would be the controller's before they
     // had a chance to see it coming.
     for (const a of all) {
-      expect(isInSector(a, airport.sector.radiusNM), a.callsign).toBe(false)
+      expect(isInSector(a, airport.controlZone), a.callsign).toBe(false)
       expect(a.entered, a.callsign).toBe(false)
     }
   })

@@ -1,5 +1,6 @@
 import { normalizeHeading } from '../core/geo'
 import { isInSector } from '../sim/aircraft'
+import { isControlled, type ControlZone } from '../sim/airspace'
 import { onApproach } from '../sim/ils'
 import type { Aircraft, ApproachClearance, HoldClearance } from '../sim/types'
 import type { Command } from './types'
@@ -41,8 +42,11 @@ export interface ApplyContext {
   readonly holdFor: (fix: string) => HoldClearance | null
   /** Null for a runway with no ILS available, which refuses the clearance. */
   readonly approachFor: (runway: string) => ApproachClearance | null
-  /** The area of responsibility. Nothing outside it takes a clearance. */
-  readonly sectorRadiusNM: number
+  /**
+   * The area of responsibility: the published controlled airspace. Nothing
+   * outside it takes a clearance, at any level.
+   */
+  readonly controlZone: ControlZone
 }
 
 export type Outcome =
@@ -61,7 +65,7 @@ export function applyCommand(
   // somebody else's. It can be seen, identified and planned around, and it
   // takes no instructions -- which is the one rule that makes the boundary
   // mean something rather than being a circle on a display.
-  if (!isInSector(aircraft, ctx.sectorRadiusNM)) {
+  if (!isInSector(aircraft, ctx.controlZone)) {
     return {
       ok: false,
       reason: `${aircraft.callsign} is not in your airspace yet`,
@@ -125,6 +129,17 @@ function altitude(ft: number, a: Aircraft, ctx: ApplyContext): Outcome {
     return {
       ok: false,
       reason: `${a.callsign} cannot be cleared ${to} ft -- the sector is ${ctx.floorFt} to ${ctx.ceilingFt}`,
+    }
+  }
+
+  // Below the airspace is outside the airspace, and the world removes what
+  // is outside. Refusing here rather than accepting and losing the aircraft
+  // two minutes later is the same principle as every other refusal in this
+  // module: say no rather than do something surprising.
+  if (!isControlled(ctx.controlZone, a.pos, to)) {
+    return {
+      ok: false,
+      reason: `${to} ft is below controlled airspace where ${a.callsign} is`,
     }
   }
 

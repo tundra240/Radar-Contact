@@ -4,6 +4,7 @@ import { advance, angleDelta, distanceNM } from '../core/geo'
 import { loadAirport } from '../data/airport'
 import raw from '../data/egll.json'
 import { stepAircraft } from './aircraft'
+import { isControlled } from './airspace'
 import { alongTrackNM, holdLeg, holdLegNM, holdSteer, leadHeading } from './hold'
 import { statusText, type Aircraft, type HoldClearance } from './types'
 
@@ -298,6 +299,58 @@ describe('the published EGLL holds', () => {
       expect(Math.abs(settled.turned), navaid.name).toBeGreaterThan(1100)
       expect(Math.sign(settled.turned), navaid.name).toBe(pattern.turns === 'right' ? 1 : -1)
       expect(statusText(settled.a)).toBe(`HOLDING ${navaid.name}`)
+    }
+  })
+})
+
+describe('holding inside the real airspace', () => {
+  /**
+   * The regression behind the hold refit in the loader.
+   *
+   * Bovingdon sits under two miles inside the edge of the London TMA, and a
+   * hold derived to point at the field laid its racetrack radially outward:
+   * 54% of every circuit outside controlled airspace, and every aircraft
+   * sent there lost for nothing. The nominal check lives in
+   * data/airport.test.ts; this one flies the pattern and asks the airspace.
+   */
+  const airport = loadAirport(raw)
+
+  it('keeps every published hold inside controlled airspace, all the way round', () => {
+    const fixes = airport.navaids.filter((n) => n.hold !== null && n.entry !== null)
+    expect(fixes).toHaveLength(4)
+
+    for (const navaid of fixes) {
+      const pattern = navaid.hold
+      const band = navaid.entry
+      if (pattern === null || band === null) throw new Error('filtered above')
+      const clearance: HoldClearance = {
+        fix: navaid.name,
+        posNM: navaid.posNM,
+        inboundTrue: pattern.inboundTrue,
+        turns: pattern.turns,
+        legMins: pattern.legMins,
+      }
+
+      // At the top of the stack and at holding speed, which is the widest
+      // the pattern ever gets.
+      let a = ac({
+        pos: navaid.posNM,
+        hdg: pattern.inboundTrue,
+        altFt: band.maxAltFt,
+        clearedAltFt: band.maxAltFt,
+        gsKts: 240,
+        clearedSpdKts: 240,
+        hold: clearance,
+        originFix: navaid.name,
+      })
+
+      let outside = 0
+      const steps = Math.round((12 * 60) / DT)
+      for (let i = 0; i < steps; i += 1) {
+        a = stepAircraft(a, DT, i * DT)
+        if (!isControlled(airport.controlZone, a.pos, a.altFt)) outside += 1
+      }
+      expect(outside, `${navaid.name} left controlled airspace`).toBe(0)
     }
   })
 })

@@ -6,6 +6,7 @@ import {
   type Vec2NM,
 } from '../core/geo'
 import { autopilot, STANDARD_RATES, type Rates } from './autopilot'
+import { isControlled, type ControlZone } from './airspace'
 import { holdSteer } from './hold'
 import { ilsGuidance } from './ils'
 import type { Aircraft } from './types'
@@ -139,9 +140,14 @@ export type Departure = 'landed' | 'left'
 /**
  * Inside the area of responsibility, and therefore the controller's to
  * work. Traffic outside it can be seen and not touched.
+ *
+ * The area of responsibility is the published controlled airspace, so this
+ * is a three-dimensional question: an aircraft below the base of the TMA
+ * and outside the CTR is in nobody's airspace, however close to the field
+ * it is. See sim/airspace.ts.
  */
-export function isInSector(a: Aircraft, sectorRadiusNM: number): boolean {
-  return distanceNM(ORIGIN_NM, a.pos) <= sectorRadiusNM
+export function isInSector(a: Aircraft, zone: ControlZone): boolean {
+  return isControlled(zone, a.pos, a.altFt)
 }
 
 /**
@@ -160,11 +166,11 @@ export function isInSector(a: Aircraft, sectorRadiusNM: number): boolean {
  */
 export function departureOf(
   a: Aircraft,
-  sectorRadiusNM: number,
+  zone: ControlZone,
   outerLimitNM = Number.POSITIVE_INFINITY,
 ): Departure | null {
   if (a.navMode === 'LANDED') return 'landed'
-  if (a.entered && !isInSector(a, sectorRadiusNM)) return 'left'
+  if (a.entered && !isInSector(a, zone)) return 'left'
   // A backstop for the other direction. Inbound traffic that turns away
   // never enters, so the rule above can never fire for it and it would fly
   // outward for ever, counted in the cap and drawn on a zoomed-out scope.
@@ -174,8 +180,8 @@ export function departureOf(
 }
 
 /** Marks an inbound aircraft as the controller's, the first time it is. */
-export function enterSector(a: Aircraft, sectorRadiusNM: number): Aircraft {
-  return !a.entered && isInSector(a, sectorRadiusNM) ? { ...a, entered: true } : a
+export function enterSector(a: Aircraft, zone: ControlZone): Aircraft {
+  return !a.entered && isInSector(a, zone) ? { ...a, entered: true } : a
 }
 
 export function distanceFlownNM(gsKts: number, dtSeconds: number): number {
