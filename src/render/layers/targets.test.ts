@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { Camera } from '../../core/camera'
 import type { Aircraft } from '../../sim/types'
 import { palettes, setPalette, theme } from '../theme'
-import { PICK_RADIUS_PX, blockBox, blockLines, drawTargets, pickTarget } from './targets'
+import {
+  PICK_RADIUS_PX,
+  blockBox,
+  blockLines,
+  dragHeading,
+  drawTargets,
+  drawVectorDrag,
+  pickTarget,
+} from './targets'
 
 /**
  * The target symbology, checked against a recording canvas: where the
@@ -27,6 +35,7 @@ interface Line {
   from: { x: number; y: number }
   to: { x: number; y: number }
   style: string
+  dashed: boolean
 }
 interface Label {
   s: string
@@ -42,12 +51,16 @@ function recorder(): {
   rects: Rect[]
   lines: Line[]
   labels: Label[]
+  dashes: number[][]
   alphaAtEnd: () => number
+  dashAtEnd: () => number[]
 } {
   const dots: Dot[] = []
   const rects: Rect[] = []
   const lines: Line[] = []
   const labels: Label[] = []
+  const dashes: number[][] = []
+  let dash: number[] = []
   let path: { x: number; y: number }[] = []
   const noop = (): void => {}
   const stub: Record<string, unknown> = {
@@ -73,7 +86,7 @@ function recorder(): {
       const from = path[0]
       const to = path[path.length - 1]
       if (from && to && path.length >= 2) {
-        lines.push({ from, to, style: String(stub['strokeStyle']) })
+        lines.push({ from, to, style: String(stub['strokeStyle']), dashed: dash.length > 0 })
       }
     },
     fill: noop,
@@ -89,7 +102,10 @@ function recorder(): {
     fillRect: noop,
     save: noop,
     restore: noop,
-    setLineDash: noop,
+    setLineDash: (d: number[]) => {
+      dash = d
+      dashes.push(d)
+    },
     fillStyle: '',
     strokeStyle: '',
     lineWidth: 0,
@@ -105,7 +121,9 @@ function recorder(): {
     rects,
     lines,
     labels,
+    dashes,
     alphaAtEnd: () => Number(stub['globalAlpha']),
+    dashAtEnd: () => dash,
   }
 }
 
@@ -354,5 +372,172 @@ describe('pickTarget', () => {
     const at = c.worldToScreen(near.pos)
     // Order reversed, so a result of NEAR cannot just be the first match.
     expect(pickTarget(c, [far, near], at)?.callsign).toBe('NEAR')
+  })
+})
+
+describe('dragHeading', () => {
+  const cam = (): Camera => {
+    const c = new Camera({ x: 0, y: 0 }, 20, { maxNM: 200 })
+    c.setViewport(1000, 600)
+    return c
+  }
+
+  it('reads the bearing from the aircraft to the cursor', () => {
+    const a = plane({ pos: { x: 0, y: 0 } })
+    expect(dragHeading(a, { x: 5, y: 0 })).toBe(90)
+    expect(dragHeading(a, { x: -5, y: 0 })).toBe(270)
+    expect(dragHeading(a, { x: 0, y: -5 })).toBe(180)
+  })
+
+  it('gives due north as zero, which is what the command wants', () => {
+    // headingLabel turns it back into 360 for the readout.
+    expect(dragHeading(plane({ pos: { x: 0, y: 0 } }), { x: 0, y: 5 })).toBe(0)
+  })
+
+  it('measures from where the aircraft is, not from the origin', () => {
+    const a = plane({ pos: { x: 10, y: 10 } })
+    expect(dragHeading(a, { x: 10, y: 20 })).toBe(0)
+    expect(dragHeading(a, { x: 20, y: 10 })).toBe(90)
+  })
+
+  it('rounds to a whole degree and never returns 360', () => {
+    const a = plane({ pos: { x: 0, y: 0 } })
+    // A hair west of north rounds to 360, which has to come back as zero.
+    expect(dragHeading(a, { x: -0.001, y: 10 })).toBe(0)
+    expect(Number.isInteger(dragHeading(a, { x: 3, y: 7 }))).toBe(true)
+  })
+
+  it('agrees with the line that was drawn', () => {
+    // The readout and the clearance must come from the same arithmetic, or
+    // the aircraft flies somewhere other than where you pointed.
+    const c = cam()
+    const a = plane({ pos: { x: 2, y: 3 } })
+    const cursor = { x: 700, y: 200 }
+    const viaScreen = dragHeading(a, c.screenToWorld(cursor))
+    const r = recorder()
+    drawVectorDrag(r.ctx, c, { aircraft: a, toPx: cursor })
+    const readout = r.labels[0]?.s ?? ''
+    expect(readout.startsWith(String(viaScreen === 0 ? 360 : viaScreen).padStart(3, '0'))).toBe(true)
+  })
+})
+
+describe('drawVectorDrag', () => {
+  const render = (aircraft = plane({ pos: { x: 0, y: 0 } }), toPx = { x: 700, y: 200 }) => {
+    const cam = new Camera({ x: 0, y: 0 }, 20, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const rec = recorder()
+    drawVectorDrag(rec.ctx, cam, { aircraft, toPx })
+    return { ...rec, cam, aircraft, toPx }
+  }
+
+  it('draws a dashed line from the target to the cursor', () => {
+    const r = render()
+    const from = r.cam.worldToScreen(r.aircraft.pos)
+    const elastic = r.lines.find((l) => l.dashed)
+    expect(elastic).toBeDefined()
+    expect((elastic as Line).from.x).toBeCloseTo(from.x, 6)
+    expect((elastic as Line).from.y).toBeCloseTo(from.y, 6)
+    expect((elastic as Line).to).toEqual(r.toPx)
+  })
+
+  it('hands the dash pattern back, so nothing after it comes out dashed', () => {
+    // The airspace boundaries are drawn with dashes of their own, and a
+    // leftover pattern would quietly restyle everything downstream.
+    expect(render().dashAtEnd()).toEqual([])
+  })
+
+  it('reads out the heading in three digits and the distance in miles', () => {
+    const r = render(plane({ pos: { x: 0, y: 0 } }))
+    const text = r.labels[0]?.s ?? ''
+    expect(text).toMatch(/^\d{3}/)
+    expect(text).toMatch(/\d+\.\d NM$/)
+  })
+
+  it('writes north as 360 rather than 000', () => {
+    const cam = new Camera({ x: 0, y: 0 }, 20, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const north = cam.worldToScreen({ x: 0, y: 8 })
+    const r = render(plane({ pos: { x: 0, y: 0 } }), north)
+    expect(r.labels[0]?.s.startsWith('360')).toBe(true)
+  })
+
+  it('measures the distance to the cursor, not to anywhere else', () => {
+    const cam = new Camera({ x: 0, y: 0 }, 20, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const six = cam.worldToScreen({ x: 6, y: 0 })
+    const r = render(plane({ pos: { x: 0, y: 0 } }), six)
+    expect(r.labels[0]?.s).toContain('6.0 NM')
+  })
+
+  it('marks the aircraft the line comes out of', () => {
+    const r = render()
+    const from = r.cam.worldToScreen(r.aircraft.pos)
+    expect(r.dots.some((d) => Math.hypot(d.x - from.x, d.y - from.y) < 0.001)).toBe(true)
+  })
+
+  it('puts the readout on a filled panel so the map cannot be read through it', () => {
+    const r = render()
+    expect(r.rects.length).toBeGreaterThan(0)
+  })
+
+  it('turns the readout inward at the right-hand edge', () => {
+    const near = render(plane({ pos: { x: 0, y: 0 } }), { x: 990, y: 300 })
+    const label = near.labels[0]
+    expect(label).toBeDefined()
+    expect((label as Label).x).toBeLessThan(990)
+  })
+
+  it('drops the readout below the cursor at the top of the display', () => {
+    const top = render(plane({ pos: { x: 0, y: 0 } }), { x: 400, y: 4 })
+    expect((top.labels[0] as Label).y).toBeGreaterThan(4)
+  })
+})
+
+describe('picking out of a stack', () => {
+  const cam = (): Camera => {
+    const c = new Camera({ x: 0, y: 0 }, 40, { maxNM: 200 })
+    c.setViewport(1400, 800)
+    return c
+  }
+
+  /** Four aircraft holding over one fix, a mile apart round the pattern. */
+  const stack = [
+    plane({ callsign: 'ONE1', pos: { x: 13.0, y: 9.0 }, altFt: 8000 }),
+    plane({ callsign: 'TWO2', pos: { x: 13.6, y: 9.4 }, altFt: 9000 }),
+    plane({ callsign: 'THREE3', pos: { x: 12.4, y: 9.6 }, altFt: 10000 }),
+    plane({ callsign: 'FOUR4', pos: { x: 13.2, y: 8.4 }, altFt: 11000 }),
+  ]
+
+  it('finds more than one candidate under a single press', () => {
+    // Otherwise the preference below is solving a problem that is not there.
+    const c = cam()
+    const at = c.worldToScreen({ x: 13, y: 9 })
+    const hits = stack.filter((a) => {
+      const p = c.worldToScreen(a.pos)
+      return Math.hypot(p.x - at.x, p.y - at.y) <= PICK_RADIUS_PX
+    })
+    expect(hits.length).toBeGreaterThan(1)
+  })
+
+  it('gives the selected aircraft the press, not merely the nearest', () => {
+    const c = cam()
+    const at = c.worldToScreen({ x: 13, y: 9 })
+    // Nearest is ONE1, sitting exactly under the cursor.
+    expect(pickTarget(c, stack, at)?.callsign).toBe('ONE1')
+    // But if another one in the stack is selected, that is the one meant.
+    expect(pickTarget(c, stack, at, undefined, 'TWO2')?.callsign).toBe('TWO2')
+    expect(pickTarget(c, stack, at, undefined, 'FOUR4')?.callsign).toBe('FOUR4')
+  })
+
+  it('ignores a preference that is not under the cursor at all', () => {
+    const c = cam()
+    const at = c.worldToScreen({ x: 13, y: 9 })
+    const away = plane({ callsign: 'FAR9', pos: { x: -30, y: -30 } })
+    expect(pickTarget(c, [...stack, away], at, undefined, 'FAR9')?.callsign).toBe('ONE1')
+  })
+
+  it('still finds nothing on empty scope, whatever is selected', () => {
+    const c = cam()
+    expect(pickTarget(c, stack, { x: 40, y: 760 }, undefined, 'TWO2')).toBe(null)
   })
 })

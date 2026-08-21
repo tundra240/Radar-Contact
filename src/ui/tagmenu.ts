@@ -1,6 +1,6 @@
 import type { Envelope } from '../commands/apply'
 import type { Command, CommandSink } from '../commands/types'
-import { normalizeHeading } from '../core/geo'
+import { headingLabel, normalizeHeading } from '../core/geo'
 import { isHeavy, modeC, trendOf, type Aircraft } from '../sim/types'
 
 /**
@@ -64,11 +64,6 @@ export function headingChoices(step: number = HEADING_STEP): readonly number[] {
   for (let deg = step; deg < 360; deg += step) out.push(deg)
   out.push(0)
   return out
-}
-
-/** Three digits, with due north written the way it is spoken. */
-export function headingLabel(deg: number): string {
-  return String(deg === 0 ? 360 : deg).padStart(3, '0')
 }
 
 /**

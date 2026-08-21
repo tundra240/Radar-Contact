@@ -59,6 +59,18 @@ export function normalizeHeading(deg: number): number {
  * wraparound arithmetic is the single most reliable source of bugs in this
  * genre -- 350 to 010 must be +20, not -340.
  */
+/**
+ * A heading as it is written and spoken: three digits, with due north as
+ * three-six-zero rather than zero.
+ *
+ * Lives here rather than in whichever module happened to need it first,
+ * because the scope and the tag menu both print headings and two copies
+ * would eventually disagree about north.
+ */
+export function headingLabel(deg: number): string {
+  return String(deg === 0 ? 360 : deg).padStart(3, '0')
+}
+
 export function angleDelta(from: number, to: number): number {
   const d = ((to - from) % 360 + 540) % 360 - 180
   // Normalize -180 to +180 so the range is (-180, 180] and a reciprocal

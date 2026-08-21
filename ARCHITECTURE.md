@@ -509,6 +509,33 @@ time -- rather than a fix name the flight model would have to look up. That is w
 aeroplane is carrying. A vector clears it, or the next tick would steer the aircraft straight
 back round the pattern.
 
+### Vectoring with the mouse
+
+Press on a target and drag: `render/layers/targets.ts` draws an elastic line from the
+aircraft's live position to the cursor with the heading and distance on it, and releasing puts
+a `heading` command through `issue()` -- the same gate as a typed line and a menu pick.
+
+The decision that makes it feel deliberate is taken at the moment of the press, not after it:
+a press that lands on a target starts a vector, and a press on empty scope pans. Working it out
+afterwards from how far the pointer moved would mean dragging the map out from under the
+aircraft being aimed at, which is the opposite of useful. Below `DRAG_MIN_PX` a release is
+treated as a click instead, because a heading taken from a three-pixel drag is decided by hand
+tremor.
+
+The line is redrawn from the aircraft's current position every frame rather than from where it
+was when the press landed, because the simulation does not stop for the mouse.
+
+**Headings here are true, not magnetic.** Every heading in the simulation is -- the tag menu's,
+the console's, the hold inbound legs -- and `magVarDeg` is zero at Heathrow in the config, so
+the two coincide exactly. Converting in this one input path would make a dragged vector
+disagree with a typed one the day that value changed. Making the display magnetic is a change
+that belongs in every heading at once.
+
+`pickTarget` gained a `prefer` argument for this. Since arrivals stack over their fix, four
+aircraft can sit within a mile of each other, which at a normal range is inside the pick radius
+-- so a press near a stack could turn a neighbour of the one intended. The selected aircraft
+now wins a tie, which makes "pick it out on the strip, then drag it on the scope" reliable.
+
 ### The tag menu
 
 Instructions are issued by **right-clicking the aircraft** -- the target on the scope, or its

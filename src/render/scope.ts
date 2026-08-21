@@ -16,7 +16,7 @@ import {
   type Runway,
 } from '../data/airport'
 import type { Aircraft } from '../sim/types'
-import { drawTargets } from './layers/targets'
+import { drawTargets, drawVectorDrag, type VectorDrag } from './layers/targets'
 import { OVERLAY_ITEMS, countEnabled, densityOf, type Overlays } from './overlays'
 import { airspaceColour, fonts, formatLevel, theme } from './theme'
 
@@ -51,6 +51,8 @@ export interface ScopeContacts {
   readonly aircraft: readonly Aircraft[]
   /** Callsign of the target under the controller's hand, if any. */
   readonly selected: string | null
+  /** A vector being dragged out with the mouse, while one is in progress. */
+  readonly drag?: VectorDrag | null
 }
 
 const NO_CONTACTS: ScopeContacts = { aircraft: [], selected: null }
@@ -123,6 +125,9 @@ export function drawScope(
   // Above every overlay and below the chrome: traffic is the top layer of
   // the radar picture, but it is still inside the display.
   drawTargets(g, cam, contacts.aircraft, contacts.selected)
+  // Above the traffic: the line being dragged is the thing the controller
+  // is looking at, and it has to be readable over a target it crosses.
+  if (contacts.drag) drawVectorDrag(g, cam, contacts.drag)
 
   drawHud(g, cam, airport, overlays, status)
   drawScreenFrame(g, cam)

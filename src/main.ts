@@ -11,7 +11,7 @@ import { parseCommandLine } from './commands/parse'
 import { applyAll, type ApplyContext } from './commands/apply'
 import { CommandConsole } from './ui/console'
 import { TagMenu } from './ui/tagmenu'
-import { pickTarget } from './render/layers/targets'
+import { dragHeading, pickTarget, type VectorDrag } from './render/layers/targets'
 import { StripBay } from './ui/stripbay'
 import { Menu } from './ui/menu'
 import { Logon, type LogonDetails } from './ui/logon'
@@ -149,32 +149,90 @@ function start(
     requestDraw()
   }, { passive: false })
 
-  let dragging = false
+  /**
+   * What the left button is doing.
+   *
+   * Pressing on a target drags a vector out of it; pressing on empty scope
+   * pans the picture. Deciding at the moment of the press, rather than
+   * after the fact, is what makes both feel deliberate -- dragging the map
+   * out from under the aircraft you were aiming would be the opposite of
+   * useful.
+   */
+  let mode: 'idle' | 'pan' | 'vector' = 'idle'
   let lastX = 0
   let lastY = 0
+  /** Where the press landed, in canvas pixels. */
+  let pressAt = { x: 0, y: 0 }
+  /** The aircraft a vector is being dragged out of, by callsign. */
+  let dragCallsign: string | null = null
+  /** Where the cursor is, while a vector is being dragged. */
+  let dragToPx = { x: 0, y: 0 }
+  /** What was selected before the press, so a click can still toggle it. */
+  let selectedBeforePress: string | null = null
+
   /**
-   * How far the pointer has travelled since it went down. A press that
-   * moves a pixel or two is a click on a target, not a pan -- without the
-   * slop, picking up a target with a trackpad is close to impossible.
+   * How far the pointer has to travel before a press counts as a drag
+   * rather than a click. Below it, a heading taken from the cursor would be
+   * decided by two or three pixels of hand tremor.
    */
-  let travelledPx = 0
-  const CLICK_SLOP_PX = 4
+  const DRAG_MIN_PX = 10
+
+  const movedFrom = (at: { readonly x: number; readonly y: number }): number =>
+    Math.hypot(at.x - pressAt.x, at.y - pressAt.y)
+
+  /** The drag resolved against the world, so the line follows the target. */
+  const currentDrag = (): VectorDrag | null => {
+    if (dragCallsign === null) return null
+    const aircraft = traffic.find((a) => a.callsign === dragCallsign)
+    return aircraft === undefined ? null : { aircraft, toPx: dragToPx }
+  }
+
+  const endDrag = (): void => {
+    mode = 'idle'
+    dragCallsign = null
+  }
 
   surface.addEventListener('pointerdown', (e: PointerEvent) => {
     // The left button only. The right button belongs to the tag menu, and
     // a right-drag that also panned would slide the picture out from under
     // the menu it had just opened.
     if (e.button !== 0) return
-    dragging = true
-    travelledPx = 0
+    const at = pointIn(e)
+    pressAt = at
     lastX = e.clientX
     lastY = e.clientY
     surface.setPointerCapture(e.pointerId)
+
+    // The selected aircraft wins a tie, so pulling one out of a stack from
+    // its strip and then dragging on the scope turns the one you meant.
+    const target = pickTarget(cam, traffic, at, undefined, selected)
+    if (target === null) {
+      mode = 'pan'
+      dragCallsign = null
+      return
+    }
+
+    mode = 'vector'
+    dragCallsign = target.callsign
+    dragToPx = at
+    // Highlighted for the duration, so there is no doubt which aircraft the
+    // line is coming out of. What was selected before is remembered, so a
+    // press that turns out to be a click can still toggle it.
+    selectedBeforePress = selected
+    selected = target.callsign
+    syncStrips()
+    requestDraw()
   })
 
   surface.addEventListener('pointermove', (e: PointerEvent) => {
-    if (!dragging) return
-    travelledPx += Math.abs(e.clientX - lastX) + Math.abs(e.clientY - lastY)
+    if (mode === 'idle') return
+
+    if (mode === 'vector') {
+      dragToPx = pointIn(e)
+      requestDraw()
+      return
+    }
+
     cam.panByPx(e.clientX - lastX, e.clientY - lastY)
     lastX = e.clientX
     lastY = e.clientY
@@ -182,27 +240,60 @@ function start(
   })
 
   surface.addEventListener('pointerup', (e: PointerEvent) => {
-    const panned = dragging && travelledPx > CLICK_SLOP_PX
-    dragging = false
-    if (e.button !== 0 || panned) return
+    const was = mode
+    const callsign = dragCallsign
+    endDrag()
+    if (e.button !== 0) {
+      requestDraw()
+      return
+    }
 
-    // Left-click picks a target up, and picks nothing up on empty scope,
-    // which is how you let go of one.
-    const target = pickTarget(cam, traffic, pointIn(e))
-    selected = target === null ? null : target.callsign === selected ? null : target.callsign
-    syncStrips()
+    const at = pointIn(e)
+    const far = movedFrom(at) > DRAG_MIN_PX
+
+    if (was === 'vector' && callsign !== null) {
+      if (far) {
+        // Straight through the same gate as a typed clearance and a menu
+        // one: one validation path, one readback, one log.
+        const target = traffic.find((a) => a.callsign === callsign)
+        if (target !== undefined) {
+          issue([
+            {
+              kind: 'heading',
+              callsign,
+              deg: dragHeading(target, cam.screenToWorld(at)),
+            },
+          ])
+        }
+      } else {
+        // It did not really move: that is a click, and a click on the
+        // target that was already selected lets go of it.
+        selected = selectedBeforePress === callsign ? null : callsign
+        syncStrips()
+      }
+      requestDraw()
+      return
+    }
+
+    // A press on empty scope that did not pan is how you let go of a
+    // target without picking another.
+    if (was === 'pan' && !far) {
+      selected = null
+      syncStrips()
+    }
     requestDraw()
   })
 
   surface.addEventListener('pointercancel', (): void => {
-    dragging = false
+    endDrag()
+    requestDraw()
   })
 
   // Right-click a target: its clearances, at the cursor. On empty scope
   // there is nothing to instruct, so the menu just closes.
   surface.addEventListener('contextmenu', (e: MouseEvent) => {
     e.preventDefault()
-    const target = pickTarget(cam, traffic, pointIn(e))
+    const target = pickTarget(cam, traffic, pointIn(e), undefined, selected)
     if (target === null) {
       tagMenu.close()
       return
@@ -531,7 +622,7 @@ function start(
           traffic: { spawned: spawner.spawned, held: spawner.deferred },
           controller,
         },
-        { aircraft: traffic, selected },
+        { aircraft: traffic, selected, drag: currentDrag() },
       )
     },
   })
@@ -725,6 +816,16 @@ function start(
 
   window.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return
+
+    // Abandons a vector being dragged, whatever has focus: a half-drawn
+    // clearance you have changed your mind about should not need the mouse
+    // brought back to somewhere safe to let go of it.
+    if (e.key === 'Escape' && mode === 'vector') {
+      endDrag()
+      requestDraw()
+      return
+    }
+
     if (isTypingTarget(e.target)) return
 
     if (e.key === ' ') {

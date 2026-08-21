@@ -1,5 +1,12 @@
 import type { Camera, Vec2Px } from '../../core/camera'
-import { advance } from '../../core/geo'
+import {
+  advance,
+  bearingDeg,
+  distanceNM,
+  headingLabel,
+  normalizeHeading,
+  type Vec2NM,
+} from '../../core/geo'
 import { isHeavy, modeC, trendOf, type Aircraft } from '../../sim/types'
 import { fonts, theme } from '../theme'
 
@@ -202,15 +209,25 @@ function drawBlock(
  * the block counts as part of the target for the same reason. Ties go to
  * whichever symbol is nearest, so two overlapping blocks resolve to the
  * aircraft the cursor is actually closest to.
+ *
+ * `prefer` breaks the tie differently: if that callsign is among the hits
+ * it wins outright. Four aircraft stacked over the same fix are within a
+ * mile of each other, which at a normal range is inside the pick radius --
+ * so without this, picking one out of a stack and then dragging a vector
+ * off it could quietly turn its neighbour. Selecting from the strip and
+ * then dragging on the scope is the way a stack is worked, and this is what
+ * makes that hold together.
  */
 export function pickTarget(
   cam: Camera,
   traffic: readonly Aircraft[],
   at: Vec2Px,
   radiusPx = PICK_RADIUS_PX,
+  prefer: string | null = null,
 ): Aircraft | null {
   let best: Aircraft | null = null
   let nearest = Infinity
+  let preferred: Aircraft | null = null
 
   for (const a of traffic) {
     const p = cam.worldToScreen(a.pos)
@@ -228,10 +245,120 @@ export function pickTarget(
         at.y <= box.y + box.h + PICK_SLOP_PX
     }
 
-    if (hit && away < nearest) {
+    if (!hit) continue
+    if (a.callsign === prefer) preferred = a
+    if (away < nearest) {
       best = a
       nearest = away
     }
   }
-  return best
+  return preferred ?? best
+}
+
+/* ----------------------------------------------------- vectoring by hand */
+
+/** A vector being dragged out of a target with the mouse. */
+export interface VectorDrag {
+  readonly aircraft: Aircraft
+  /** Where the cursor is, in the canvas's own pixels. */
+  readonly toPx: Vec2Px
+}
+
+/** Written as an escape so this file stays ASCII, as the strip bay does. */
+const DEGREE = String.fromCharCode(0xb0)
+
+const DRAG_FONT_PX = 11
+const DRAG_PAD_PX = 4
+/** Clear of the cursor, so the readout is never under the pointer. */
+const DRAG_OFFSET_PX = 14
+const DRAG_ORIGIN_PX = 3
+
+/**
+ * The heading a drag would issue: from where the aircraft is now to where
+ * the cursor is.
+ *
+ * True, not magnetic. Every heading in the simulation is true -- the tag
+ * menu's, the console's, the hold inbound legs -- and `magVarDeg` is zero
+ * at Heathrow in the config, so the two coincide exactly. Converting here
+ * alone would make a dragged vector disagree with a typed one the day that
+ * value changed; making the display magnetic is a change that belongs in
+ * every heading at once, not in one input path.
+ */
+export function dragHeading(a: Aircraft, toWorld: Vec2NM): number {
+  return normalizeHeading(Math.round(bearingDeg(a.pos, toWorld)))
+}
+
+/**
+ * The elastic line: the aircraft, the cursor, and the clearance that
+ * releasing would issue.
+ *
+ * Drawn from the aircraft's live position rather than from where it was
+ * when the drag started, so the line stays attached to a target that is
+ * still flying -- which it is, because the simulation does not stop for
+ * the mouse.
+ */
+export function drawVectorDrag(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  drag: VectorDrag,
+): void {
+  const from = cam.worldToScreen(drag.aircraft.pos)
+  const to = drag.toPx
+  const world = cam.screenToWorld(to)
+
+  // Dashed, and in the attention colour: this is a proposal, not something
+  // that is on the map.
+  g.strokeStyle = theme.accent
+  g.lineWidth = 1.4
+  g.setLineDash([6, 4])
+  g.beginPath()
+  g.moveTo(from.x, from.y)
+  g.lineTo(to.x, to.y)
+  g.stroke()
+  g.setLineDash([])
+
+  // Anchored on the aircraft, so which one is being turned is unambiguous
+  // even where two targets overlap.
+  g.fillStyle = theme.accent
+  g.beginPath()
+  g.arc(from.x, from.y, DRAG_ORIGIN_PX, 0, Math.PI * 2)
+  g.fill()
+
+  const text = `${headingLabel(dragHeading(drag.aircraft, world))}${DEGREE}  ${distanceNM(
+    drag.aircraft.pos,
+    world,
+  ).toFixed(1)} NM`
+  drawDragReadout(g, cam, to, text)
+}
+
+function drawDragReadout(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  at: Vec2Px,
+  text: string,
+): void {
+  const w = text.length * DRAG_FONT_PX * CHAR_ADVANCE + DRAG_PAD_PX * 2
+  const h = DRAG_FONT_PX + DRAG_PAD_PX * 2
+
+  // Beside the cursor, and on the other side of it near an edge, so the
+  // readout is never the thing that runs off the display.
+  const x =
+    at.x + DRAG_OFFSET_PX + w > cam.width ? at.x - DRAG_OFFSET_PX - w : at.x + DRAG_OFFSET_PX
+  const y = at.y - DRAG_OFFSET_PX - h < 0 ? at.y + DRAG_OFFSET_PX : at.y - DRAG_OFFSET_PX - h
+
+  // Filled with the ground colour first: a heading read off a readout that
+  // has airspace boundaries running through it is a heading read wrong.
+  g.fillStyle = theme.bg
+  g.fillRect(x, y, w, h)
+  g.strokeStyle = theme.accent
+  g.lineWidth = 1
+  g.beginPath()
+  g.rect(x, y, w, h)
+  g.stroke()
+
+  g.fillStyle = theme.accent
+  g.font = fonts.bold(DRAG_FONT_PX)
+  g.textAlign = 'left'
+  g.textBaseline = 'middle'
+  g.fillText(text, x + DRAG_PAD_PX, y + h / 2)
 }

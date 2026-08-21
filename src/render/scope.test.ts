@@ -1134,3 +1134,73 @@ describe('hold patterns', () => {
     setPalette('beige')
   })
 })
+
+describe('a vector being dragged', () => {
+  function plane(over: Partial<Aircraft> = {}): Aircraft {
+    return {
+      callsign: 'BAW42',
+      type: 'A320',
+      wake: 'M',
+      pos: { x: 6, y: 6 },
+      altFt: 9000,
+      hdg: 225,
+      gsKts: 250,
+      vsFpm: 0,
+      clearedHdg: 225,
+      clearedAltFt: 9000,
+      clearedSpdKts: 220,
+      navMode: 'VECTOR',
+      clearedApproach: null,
+      hold: null,
+      originFix: 'LAM',
+      trail: [],
+      trailAt: 0,
+      spawnedAt: 0,
+      ...over,
+    }
+  }
+
+  const draw = (contacts: ScopeContacts) => {
+    const cam = new Camera({ x: 0, y: 0 }, 30, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.full, STATUS, contacts)
+    return { ...rec, cam, labels: rec.texts.map((t) => t.s) }
+  }
+
+  it('puts the readout on the display while the drag is live', () => {
+    const a = plane()
+    const r = draw({ aircraft: [a], selected: a.callsign, drag: { aircraft: a, toPx: { x: 800, y: 150 } } })
+    expect(r.labels.some((s) => /^\d{3}.* NM$/.test(s))).toBe(true)
+  })
+
+  it('draws nothing extra when no drag is in progress', () => {
+    const a = plane()
+    const withDrag = draw({ aircraft: [a], selected: null, drag: { aircraft: a, toPx: { x: 800, y: 150 } } })
+    const without = draw({ aircraft: [a], selected: null })
+    expect(withDrag.labels.length).toBeGreaterThan(without.labels.length)
+    expect(without.labels.some((s) => /^\d{3}.* NM$/.test(s))).toBe(false)
+  })
+
+  it('treats an omitted drag and an explicit null the same', () => {
+    const a = plane()
+    const omitted = draw({ aircraft: [a], selected: null })
+    const explicit = draw({ aircraft: [a], selected: null, drag: null })
+    expect(explicit.labels).toEqual(omitted.labels)
+  })
+
+  it('draws the line above the traffic, so it is readable over a target', () => {
+    const a = plane()
+    const b = plane({ callsign: 'VIR9', pos: { x: 8, y: 8 } })
+    const r = draw({
+      aircraft: [a, b],
+      selected: a.callsign,
+      drag: { aircraft: a, toPx: { x: 700, y: 120 } },
+    })
+    const readout = r.texts.findIndex((t) => /^\d{3}.* NM$/.test(t.s))
+    const block = r.texts.findIndex((t) => t.s === 'VIR9')
+    expect(readout).toBeGreaterThan(-1)
+    expect(block).toBeGreaterThan(-1)
+    expect(readout).toBeGreaterThan(block)
+  })
+})

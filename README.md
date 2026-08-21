@@ -152,6 +152,12 @@ stack.
 
 ### Issuing clearances
 
+**Drag a vector.** Press on a target or its data block and drag: an elastic line follows the
+cursor with the heading and distance written beside it, and releasing issues that heading.
+Pressing on empty scope pans instead, Escape abandons a drag, and a press that does not really
+move is just a click.
+
+
 The command line under the scope takes one aircraft's whole clearance in a line:
 
 ```

@@ -23,7 +23,26 @@ overlays and the rest of the interface are in [README.md](README.md); the code l
 
 ## Talking to aircraft
 
-There are two ways in, and they do exactly the same thing.
+There are three ways in, and they all do exactly the same thing.
+
+### Drag the vector you want
+
+**Press on an aircraft and drag.** A line comes out of the target and follows the cursor, with
+the heading and the distance written beside it; let go and that heading is the clearance. It is
+the quickest way to turn something, and the only one where you are aiming at the picture rather
+than at a number.
+
+Press on the target square or on its data block -- the block is bigger and easier to hit. The
+line is drawn from where the aircraft *is*, not from where it was when you pressed, so it stays
+attached while the aircraft flies. A press that barely moves is treated as a click and just
+selects, and **Escape** abandons a drag you have changed your mind about.
+
+Pressing on empty scope pans the picture instead, so the two never fight.
+
+One thing worth knowing if you are pulling traffic out of a stack: four aircraft holding over
+the same fix are within a mile of each other, which at normal range is a smaller gap than the
+cursor can resolve. Select the one you want first -- click its strip -- and the scope will then
+give the press to that aircraft rather than to whichever is nearest.
 
 ### Point at it
 
@@ -73,7 +92,8 @@ which is why the same four miles is fine behind an A320 and not behind a 777. Se
 
 ### Or type it
 
-One line does everything you want to say to one aircraft:
+The console takes anything the mouse cannot say -- a level, a speed, several instructions at
+once -- and one line does everything you want to say to one aircraft:
 
 ```
   BAW178 H270 A30 S180

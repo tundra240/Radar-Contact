@@ -2,13 +2,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { applyCommand, type ApplyContext, type Envelope } from '../commands/apply'
 import type { Command } from '../commands/types'
+import { headingLabel } from '../core/geo'
 import type { Aircraft, HoldClearance } from '../sim/types'
 import {
   TagMenu,
   altitudeChoices,
   altitudeLabel,
   headingChoices,
-  headingLabel,
   relativeTurns,
   speedChoices,
   tagReadout,
