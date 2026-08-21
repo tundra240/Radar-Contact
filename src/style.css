@@ -69,16 +69,27 @@ canvas {
   --warn: #a00000;
 }
 
-/* One button in the corner of the scope, with its panel hanging under it. */
-.menu {
+/* The corner of the scope: the guide and the menu, each a button with its
+   own panel hanging under it. Laid out right to left so the menu stays
+   hard against the corner where it has always been, and above the logon
+   window in the stacking order so both panels can be opened over it. */
+.controls {
   position: absolute;
   top: 12px;
   right: 12px;
-  z-index: 10;
+  z-index: 30;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  flex-direction: row-reverse;
+  align-items: flex-start;
   gap: 6px;
+}
+
+/* Each is just its button as far as the row is concerned -- the panels
+   hang out of the flow, so opening one does not shove the other button
+   sideways. */
+.menu,
+.guide {
+  position: relative;
 }
 
 .mode-toggle {
@@ -128,6 +139,10 @@ canvas {
 }
 
 .menu-panel {
+  /* Hangs below its button, out of the controls row's flow. */
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
   width: 212px;
   /* Scrolls rather than runs off the bottom on a short window. */
   max-height: calc(100vh - 96px);
@@ -523,4 +538,434 @@ canvas {
   box-shadow:
     inset 1px 1px 0 0 var(--bevel-shadow),
     inset -1px -1px 0 0 var(--bevel-light);
+}
+
+/* --------------------------------------------------------------- logon
+
+   The main menu: a modal system-logon window over the whole shell, in the
+   same idiom as the rest of the furniture. It sits BELOW the options menu
+   in the stacking order on purpose, so pressing Settings can float the
+   options panel over the top of it.                                    */
+
+.logon {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  /* The scope shows through, dimmed, so the radar is visibly already up.
+     Flat fallback first, for anything without color-mix. */
+  background: var(--well);
+  background: color-mix(in srgb, var(--well) 82%, transparent);
+}
+
+.logon[hidden] {
+  display: none;
+}
+
+.logon-window {
+  width: 100%;
+  max-width: 420px;
+  max-height: 100%;
+  overflow-y: auto;
+  color: var(--chrome-text);
+  background: var(--face);
+  box-shadow:
+    inset 2px 2px 0 0 var(--bevel-light),
+    inset -2px -2px 0 0 var(--bevel-shadow);
+}
+
+.logon-caption {
+  margin: 3px 3px 0;
+  padding: 5px 8px;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--title-text);
+  background: var(--title-bar);
+}
+
+.logon-body {
+  padding: 14px;
+}
+
+.logon-brand {
+  font-size: 17px;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.logon-sub {
+  margin-top: 2px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--chrome-dim);
+}
+
+/* Boot summary, in a sunken well: what the radar has actually loaded. */
+.logon-facts {
+  margin: 12px 0 0;
+  padding: 7px 9px;
+  list-style: none;
+  font-size: 10px;
+  line-height: 1.7;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--chrome-dim);
+  background: var(--well);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.logon-fields {
+  margin-top: 12px;
+}
+
+.logon-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.logon-field > span {
+  flex: 0 0 76px;
+  color: var(--chrome-dim);
+}
+
+.logon-input,
+.logon-output {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--chrome-text);
+  background: var(--well);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.logon-input:focus {
+  outline: 1px dotted var(--chrome-text);
+  outline-offset: -4px;
+}
+
+/* Read-only, so it reads as a readout rather than as a field. */
+.logon-output {
+  color: var(--accent);
+}
+
+.logon-error {
+  margin: 8px 0 0;
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: var(--warn);
+}
+
+.logon-error[hidden] {
+  display: none;
+}
+
+.logon-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.logon-button {
+  flex: 1 1 auto;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+  cursor: pointer;
+}
+
+.logon-button:active {
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.logon-button:focus-visible {
+  outline: 1px dotted var(--chrome-text);
+  outline-offset: -4px;
+}
+
+/* The default action, so it reads as the one to press. */
+.logon-go {
+  font-weight: bold;
+  color: var(--title-text);
+  background: var(--title-bar);
+}
+
+.logon-foot {
+  margin: 12px 0 0;
+  font-size: 9px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: var(--chrome-dim);
+}
+
+/* --------------------------------------------------------------- guide
+
+   The how-to-play window: the project's own Markdown, rendered into the
+   same furniture as everything else. It is wider and taller than the other
+   panels because it is a document rather than a set of controls, and it
+   floats above the logon window so it can be read before logging on.    */
+
+.guide-button {
+  min-width: 40px;
+  /* The emoji does not want the uppercase letter-spacing the other
+     buttons carry, and it needs a little more room vertically. */
+  padding: 5px 10px 4px;
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.guide-button.is-open {
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.guide-window {
+  position: fixed;
+  top: 48px;
+  right: 12px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: min(740px, calc(100vw - 24px));
+  max-height: calc(100vh - 72px);
+  color: var(--chrome-text);
+  background: var(--face);
+  box-shadow:
+    inset 2px 2px 0 0 var(--bevel-light),
+    inset -2px -2px 0 0 var(--bevel-shadow);
+}
+
+.guide-window[hidden] {
+  display: none;
+}
+
+.guide-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 3px 3px 0;
+  padding: 4px 4px 4px 8px;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--title-text);
+  background: var(--title-bar);
+}
+
+.guide-close {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: bold;
+  line-height: 1;
+  color: var(--chrome-text);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+  cursor: pointer;
+}
+
+.guide-close:active {
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+/* Says where to edit what is on screen, because the whole point of this
+   window is that its contents come from a file. */
+.guide-note {
+  margin: 7px 10px 0;
+  padding: 5px 7px;
+  font-size: 9px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: var(--chrome-dim);
+  background: var(--well);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+/* The document itself, in a sunken well. */
+.guide-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 7px;
+  padding: 10px 14px;
+  font-size: 11px;
+  line-height: 1.6;
+  background: var(--well);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.guide-body:focus-visible {
+  outline: 1px dotted var(--chrome-text);
+  outline-offset: -3px;
+}
+
+.guide-body h1,
+.guide-body h2,
+.guide-body h3,
+.guide-body h4 {
+  margin: 16px 0 6px;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.guide-body > :first-child {
+  margin-top: 0;
+}
+
+.guide-body h1 {
+  font-size: 13px;
+}
+
+.guide-body h2 {
+  font-size: 11px;
+}
+
+.guide-body h3,
+.guide-body h4 {
+  font-size: 10px;
+  color: var(--chrome-text);
+}
+
+.guide-body p,
+.guide-body ul,
+.guide-body ol {
+  margin: 0 0 9px;
+}
+
+.guide-body ul,
+.guide-body ol {
+  padding-left: 18px;
+}
+
+.guide-body li {
+  margin-bottom: 3px;
+}
+
+.guide-body strong {
+  color: var(--chrome-text);
+}
+
+.guide-body em {
+  font-style: normal;
+  /* Italic monospace is close to unreadable at 11px, so emphasis is shown
+     by colour instead. */
+  color: var(--accent);
+}
+
+.guide-body code {
+  padding: 0 2px;
+  font-family: inherit;
+  color: var(--accent);
+}
+
+/* Diagrams and worked examples: shown exactly as written, and allowed to
+   scroll sideways rather than forcing the window wider. */
+.guide-body pre {
+  margin: 0 0 10px;
+  padding: 7px 8px;
+  overflow-x: auto;
+  font-family: inherit;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--chrome-dim);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+}
+
+.guide-body blockquote {
+  margin: 0 0 10px;
+  padding: 7px 9px;
+  color: var(--chrome-dim);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+}
+
+.guide-body blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+.guide-body hr {
+  height: 0;
+  margin: 14px 0;
+  border: 0;
+  border-top: 1px solid var(--bevel-shadow);
+  box-shadow: 0 1px 0 0 var(--bevel-light);
+}
+
+.guide-body table {
+  width: 100%;
+  margin: 0 0 10px;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.guide-body th,
+.guide-body td {
+  padding: 3px 6px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--bevel-shadow);
+}
+
+.guide-body th {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--chrome-dim);
 }

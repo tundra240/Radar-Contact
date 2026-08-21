@@ -539,3 +539,282 @@ describe('airspace validation', () => {
     expect(v.shape.verticesNM[0]?.y).toBeGreaterThan(v.shape.verticesNM[2]?.y ?? 0)
   })
 })
+
+describe('the wider aerodrome picture', () => {
+  const field = (icao: string) => {
+    const a = egll.airports.find((x) => x.icao === icao)
+    if (!a) throw new Error()
+    return a
+  }
+
+  it('reaches well beyond the sector', () => {
+    // The original list stopped at about 40 NM, which is the sector edge;
+    // the scope can be zoomed to twice that.
+    const furthest = Math.max(...egll.airports.map((a) => a.distanceFromArpNM))
+    expect(furthest).toBeGreaterThan(80)
+  })
+
+  it('includes Southend and the other regional fields', () => {
+    for (const icao of ['EGMC', 'EGHI', 'EGHH', 'EGSC', 'EGBB', 'EGGD']) {
+      expect(egll.airports.map((a) => a.icao), icao).toContain(icao)
+    }
+    expect(field('EGMC').name).toMatch(/Southend/)
+  })
+
+  it('puts them on their real bearings and distances', () => {
+    // Southend east-north-east down the estuary, Southampton south-west.
+    expect(field('EGMC').distanceFromArpNM).toBeCloseTo(43.5, 0)
+    expect(field('EGMC').bearingFromArpTrue).toBeGreaterThan(75)
+    expect(field('EGMC').bearingFromArpTrue).toBeLessThan(95)
+    expect(field('EGHI').bearingFromArpTrue).toBeGreaterThan(200)
+    expect(field('EGHI').bearingFromArpTrue).toBeLessThan(240)
+  })
+
+  it('carries a real runway bearing for each one', () => {
+    // Computed from the two threshold coordinates, so 05/23 has to come out
+    // at about 050 rather than at whatever the heading column said.
+    expect(field('EGMC').primaryRunway?.bearingTrue).toBeCloseTo(54, 0)
+    expect(field('EGBB').primaryRunway?.bearingTrue).toBeCloseTo(146, 0)
+    for (const a of egll.airports) {
+      expect(a.primaryRunway, a.icao).not.toBeNull()
+      expect(a.primaryRunway?.lengthNM ?? 0, a.icao).toBeGreaterThan(0)
+    }
+  })
+
+  it('does not list the field being worked as its own neighbour', () => {
+    expect(egll.airports.map((a) => a.icao)).not.toContain(egll.icao)
+  })
+})
+
+describe('geography', () => {
+  const feature = (id: string) => {
+    const f = egll.geography.find((x) => x.id === id)
+    if (!f) throw new Error(`no geography feature ${id}`)
+    return f
+  }
+
+  it('loads a coastline, the Thames and a FIR boundary', () => {
+    expect(egll.geography.map((f) => f.id)).toEqual(['coastline', 'thames', 'fir-boundary'])
+    expect(feature('coastline').kind).toBe('coastline')
+    expect(feature('thames').kind).toBe('river')
+    expect(feature('fir-boundary').kind).toBe('fir')
+  })
+
+  it('keeps the two provenances apart', () => {
+    // A surveyed shoreline is not published in an AIP, and saying it was
+    // would be a small lie in the data.
+    expect(feature('coastline').derivation).toBe('survey')
+    expect(feature('coastline').source).toMatch(/Natural Earth/)
+    expect(feature('fir-boundary').derivation).toBe('aip')
+    expect(feature('fir-boundary').source).toMatch(/VATSIM UK/)
+    expect(feature('thames').derivation).toBe('survey')
+    expect(feature('thames').source).toMatch(/VATSIM UK/)
+  })
+
+  it('projects every path into world space with at least two points', () => {
+    for (const f of egll.geography) {
+      expect(f.paths.length).toBeGreaterThan(0)
+      for (const p of f.paths) {
+        expect(p.pointsNM.length).toBeGreaterThanOrEqual(2)
+        for (const v of p.pointsNM) {
+          expect(Number.isFinite(v.x) && Number.isFinite(v.y)).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('precomputes bounds that actually enclose the path', () => {
+    for (const f of egll.geography) {
+      for (const p of f.paths) {
+        for (const v of p.pointsNM) {
+          expect(v.x).toBeGreaterThanOrEqual(p.minNM.x)
+          expect(v.x).toBeLessThanOrEqual(p.maxNM.x)
+          expect(v.y).toBeGreaterThanOrEqual(p.minNM.y)
+          expect(v.y).toBeLessThanOrEqual(p.maxNM.y)
+        }
+      }
+    }
+  })
+
+  it('keeps every chunk small enough for the cull to be worth doing', () => {
+    // A single path from the Bristol Channel to East Anglia would have a
+    // bounding box containing Heathrow, and would therefore never be
+    // rejected however far the scope is zoomed in.
+    for (const f of egll.geography) {
+      for (const p of f.paths) {
+        const span = Math.max(p.maxNM.x - p.minNM.x, p.maxNM.y - p.minNM.y)
+        expect(span, f.id).toBeLessThanOrEqual(12.5)
+      }
+    }
+  })
+
+  it('puts the shoreline where the shoreline is', () => {
+    // Distance from a handful of real coastal points to the nearest drawn
+    // segment. The residual is town-centre position, not line error.
+    const nearestNM = (lat: number, lon: number): number => {
+      const t = egll.projection.toWorld({ lat, lon })
+      let best = Infinity
+      for (const p of feature('coastline').paths) {
+        for (let i = 0; i < p.pointsNM.length - 1; i += 1) {
+          const a = p.pointsNM[i]
+          const b = p.pointsNM[i + 1]
+          if (!a || !b) continue
+          const dx = b.x - a.x
+          const dy = b.y - a.y
+          const len2 = dx * dx + dy * dy
+          let u = len2 === 0 ? 0 : ((t.x - a.x) * dx + (t.y - a.y) * dy) / len2
+          u = Math.max(0, Math.min(1, u))
+          best = Math.min(best, Math.hypot(t.x - (a.x + u * dx), t.y - (a.y + u * dy)))
+        }
+      }
+      return best
+    }
+
+    expect(nearestNM(50.821, -0.137), 'Brighton').toBeLessThan(0.5)
+    expect(nearestNM(51.535, 0.712), 'Southend').toBeLessThan(0.5)
+    expect(nearestNM(51.126, 1.318), 'Dover').toBeLessThan(0.5)
+    expect(nearestNM(51.944, 1.288), 'Harwich').toBeLessThan(0.5)
+    expect(nearestNM(50.737, 0.246), 'Beachy Head').toBeLessThan(1)
+  })
+
+  it('follows the Thames through London', () => {
+    // The source file is unlabelled -- nothing in it says which watercourse
+    // a segment belongs to -- so the identification is geometric and this
+    // is the check on it: the line has to pass through the places the
+    // Thames passes through, in the right order, west to east.
+    const nearest = (lat: number, lon: number): number => {
+      const t = egll.projection.toWorld({ lat, lon })
+      let best = Infinity
+      for (const p of feature('thames').paths) {
+        for (let i = 0; i < p.pointsNM.length - 1; i += 1) {
+          const a = p.pointsNM[i]
+          const b = p.pointsNM[i + 1]
+          if (!a || !b) continue
+          const dx = b.x - a.x
+          const dy = b.y - a.y
+          const len2 = dx * dx + dy * dy
+          let u = len2 === 0 ? 0 : ((t.x - a.x) * dx + (t.y - a.y) * dy) / len2
+          u = Math.max(0, Math.min(1, u))
+          best = Math.min(best, Math.hypot(t.x - (a.x + u * dx), t.y - (a.y + u * dy)))
+        }
+      }
+      return best
+    }
+
+    expect(nearest(51.4839, -0.6094), 'Windsor').toBeLessThan(1)
+    expect(nearest(51.4612, -0.3084), 'Richmond').toBeLessThan(1)
+    expect(nearest(51.5007, -0.1246), 'Westminster').toBeLessThan(1)
+    expect(nearest(51.5055, -0.0754), 'Tower Bridge').toBeLessThan(1)
+    expect(nearest(51.4934, 0.0684), 'Woolwich').toBeLessThan(1)
+    expect(nearest(51.4415, 0.3685), 'Gravesend').toBeLessThan(1)
+    // And nowhere near somewhere it does not go.
+    expect(nearest(51.15, -0.18), 'Gatwick').toBeGreaterThan(10)
+  })
+
+  it('brings the Thames close enough to the field to orient by', () => {
+    // Which is the whole reason it earns a layer: it passes within a few
+    // miles of Heathrow, so it is on screen even at close range.
+    const closest = Math.min(
+      ...feature('thames').paths.flatMap((p) =>
+        p.pointsNM.map((v) => Math.hypot(v.x, v.y)),
+      ),
+    )
+    expect(closest).toBeLessThan(6)
+  })
+
+  it('reaches the coast in every direction the scope can see', () => {
+    const xs = feature('coastline').paths.flatMap((p) => [p.minNM.x, p.maxNM.x])
+    const ys = feature('coastline').paths.flatMap((p) => [p.minNM.y, p.maxNM.y])
+    // Comfortably past the 80 NM zoom ceiling on every side, so zooming out
+    // never runs off the end of the map.
+    expect(Math.min(...xs)).toBeLessThan(-100)
+    expect(Math.max(...xs)).toBeGreaterThan(100)
+    expect(Math.min(...ys)).toBeLessThan(-100)
+    expect(Math.max(...ys)).toBeGreaterThan(100)
+  })
+
+  it('stays out of the extent used for the initial camera fit', () => {
+    // Otherwise opening the app would frame 200 NM of coastline and the
+    // airport would be a dot in the middle of it. Counted exactly rather
+    // than bounded by a radius, because the aerodrome list legitimately
+    // reaches further out than the sector does.
+    expect(egll.extentNM).toHaveLength(
+      egll.runways.length * 2 + egll.navaids.length + egll.airports.length,
+    )
+  })
+})
+
+describe('the edge of the map', () => {
+  it('reports the outer extent of everything drawn', () => {
+    const b = egll.mapBoundsNM
+    expect(b).not.toBeNull()
+    if (!b) return
+    // Roughly 230 NM west to 190 NM east, 180 south to 190 north.
+    expect(b.min.x).toBeLessThan(-200)
+    expect(b.max.x).toBeGreaterThan(180)
+    expect(b.min.y).toBeLessThan(-170)
+    expect(b.max.y).toBeGreaterThan(180)
+  })
+
+  it('encloses every drawn path', () => {
+    const b = egll.mapBoundsNM
+    if (!b) throw new Error('no map bounds')
+    for (const f of egll.geography) {
+      for (const p of f.paths) {
+        expect(p.minNM.x).toBeGreaterThanOrEqual(b.min.x)
+        expect(p.maxNM.x).toBeLessThanOrEqual(b.max.x)
+        expect(p.minNM.y).toBeGreaterThanOrEqual(b.min.y)
+        expect(p.maxNM.y).toBeLessThanOrEqual(b.max.y)
+      }
+    }
+  })
+
+  it('reaches well past the zoom ceiling on every side', () => {
+    // The fence must not bite before the scope has zoomed out fully, or
+    // the display would refuse to pan while there is still map to see.
+    const b = egll.mapBoundsNM
+    if (!b) throw new Error('no map bounds')
+    const ceiling = egll.sector.radiusNM * 2
+    expect(Math.min(-b.min.x, b.max.x, -b.min.y, b.max.y)).toBeGreaterThan(ceiling * 2)
+  })
+
+  it('is null for a config with no map, so that camera is not fenced', () => {
+    const cfg = structuredClone(raw) as Record<string, unknown>
+    delete cfg['geography']
+    expect(loadAirport(cfg).mapBoundsNM).toBeNull()
+  })
+})
+
+describe('geography validation', () => {
+  function load(fn: (g: Record<string, unknown>[]) => void): () => Airport {
+    return () => {
+      const cfg = structuredClone(raw) as Record<string, unknown>
+      fn(cfg['geography'] as Record<string, unknown>[])
+      return loadAirport(cfg)
+    }
+  }
+
+  it('accepts a config with no map at all', () => {
+    const cfg = structuredClone(raw) as Record<string, unknown>
+    delete cfg['geography']
+    expect(loadAirport(cfg).geography).toEqual([])
+  })
+
+  it('rejects an unknown feature kind', () => {
+    expect(load((g) => { g[0]!['kind'] = 'contours' })).toThrow(/must be "coastline", "river" or "fir"/)
+  })
+
+  it('rejects a provenance it does not have a vocabulary for', () => {
+    expect(load((g) => { g[0]!['derivation'] = 'guessed' })).toThrow(/must be survey or aip/)
+  })
+
+  it('rejects a path that cannot be a line', () => {
+    expect(load((g) => { g[0]!['paths'] = [[{ lat: 51, lon: 0 }]] })).toThrow(
+      /must have at least 2 points/,
+    )
+  })
+
+  it('rejects two features sharing an id', () => {
+    expect(load((g) => { g[1]!['id'] = 'coastline' })).toThrow(/duplicate "coastline"/)
+  })
+})

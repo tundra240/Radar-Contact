@@ -146,11 +146,17 @@ describe('palette legibility', () => {
     // The per-mile ticks are how spacing is judged by eye, so they carry
     // information and belong here rather than with the grid.
     'centrelineTick',
+    // The FIR limit is a real airspace boundary, so it is read rather than
+    // merely sensed.
+    'fir',
   ] as const
 
   // Grid furniture is meant to recede. An upper bound matters as much as a
   // lower one: rings that shout compete with the traffic.
-  const FURNITURE = ['ring', 'ringStrong', 'cardinal', 'centreline'] as const
+  // The coastline belongs here rather than with the symbology: it is a
+  // backdrop for orientation, and 2400 points of shoreline drawn loudly
+  // would bury the traffic it is supposed to give context to.
+  const FURNITURE = ['ring', 'ringStrong', 'cardinal', 'centreline', 'coast'] as const
 
   for (const name of PALETTE_ORDER) {
     describe(name, () => {

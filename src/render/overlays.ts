@@ -19,6 +19,12 @@ export interface Overlays {
   readonly aerodromes: boolean
   readonly rangeRings: boolean
   readonly centrelines: boolean
+  /** The shoreline, as a backdrop to orient the picture against. */
+  readonly coastline: boolean
+  /** The Thames, which is the strongest orientation cue London has. */
+  readonly rivers: boolean
+  /** The lateral limit of the London FIR -- the edge of UK airspace. */
+  readonly firBoundary: boolean
 }
 
 export type OverlayKey = keyof Overlays
@@ -33,6 +39,9 @@ export const OVERLAY_ITEMS: readonly { readonly key: OverlayKey; readonly label:
   { key: 'aerodromes', label: 'Other aerodromes' },
   { key: 'navaids', label: 'Other navaids' },
   { key: 'navaidFreqs', label: 'Navaid frequencies' },
+  { key: 'coastline', label: 'Coastline' },
+  { key: 'rivers', label: 'River Thames' },
+  { key: 'firBoundary', label: 'FIR boundary' },
 ]
 
 export type DensityName = 'minimal' | 'standard' | 'full'
@@ -48,6 +57,9 @@ export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
     aerodromes: false,
     rangeRings: true,
     centrelines: true,
+    coastline: false,
+    rivers: false,
+    firBoundary: false,
   },
   /** Enough surrounding context to stay oriented. */
   standard: {
@@ -59,6 +71,9 @@ export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
     aerodromes: true,
     rangeRings: true,
     centrelines: true,
+    coastline: true,
+    rivers: true,
+    firBoundary: true,
   },
   /** Everything the data supports. */
   full: {
@@ -70,6 +85,9 @@ export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
     aerodromes: true,
     rangeRings: true,
     centrelines: true,
+    coastline: true,
+    rivers: true,
+    firBoundary: true,
   },
 }
 

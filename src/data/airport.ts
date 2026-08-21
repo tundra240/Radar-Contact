@@ -4,6 +4,7 @@ import {
   distanceNM,
   makeProjection,
   normalizeHeading,
+  type BoundsNM,
   type LatLon,
   type Projection,
   type Vec2NM,
@@ -265,8 +266,16 @@ export interface Airport {
   readonly navaids: readonly Navaid[]
   readonly airports: readonly NeighbourAirport[]
   readonly airspace: readonly AirspaceVolume[]
-  /** Coastline and FIR limit. Empty when the config omits the section. */
+  /** Coastline, river and FIR limit. Empty when the config omits it. */
   readonly geography: readonly GeographyFeature[]
+  /**
+   * The outer edge of the drawn map, or null when there is no map.
+   *
+   * The camera is fenced into this: past the edge of the coastline data
+   * there is nothing but empty ground, and being able to drag out there
+   * reads as a broken display rather than as freedom.
+   */
+  readonly mapBoundsNM: BoundsNM | null
   readonly aircraftTypes: readonly AircraftType[]
   /** Navaids that carry a holding pattern, in config order. */
   readonly holdingFixes: readonly Navaid[]
@@ -439,6 +448,8 @@ export function loadAirport(raw: unknown): Airport {
         )
   assertUnique(geography.map((f) => f.id), 'geography[].id')
 
+  const mapBoundsNM = boundsOfGeography(geography)
+
   const byId = new Map(runways.map((r) => [r.id, r]))
   const arrivalRunways = sector.activeArrivalRunways.map((id) => {
     const rwy = byId.get(id)
@@ -475,6 +486,7 @@ export function loadAirport(raw: unknown): Airport {
     airports,
     airspace,
     geography,
+    mapBoundsNM,
     aircraftTypes,
     holdingFixes: navaids.filter((n) => n.hold !== null),
     arrivalRunways,
@@ -860,6 +872,29 @@ function parseGeography(
     source: str(o['source'], `${path}.source`),
     paths,
   }
+}
+
+/**
+ * The union of every drawn path's bounding box: how far the map reaches.
+ *
+ * Built from the per-path boxes the renderer already culls on, so it costs
+ * nothing and cannot disagree with what is actually drawn.
+ */
+function boundsOfGeography(features: readonly GeographyFeature[]): BoundsNM | null {
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const f of features) {
+    for (const p of f.paths) {
+      if (p.minNM.x < minX) minX = p.minNM.x
+      if (p.minNM.y < minY) minY = p.minNM.y
+      if (p.maxNM.x > maxX) maxX = p.maxNM.x
+      if (p.maxNM.y > maxY) maxY = p.maxNM.y
+    }
+  }
+  if (!Number.isFinite(minX)) return null
+  return { min: { x: minX, y: minY }, max: { x: maxX, y: maxY } }
 }
 
 /** Wraps a projected polyline with the bounding box the renderer culls on. */

@@ -2,11 +2,20 @@ import './style.css'
 import { Camera } from './core/camera'
 import { loadAirport } from './data/airport'
 import egllConfig from './data/egll.json'
+import { distanceNM, type Vec2NM } from './core/geo'
+import { stepAircraft } from './sim/aircraft'
 import { Spawner } from './sim/spawner'
 import type { Aircraft } from './sim/types'
 import { describeCommand, type Command } from './commands/types'
 import { StripBay } from './ui/stripbay'
 import { Menu } from './ui/menu'
+import { Logon, type LogonDetails } from './ui/logon'
+import { isTypingTarget, ownsSpace } from './ui/keys'
+import { Guide } from './ui/guide'
+// The guide's text is the repository's own how-to-play document, imported
+// as raw text rather than restated here. Editing TUTORIAL.md edits the
+// panel: immediately with the dev server running, at build time otherwise.
+import guideSource from '../TUTORIAL.md?raw'
 import clickUrl from './assets/click.wav'
 import { Sfx, isClickable } from './audio/sfx'
 import { GameLoop } from './core/loop'
@@ -17,6 +26,7 @@ import {
   type Overlays,
 } from './render/overlays'
 import {
+  formatLevel,
   isPaletteName,
   nextPaletteName,
   paletteName,
@@ -66,6 +76,12 @@ function start(
   const cam = new Camera({ x: 0, y: 0 }, airport.sector.defaultRangeNM, {
     maxNM: airport.sector.radiusNM * 2,
   })
+
+  // Fenced into the drawn map. Past the edge of the coastline data there is
+  // nothing but empty ground, and being able to drag out there reads as a
+  // broken display rather than as freedom. Derived from the data, so a
+  // config with no map is simply not fenced.
+  cam.setBounds(airport.mapBoundsNM)
 
   let overlays: Overlays = DEFAULT_OVERLAYS
 
@@ -138,10 +154,6 @@ function start(
   surface.addEventListener('pointerup', endDrag)
   surface.addEventListener('pointercancel', endDrag)
 
-  window.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.key === 'r' || e.key === 'R') reset()
-  })
-
   // ---- interface sound -------------------------------------------------
   // One delegated listener rather than a handler per control: the strip bay
   // creates and destroys buttons as traffic comes and goes, and they should
@@ -187,11 +199,15 @@ function start(
   // callbacks and is told what to show by paintMenu, so the menu and the
   // keyboard shortcuts cannot end up disagreeing about what is set.
 
+  // Both corner controls share a row. Mounted in the scope rather than on
+  // the body: the strip bay owns the right-hand edge of the window, and
+  // fixed positioning put controls straight on top of it.
+  const controls = document.createElement('div')
+  controls.className = 'controls'
+  container.appendChild(controls)
+
   const menu = new Menu({
-    // Mounted in the scope rather than on the body: the strip bay owns the
-    // right-hand edge of the window, and fixed positioning put controls
-    // straight on top of it.
-    mount: container,
+    mount: controls,
     onOverlays: (next) => setOverlays(next),
     onPalette: (next) => applyPalette(next),
     onSpeed: (speed) => {
@@ -207,6 +223,19 @@ function start(
       requestDraw()
     },
     onToggleSound: toggleSound,
+  })
+
+  // ---- the guide -------------------------------------------------------
+  // A book button next to the menu, opening the project's own how-to-play
+  // document. Nothing about the text lives in the code: it is read from
+  // TUTORIAL.md, so that file is both the document a person edits and the
+  // one the game shows.
+
+  new Guide({
+    mount: controls,
+    source: guideSource,
+    title: `${airport.icao} approach -- how to play`,
+    note: 'This guide is TUTORIAL.md, rendered as it stands. Edit that file to change it.',
   })
 
   const paintMenu = (): void => {
@@ -252,9 +281,22 @@ function start(
   const spawner = new Spawner({ airport })
   let traffic: readonly Aircraft[] = []
 
+  // Landing and handoff are Day 2 and 3 work. Until then, crossing the area
+  // of responsibility is how an arrival finishes -- and letting go of them
+  // is what stops the concurrency cap filling permanently.
+  const ORIGIN: Vec2NM = { x: 0, y: 0 }
+  const HANDOFF_MARGIN_NM = 5
+  const handoffRadiusNM = airport.sector.radiusNM + HANDOFF_MARGIN_NM
+
   const syncStrips = (): void => {
     bay.update(traffic, selected)
   }
+
+  // ---- the session -----------------------------------------------------
+  // Who is working the position. Null until someone logs on, which is also
+  // what keeps the clock stopped: the simulation is not running while the
+  // main menu is up.
+  let controller: LogonDetails | null = null
 
   // ---- the loop --------------------------------------------------------
 
@@ -267,12 +309,22 @@ function start(
   const loop = new GameLoop({
     tick: (dt, clock) => {
       simAdvanced = true
-      // Day 1: world.tick goes here, between the spawner and the strips.
-      // Until it exists the traffic the spawner releases stays where it is
-      // put, which is why the flow stalls once every fix is occupied -- the
-      // HELD counter on the status bar is the spacing rule doing its job.
-      const arrivals = spawner.update(dt, clock, traffic)
-      if (arrivals.length > 0) traffic = [...traffic, ...arrivals]
+
+      // Fly everything, then release whatever has crossed the sector.
+      const flown = traffic
+        .map((a) => stepAircraft(a, dt, clock.elapsedSeconds))
+        .filter((a) => distanceNM(ORIGIN, a.pos) <= handoffRadiusNM)
+
+      // The spawner sees the world as it is after the step, so a fix that
+      // has just been vacated is available again on the same tick.
+      const arrivals = spawner.update(dt, clock, flown)
+      traffic = arrivals.length > 0 ? [...flown, ...arrivals] : flown
+
+      // Do not keep pointing at an aircraft that has left.
+      if (selected !== null && !traffic.some((a) => a.callsign === selected)) {
+        selected = null
+      }
+
       if (clock.ticks % SYNC_EVERY_TICKS === 0) syncStrips()
     },
     render: () => {
@@ -284,38 +336,84 @@ function start(
         speed: loop.speed,
         paused: loop.paused,
         traffic: { spawned: spawner.spawned, held: spawner.deferred },
+        controller,
       })
     },
   })
 
   // Release an arrival on command, for when the scope is quiet or to line
   // up a particular situation without waiting for the cadence.
-  window.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.key !== 'n' && e.key !== 'N') return
+  // Release an arrival on command, for when the scope is quiet or to line
+  // up a particular situation without waiting for the cadence.
+  const spawnNow = (): void => {
     const arrivals = spawner.spawnNow(loop.clock, traffic)
     if (arrivals.length === 0) return
     traffic = [...traffic, ...arrivals]
     syncStrips()
     requestDraw()
-  })
+  }
 
-  window.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.key !== ' ') return
-    // A focused checkbox keeps the space bar, because it is the only way
-    // to set one from the keyboard, and the menu is full of them. Anything
-    // else focused means space is meant for the clock.
-    if (e.target instanceof HTMLInputElement && e.target.type === 'checkbox') return
-    // Otherwise space scrolls the page or re-triggers a focused button.
-    e.preventDefault()
-    loop.togglePaused()
-    paintMenu()
-    requestDraw()
+  // ---- the main menu ---------------------------------------------------
+  // The session begins at a logon screen rather than mid-shift. The clock
+  // is held stopped behind it, so no traffic accumulates while the display
+  // is being set up -- and the scope is drawn underneath, dimmed, so the
+  // radar is visibly already running before anyone logs on.
+
+  const LOGON_STORAGE = 'radar-contact:initials'
+
+  const storedInitials = (): string => {
+    try {
+      return window.localStorage.getItem(LOGON_STORAGE) ?? ''
+    } catch {
+      return ''
+    }
+  }
+
+  const position = `${airport.icao}_APP`
+
+  const logon = new Logon({
+    mount: shell,
+    title: `${airport.icao} APPROACH`,
+    subtitle: airport.name,
+    position,
+    // Read off what actually loaded, so a data failure shows up here
+    // rather than as a quietly empty scope.
+    facts: [
+      `Sector ${airport.sector.radiusNM} NM -- ${formatLevel(airport.sector.floorFt)} to ${formatLevel(airport.sector.ceilingFt)}`,
+      `${airport.runways.length} runways -- arrivals ${airport.arrivalRunways
+        .map((r) => r.id)
+        .join(' and ')}`,
+      `${airport.holdingFixes.length} holds -- ${airport.holdingFixes
+        .map((f) => f.name)
+        .join(' ')}`,
+      `${airport.airports.length} aerodromes -- ${airport.airspace.length} airspace volumes`,
+      `Map: ${airport.geography.map((f) => f.label.toLowerCase()).join(', ')}`,
+    ],
+    initials: storedInitials(),
+    onSettings: () => menu.setOpen(true),
+    onLogon: (details) => {
+      controller = details
+      try {
+        window.localStorage.setItem(LOGON_STORAGE, details.initials)
+      } catch {
+        /* preference simply will not persist */
+      }
+      logon.hide()
+      menu.setOpen(false)
+      loop.setPaused(false)
+      paintMenu()
+      requestDraw()
+    },
   })
 
   syncStrips()
   paintMenu()
   resize()
+  // Stopped until someone logs on, so the shift starts when the controller
+  // says it does.
+  loop.setPaused(true)
   loop.start()
+  logon.focus()
 
   // ---- overlay control -------------------------------------------------
   // How much context to draw is a controller preference, not a constant.
@@ -412,13 +510,51 @@ function start(
     requestDraw()
   }
 
+  // ---- keyboard --------------------------------------------------------
+  // One handler for every shortcut rather than one per feature. The
+  // shortcuts are bare letters, so the guard at the top is not a detail:
+  // without it, typing initials into the logon window released aircraft and
+  // changed the display scheme. Having a single place to ask means the next
+  // shortcut cannot be added without it.
+
   window.addEventListener('keydown', (e: KeyboardEvent) => {
-    // D still cycles the schemes without opening anything, because trying
-    // them against live traffic is a by-eye decision.
-    if (e.key === 'd' || e.key === 'D') applyPalette(nextPaletteName())
-    // O kept as well as M: the overlays are what the menu is most often
-    // opened for, and that shortcut is already documented.
-    if (e.key === 'm' || e.key === 'M' || e.key === 'o' || e.key === 'O') menu.toggle()
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    if (isTypingTarget(e.target)) return
+
+    if (e.key === ' ') {
+      if (ownsSpace(e.target)) return
+      // Otherwise space scrolls the page or re-triggers a focused button.
+      e.preventDefault()
+      // Nothing to pause or resume until the shift has started.
+      if (controller === null) return
+      loop.togglePaused()
+      paintMenu()
+      requestDraw()
+      return
+    }
+
+    switch (e.key.toLowerCase()) {
+      case 'r':
+        reset()
+        return
+      case 'd':
+        // D still cycles the schemes without opening anything, because
+        // trying them against live traffic is a by-eye decision.
+        applyPalette(nextPaletteName())
+        return
+      // O as well as M: the overlays are what the menu is most often opened
+      // for, and that shortcut is already documented.
+      case 'm':
+      case 'o':
+        menu.toggle()
+        return
+      case 'n':
+        // A dev shortcut, so it waits until someone is working the sector.
+        if (controller !== null) spawnNow()
+        return
+      default:
+        return
+    }
   })
 
   setOverlays(readOverlays() ?? DEFAULT_OVERLAYS)

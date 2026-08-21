@@ -1,0 +1,188 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it } from 'vitest'
+import { Logon, validateInitials, type LogonDetails } from './logon'
+
+/**
+ * The main menu is a gate: nothing starts until it reports a valid logon.
+ * These hold it to that, and to not inventing a settings implementation of
+ * its own.
+ */
+
+interface Harness {
+  logon: Logon
+  mount: HTMLElement
+  logons: LogonDetails[]
+  settings: number
+}
+
+let live: Logon | null = null
+
+function mountLogon(initials = ''): Harness {
+  document.body.innerHTML = ''
+  const mount = document.createElement('div')
+  document.body.appendChild(mount)
+
+  const h: Harness = {
+    logon: null as unknown as Logon,
+    mount,
+    logons: [],
+    settings: 0,
+  }
+
+  h.logon = new Logon({
+    mount,
+    title: 'EGLL APPROACH',
+    subtitle: 'London Heathrow',
+    position: 'EGLL_APP',
+    facts: ['Sector 40 NM -- 1500 to FL150', '4 holds -- LAM BIG BNN OCK'],
+    initials,
+    onLogon: (d) => h.logons.push(d),
+    onSettings: () => {
+      h.settings += 1
+    },
+  })
+  live = h.logon
+  return h
+}
+
+afterEach(() => {
+  live?.destroy()
+  live = null
+})
+
+const input = (m: HTMLElement): HTMLInputElement => {
+  const el = m.querySelector<HTMLInputElement>('.logon-input')
+  if (!el) throw new Error('no initials field')
+  return el
+}
+
+const button = (m: HTMLElement, cls: string): HTMLButtonElement => {
+  const el = m.querySelector<HTMLButtonElement>(cls)
+  if (!el) throw new Error(`no ${cls}`)
+  return el
+}
+
+const error = (m: HTMLElement): HTMLElement => {
+  const el = m.querySelector<HTMLElement>('.logon-error')
+  if (!el) throw new Error('no error line')
+  return el
+}
+
+/** Simulates typing, which is what triggers the input handler. */
+function type(el: HTMLInputElement, value: string): void {
+  el.value = value
+  el.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
+describe('validateInitials', () => {
+  it('accepts two or three letters', () => {
+    expect(validateInitials('NF')).toBe('NF')
+    expect(validateInitials('abc')).toBe('ABC')
+    expect(validateInitials('  nf  ')).toBe('NF')
+  })
+
+  it('rejects anything that is not a set of initials', () => {
+    expect(validateInitials('')).toBeNull()
+    expect(validateInitials('N')).toBeNull()
+    expect(validateInitials('ABCD')).toBeNull()
+    expect(validateInitials('N1')).toBeNull()
+    expect(validateInitials('N F')).toBeNull()
+  })
+})
+
+describe('the main menu', () => {
+  it('shows what the radar has loaded', () => {
+    // The boot summary doubles as a data check: an empty list here means
+    // the airport config did not load.
+    const { mount } = mountLogon()
+    const facts = [...mount.querySelectorAll('.logon-facts li')].map((l) => l.textContent)
+    expect(facts).toHaveLength(2)
+    expect(facts[0]).toContain('40 NM')
+  })
+
+  it('names the position being worked', () => {
+    const { mount } = mountLogon()
+    expect(mount.querySelector('.logon-output')?.textContent).toBe('EGLL_APP')
+    expect(mount.querySelector('.logon-brand')?.textContent).toBe('EGLL APPROACH')
+  })
+
+  it('asks for no credential of any kind', () => {
+    // It is a position logon, not an account. A password box would imply
+    // something is being checked, and nothing is.
+    const { mount } = mountLogon()
+    expect(mount.querySelector('input[type="password"]')).toBeNull()
+    expect(mount.querySelectorAll('input')).toHaveLength(1)
+    expect(mount.querySelector('.logon-foot')?.textContent).toMatch(/no password/i)
+  })
+
+  it('reports a valid logon with the position', () => {
+    const h = mountLogon()
+    type(input(h.mount), 'NF')
+    button(h.mount, '.logon-go').click()
+    expect(h.logons).toEqual([{ initials: 'NF', position: 'EGLL_APP' }])
+  })
+
+  it('upper-cases and filters as you type', () => {
+    // Operating initials are always written in capitals, and correcting it
+    // after the fact reads as a rejection.
+    const h = mountLogon()
+    type(input(h.mount), 'n7f!')
+    expect(input(h.mount).value).toBe('NF')
+  })
+
+  it('refuses a logon it cannot use, and says why', () => {
+    const h = mountLogon()
+    type(input(h.mount), 'N')
+    button(h.mount, '.logon-go').click()
+    expect(h.logons).toHaveLength(0)
+    expect(error(h.mount).hidden).toBe(false)
+    expect(error(h.mount).textContent).toMatch(/letters/)
+    expect(input(h.mount).getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('clears the complaint as soon as you start fixing it', () => {
+    const h = mountLogon()
+    button(h.mount, '.logon-go').click()
+    expect(error(h.mount).hidden).toBe(false)
+    type(input(h.mount), 'NF')
+    expect(error(h.mount).hidden).toBe(true)
+    expect(input(h.mount).hasAttribute('aria-invalid')).toBe(false)
+  })
+
+  it('logs on from the keyboard', () => {
+    const h = mountLogon()
+    type(input(h.mount), 'ABC')
+    input(h.mount).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    expect(h.logons).toEqual([{ initials: 'ABC', position: 'EGLL_APP' }])
+  })
+
+  it('prefills remembered initials', () => {
+    expect(input(mountLogon('NF').mount).value).toBe('NF')
+  })
+
+  it('hands settings off rather than reimplementing them', () => {
+    // The same options menu the scope uses, so a change made before logging
+    // on is the change that applies afterwards.
+    const h = mountLogon()
+    button(h.mount, '.logon-settings').click()
+    expect(h.settings).toBe(1)
+    // And it does not carry its own copies of those controls.
+    expect(h.mount.querySelectorAll('input[type="checkbox"]')).toHaveLength(0)
+  })
+
+  it('stays up until it is dismissed', () => {
+    const h = mountLogon()
+    expect(h.logon.visible).toBe(true)
+    h.logon.hide()
+    expect(h.logon.visible).toBe(false)
+    expect(h.mount.querySelector<HTMLElement>('.logon')?.hidden).toBe(true)
+    h.logon.show()
+    expect(h.logon.visible).toBe(true)
+  })
+
+  it('is a modal dialog as far as assistive technology is concerned', () => {
+    const el = mountLogon().mount.querySelector('.logon')
+    expect(el?.getAttribute('role')).toBe('dialog')
+    expect(el?.getAttribute('aria-modal')).toBe('true')
+  })
+})

@@ -473,6 +473,356 @@
         "bearingTrue": 11,
         "lengthFt": 5006
       }
+    },
+    {
+      "icao": "EGUB",
+      "name": "RAF Benson",
+      "iata": "BEX",
+      "kind": "medium",
+      "lat": 51.614366,
+      "lon": -1.095991,
+      "elevationFt": 226,
+      "primaryRunway": {
+        "ident": "01/19",
+        "bearingTrue": 7.8,
+        "lengthFt": 5981
+      }
+    },
+    {
+      "icao": "EGHL",
+      "name": "Lasham Airfield",
+      "iata": null,
+      "kind": "medium",
+      "lat": 51.18744,
+      "lon": -1.031663,
+      "elevationFt": 618,
+      "primaryRunway": {
+        "ident": "09/27",
+        "bearingTrue": 85.7,
+        "lengthFt": 5896
+      }
+    },
+    {
+      "icao": "EGTC",
+      "name": "Cranfield Airport",
+      "iata": null,
+      "kind": "medium",
+      "lat": 52.072201,
+      "lon": -0.616667,
+      "elevationFt": 360,
+      "primaryRunway": {
+        "ident": "03/21",
+        "bearingTrue": 31.6,
+        "lengthFt": 5902
+      }
+    },
+    {
+      "icao": "EGKA",
+      "name": "Brighton City Airport",
+      "iata": "ESH",
+      "kind": "medium",
+      "lat": 50.835602,
+      "lon": -0.297222,
+      "elevationFt": 7,
+      "primaryRunway": {
+        "ident": "02/20",
+        "bearingTrue": 21.5,
+        "lengthFt": 3385
+      }
+    },
+    {
+      "icao": "EGMC",
+      "name": "London Southend Airport",
+      "iata": "SEN",
+      "kind": "medium",
+      "lat": 51.570562,
+      "lon": 0.693627,
+      "elevationFt": 49,
+      "primaryRunway": {
+        "ident": "05/23",
+        "bearingTrue": 54.2,
+        "lengthFt": 6089
+      }
+    },
+    {
+      "icao": "EGVN",
+      "name": "RAF Brize Norton",
+      "iata": "BZZ",
+      "kind": "medium",
+      "lat": 51.75,
+      "lon": -1.58362,
+      "elevationFt": 288,
+      "primaryRunway": {
+        "ident": "07/25",
+        "bearingTrue": 73.4,
+        "lengthFt": 10007
+      }
+    },
+    {
+      "icao": "EGHI",
+      "name": "Southampton Airport",
+      "iata": "SOU",
+      "kind": "medium",
+      "lat": 50.950298,
+      "lon": -1.3568,
+      "elevationFt": 44,
+      "primaryRunway": {
+        "ident": "02/20",
+        "bearingTrue": 19.4,
+        "lengthFt": 6191
+      }
+    },
+    {
+      "icao": "EGSC",
+      "name": "Cambridge City Airport",
+      "iata": "CBG",
+      "kind": "medium",
+      "lat": 52.205002,
+      "lon": 0.175,
+      "elevationFt": 47,
+      "primaryRunway": {
+        "ident": "05/23",
+        "bearingTrue": 49.7,
+        "lengthFt": 6444
+      }
+    },
+    {
+      "icao": "EGVA",
+      "name": "RAF Fairford",
+      "iata": "FFD",
+      "kind": "medium",
+      "lat": 51.683568,
+      "lon": -1.789172,
+      "elevationFt": 286,
+      "primaryRunway": {
+        "ident": "09/27",
+        "bearingTrue": 87.9,
+        "lengthFt": 9994
+      }
+    },
+    {
+      "icao": "EGDM",
+      "name": "MoD Boscombe Down",
+      "iata": null,
+      "kind": "medium",
+      "lat": 51.152199,
+      "lon": -1.74741,
+      "elevationFt": 407,
+      "primaryRunway": {
+        "ident": "05/23",
+        "bearingTrue": 50.1,
+        "lengthFt": 10538
+      }
+    },
+    {
+      "icao": "EGMD",
+      "name": "Lydd London Ashford Airport",
+      "iata": "LYX",
+      "kind": "medium",
+      "lat": 50.956246,
+      "lon": 0.939074,
+      "elevationFt": 13,
+      "primaryRunway": {
+        "ident": "03/21",
+        "bearingTrue": 32.7,
+        "lengthFt": 4938
+      }
+    },
+    {
+      "icao": "EGUN",
+      "name": "RAF Mildenhall",
+      "iata": "MHZ",
+      "kind": "medium",
+      "lat": 52.3619,
+      "lon": 0.486406,
+      "elevationFt": 33,
+      "primaryRunway": {
+        "ident": "10/28",
+        "bearingTrue": 102.9,
+        "lengthFt": 9213
+      }
+    },
+    {
+      "icao": "EGUW",
+      "name": "Wattisham Airfield",
+      "iata": null,
+      "kind": "medium",
+      "lat": 52.127451,
+      "lon": 0.956189,
+      "elevationFt": 284,
+      "primaryRunway": {
+        "ident": "05/23",
+        "bearingTrue": 47.9,
+        "lengthFt": 7953
+      }
+    },
+    {
+      "icao": "EGHH",
+      "name": "Bournemouth Airport",
+      "iata": "BOH",
+      "kind": "medium",
+      "lat": 50.780483,
+      "lon": -1.839576,
+      "elevationFt": 38,
+      "primaryRunway": {
+        "ident": "08/26",
+        "bearingTrue": 75.2,
+        "lengthFt": 7454
+      }
+    },
+    {
+      "icao": "EGUL",
+      "name": "RAF Lakenheath",
+      "iata": "LKZ",
+      "kind": "medium",
+      "lat": 52.40954,
+      "lon": 0.561161,
+      "elevationFt": 32,
+      "primaryRunway": {
+        "ident": "05/23",
+        "bearingTrue": 55.6,
+        "lengthFt": 8998
+      }
+    },
+    {
+      "icao": "EGXT",
+      "name": "RAF Wittering",
+      "iata": null,
+      "kind": "medium",
+      "lat": 52.612598,
+      "lon": -0.476453,
+      "elevationFt": 273,
+      "primaryRunway": {
+        "ident": "07/25",
+        "bearingTrue": 73,
+        "lengthFt": 9052
+      }
+    },
+    {
+      "icao": "EGBJ",
+      "name": "Gloucestershire Airport",
+      "iata": "GLO",
+      "kind": "medium",
+      "lat": 51.894199,
+      "lon": -2.16722,
+      "elevationFt": 101,
+      "primaryRunway": {
+        "ident": "08/26",
+        "bearingTrue": 85,
+        "lengthFt": 4695
+      }
+    },
+    {
+      "icao": "EGXH",
+      "name": "RAF Honington",
+      "iata": "BEQ",
+      "kind": "medium",
+      "lat": 52.342602,
+      "lon": 0.772939,
+      "elevationFt": 174,
+      "primaryRunway": {
+        "ident": "09/27",
+        "bearingTrue": 81.3,
+        "lengthFt": 9012
+      }
+    },
+    {
+      "icao": "EGBB",
+      "name": "Birmingham Airport",
+      "iata": "BHX",
+      "kind": "large",
+      "lat": 52.453899,
+      "lon": -1.74803,
+      "elevationFt": 327,
+      "primaryRunway": {
+        "ident": "15/33",
+        "bearingTrue": 145.8,
+        "lengthFt": 10013
+      }
+    },
+    {
+      "icao": "EGYM",
+      "name": "RAF Marham",
+      "iata": "KNF",
+      "kind": "medium",
+      "lat": 52.648395,
+      "lon": 0.550692,
+      "elevationFt": 75,
+      "primaryRunway": {
+        "ident": "05/23",
+        "bearingTrue": 55.5,
+        "lengthFt": 9131
+      }
+    },
+    {
+      "icao": "EGGD",
+      "name": "Bristol Airport",
+      "iata": "BRS",
+      "kind": "large",
+      "lat": 51.382326,
+      "lon": -2.716453,
+      "elevationFt": 622,
+      "primaryRunway": {
+        "ident": "09/27",
+        "bearingTrue": 86.5,
+        "lengthFt": 6598
+      }
+    },
+    {
+      "icao": "EGDY",
+      "name": "RNAS Yeovilton",
+      "iata": "YEO",
+      "kind": "medium",
+      "lat": 51.009399,
+      "lon": -2.63882,
+      "elevationFt": 75,
+      "primaryRunway": {
+        "ident": "08/26",
+        "bearingTrue": 83.1,
+        "lengthFt": 7580
+      }
+    },
+    {
+      "icao": "EGNX",
+      "name": "East Midlands Airport",
+      "iata": "EMA",
+      "kind": "large",
+      "lat": 52.8311,
+      "lon": -1.32806,
+      "elevationFt": 306,
+      "primaryRunway": {
+        "ident": "09/27",
+        "bearingTrue": 88.2,
+        "lengthFt": 9495
+      }
+    },
+    {
+      "icao": "EGYE",
+      "name": "RAF Barkston Heath",
+      "iata": null,
+      "kind": "medium",
+      "lat": 52.960616,
+      "lon": -0.559428,
+      "elevationFt": 367,
+      "primaryRunway": {
+        "ident": "06/24",
+        "bearingTrue": 57.6,
+        "lengthFt": 5722
+      }
+    },
+    {
+      "icao": "EGBN",
+      "name": "Nottingham City Airport",
+      "iata": "NQT",
+      "kind": "medium",
+      "lat": 52.919998,
+      "lon": -1.07917,
+      "elevationFt": 138,
+      "primaryRunway": {
+        "ident": "09/27",
+        "bearingTrue": 90,
+        "lengthFt": 3445
+      }
     }
   ],
   "airspace": [
@@ -16936,7 +17286,8 @@
       "Coastline from the Natural Earth 10m coastline dataset (public domain), clipped to a box roughly 180 NM around the field, simplified with Douglas-Peucker to a 0.1 NM tolerance, then split into chunks spanning at most 12 NM so the renderer can reject an off-screen chunk on its bounding box. Checked against known coastal points: Brighton 0.02 NM, Southend 0.04 NM, Dover 0.20 NM, Harwich 0.24 NM, Beachy Head 0.61 NM from the drawn line.",
       "The London FIR boundary is from the VATSIM UK Sector File, ARTCC/High/EGTT London FIR.txt. Its 39 published segments chain into a single closed ring, so unlike the TMA line work it is continuous; only the portion inside the same box is kept. Long straight legs carry added colinear points, purely so the chunking has somewhere to cut -- the drawn line is unchanged. The Scottish FIR boundary is about 215 NM north of the field and so is absent.",
       "traffic cadence is one arrival every 30 to 60 seconds, ramping from the slower end to the faster over rampMinutes. The interval is clamped to that band so jitter cannot push it outside. entrySpeedKts is the standard entry groundspeed, capped by the type cruise and by the sector speed limit below the limit altitude.",
-      "The River Thames is from the VATSIM UK Sector File, Misc Geo/Rivers.txt. That file is an unlabelled pile of 4438 segments -- every line ends in the colour name \"river\" and nothing identifies the watercourse -- so the segments were chained on shared endpoints into 35 polylines and the Thames was identified by geometry: exactly one chain passes within a mile of Windsor, Richmond, Westminster, Tower Bridge, Woolwich and Gravesend. The per-point widths in metres are APPROXIMATE, interpolated along the line from a table of real widths at fifteen known places (25 m at Oxford to 5 km off Canvey); the source carries no width at all."
+      "The River Thames is from the VATSIM UK Sector File, Misc Geo/Rivers.txt. That file is an unlabelled pile of 4438 segments -- every line ends in the colour name \"river\" and nothing identifies the watercourse -- so the segments were chained on shared endpoints into 35 polylines and the Thames was identified by geometry: exactly one chain passes within a mile of Windsor, Richmond, Westminster, Tower Bridge, Woolwich and Gravesend. The per-point widths in metres are APPROXIMATE, interpolated along the line from a table of real widths at fifteen known places (25 m at Oxford to 5 km off Canvey); the source carries no width at all.",
+      "The aerodrome list was extended outwards from the original fifteen within 40 NM: every large airport within 100 NM and every medium one within 90 NM that OurAirports records a runway for, which adds twenty-five fields including London Southend, Southampton, Bournemouth, Cambridge, Birmingham and Bristol. Small aerodromes were deliberately left alone -- the close-in strips were curated by hand and there are hundreds of farm strips at that size. Each runway bearing is computed from the two published threshold coordinates rather than taken from the heading column, which is often blank and sometimes magnetic."
     ],
     "airspace": "Airspace boundaries are from the VATSIM UK Sector File (github.com/VATSIM-UK/UK-Sector-File), licensed GPL-3.0. See ATTRIBUTION.md. Retrieved 2026-08-21."
   },

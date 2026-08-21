@@ -3,7 +3,7 @@ import { Camera } from '../core/camera'
 import { loadAirport, runwayScaleAt } from '../data/airport'
 import raw from '../data/egll.json'
 import { drawScope } from './scope'
-import { OVERLAY_PRESETS, type Overlays } from './overlays'
+import { OVERLAY_ITEMS, OVERLAY_PRESETS, type Overlays } from './overlays'
 import type { ScopeStatus } from './scope'
 import { PALETTE_ORDER, palettes, setPalette } from './theme'
 
@@ -24,6 +24,12 @@ interface Arc {
   y: number
   r: number
 }
+/** One stroked polyline, with the state it was stroked under. */
+interface Stroke {
+  style: string
+  width: number
+  points: { x: number; y: number }[]
+}
 
 function recorder(): {
   ctx: CanvasRenderingContext2D
@@ -31,21 +37,37 @@ function recorder(): {
   arcs: Arc[]
   dashes: number[][]
   fills: string[]
+  strokes: Stroke[]
 } {
   const texts: Text[] = []
   const arcs: Arc[] = []
   const dashes: number[][] = []
   const fills: string[] = []
+  const strokes: Stroke[] = []
+  let path: { x: number; y: number }[] = []
   const noop = (): void => {}
   const stub: Record<string, unknown> = {
     fillRect: () => {
       fills.push(String(stub["fillStyle"]))
     },
-    beginPath: noop,
+    beginPath: () => {
+      path = []
+    },
     closePath: noop,
-    moveTo: noop,
-    lineTo: noop,
-    stroke: noop,
+    moveTo: (x: number, y: number) => {
+      path.push({ x, y })
+    },
+    lineTo: (x: number, y: number) => {
+      path.push({ x, y })
+    },
+    stroke: () => {
+      // Copied, because the next beginPath replaces the array.
+      strokes.push({
+        style: String(stub['strokeStyle']),
+        width: Number(stub['lineWidth']),
+        points: [...path],
+      })
+    },
     fill: noop,
     save: noop,
     restore: noop,
@@ -67,7 +89,14 @@ function recorder(): {
     textAlign: 'left',
     textBaseline: 'top',
   }
-  return { ctx: stub as unknown as CanvasRenderingContext2D, texts, arcs, dashes, fills }
+  return {
+    ctx: stub as unknown as CanvasRenderingContext2D,
+    texts,
+    arcs,
+    dashes,
+    fills,
+    strokes,
+  }
 }
 
 const airport = loadAirport(raw)
@@ -79,6 +108,7 @@ const STATUS: ScopeStatus = {
   speed: 1,
   paused: false,
   traffic: { spawned: 0, held: 0 },
+  controller: null,
 }
 
 // Most tests assert that a feature draws, so they render everything; the
@@ -391,6 +421,22 @@ describe('period chrome', () => {
     expect(fills).toContain(palettes.beige.chromeWell)
     expect(fills).toContain(palettes.beige.chromeLight)
     expect(fills).toContain(palettes.beige.chromeShadow)
+  })
+
+  it('shows who is working the position once they have logged on', () => {
+    const cam = new Camera({ x: 0, y: 0 }, 30, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.standard, {
+      ...STATUS,
+      controller: { initials: 'NF', position: 'EGLL_APP' },
+    })
+    const labels = rec.texts.map((t) => t.s)
+    expect(labels).toContain('EGLL_APP  NF')
+  })
+
+  it('leaves the title block alone before anyone logs on', () => {
+    expect(render().labels.some((s) => s.includes('_APP  '))).toBe(false)
   })
 
   it('names the field and the airport in the title block', () => {
@@ -725,6 +771,7 @@ describe('the clock and rate readouts', () => {
       speed: 1,
       paused: false,
       traffic: { spawned: 0, held: 0 },
+  controller: null,
     })
     expect(labels).toContain('TIME')
     expect(labels).toContain('13:01:01')
@@ -742,6 +789,7 @@ describe('the clock and rate readouts', () => {
         speed,
         paused: false,
         traffic: { spawned: 0, held: 0 },
+  controller: null,
       })
       expect(labels, `x${speed}`).toContain('RATE')
       expect(labels, `x${speed}`).toContain(shown)
@@ -755,6 +803,7 @@ describe('the clock and rate readouts', () => {
       speed: 4,
       paused: true,
       traffic: { spawned: 0, held: 0 },
+  controller: null,
     })
     expect(labels).toContain('PAUSED')
     expect(labels).not.toContain('x4')
@@ -773,9 +822,156 @@ describe('the traffic readout', () => {
       speed: 1,
       paused: false,
       traffic: { spawned: 7, held: 3 },
+      controller: null,
     })
     const labels = rec.texts.map((t) => t.s)
     expect(labels).toContain('TRAFFIC')
     expect(labels).toContain('7 HELD 3')
+  })
+})
+
+describe('the map underneath', () => {
+  // The coastline and the FIR limit are drawn from real line work, so the
+  // checks are geometric: the right colour, in the right place, and not
+  // projected at all when none of it can be on screen.
+
+  const coastStrokes = (r: { strokes: Stroke[] }, palette = palettes.beige): Stroke[] =>
+    r.strokes.filter((s) => s.style === palette.coast)
+  const firStrokes = (r: { strokes: Stroke[] }, palette = palettes.beige): Stroke[] =>
+    r.strokes.filter((s) => s.style === palette.fir)
+
+  it('draws the coastline once the scope is wide enough to reach it', () => {
+    const wide = render(1000, 600, 80)
+    const strokes = coastStrokes(wide)
+    expect(strokes.length).toBeGreaterThan(0)
+    // A shoreline, not a straight line: the paths carry real detail.
+    expect(strokes.reduce((n, s) => n + s.points.length, 0)).toBeGreaterThan(100)
+  })
+
+  it('draws the FIR boundary heavier than the shoreline', () => {
+    // One is an airspace limit and the other is a backdrop, so they must
+    // not read as the same kind of line.
+    const wide = render(1000, 600, 80)
+    const coast = coastStrokes(wide)[0]
+    const fir = firStrokes(wide)[0]
+    expect(coast).toBeDefined()
+    expect(fir).toBeDefined()
+    expect(fir?.width).toBeGreaterThan(Number(coast?.width))
+  })
+
+  it('puts the south coast south of the field', () => {
+    // Beachy Head, through the same projection and camera the scope uses.
+    const wide = render(1000, 600, 80)
+    const head = wide.cam.worldToScreen(
+      airport.projection.toWorld({ lat: 50.737, lon: 0.246 }),
+    )
+    const field = wide.cam.worldToScreen({ x: 0, y: 0 })
+    expect(head.y).toBeGreaterThan(field.y)
+
+    let nearest = Infinity
+    for (const s of coastStrokes(wide)) {
+      for (const p of s.points) {
+        nearest = Math.min(nearest, Math.hypot(p.x - head.x, p.y - head.y))
+      }
+    }
+    // The drawn line passes within a few pixels of a real headland, which
+    // is the whole pipeline -- lat/lon to world to screen -- in one check.
+    expect(nearest).toBeLessThan(8)
+  })
+
+  it('projects nothing that cannot be on screen', () => {
+    // Zoomed onto the runway, every coastline and FIR chunk is rejected by
+    // its bounding box rather than transformed point by point.
+    const close = render(1000, 600, 2, { ...OVERLAY_PRESETS.full, rivers: false })
+    expect(coastStrokes(close)).toHaveLength(0)
+    expect(firStrokes(close)).toHaveLength(0)
+  })
+
+  it('keeps the Thames even at close range, because it is genuinely there', () => {
+    // The river passes within a few miles of the field, so unlike the coast
+    // it survives the cull zoomed right in -- which is most of why it is
+    // worth drawing.
+    const close = render(1000, 600, 4, {
+      ...OVERLAY_PRESETS.full,
+      coastline: false,
+    })
+    expect(coastStrokes(close).length).toBeGreaterThan(0)
+  })
+
+  it('draws the Thames at its real width, widening downstream', () => {
+    // The estuary is over a kilometre across and the upper river is 60 m,
+    // so a river drawn at one width everywhere is throwing away the most
+    // recognisable thing about it.
+    const wide = render(1000, 600, 60, { ...OVERLAY_PRESETS.full, coastline: false })
+    const river = coastStrokes(wide)
+    expect(river.length).toBeGreaterThan(1)
+
+    // Widest run should be well east of the narrowest: width grows towards
+    // the sea.
+    const midX = (s: Stroke) =>
+      s.points.reduce((n, p) => n + p.x, 0) / s.points.length
+    const widest = river.reduce((a, b) => (b.width > a.width ? b : a))
+    const narrowest = river.reduce((a, b) => (b.width < a.width ? b : a))
+    expect(widest.width).toBeGreaterThan(narrowest.width)
+    expect(midX(widest)).toBeGreaterThan(midX(narrowest))
+  })
+
+  it('scales the river width with the zoom', () => {
+    // It is a real width in nautical miles, not a line weight, so zooming in
+    // makes the estuary wider on screen.
+    const widthAt = (rangeNM: number): number => {
+      const r = render(1000, 600, rangeNM, { ...OVERLAY_PRESETS.full, coastline: false })
+      return Math.max(...coastStrokes(r).map((s) => s.width))
+    }
+    expect(widthAt(20)).toBeGreaterThan(widthAt(60))
+  })
+
+  it('never draws the upper river thinner than a hairline', () => {
+    // Zoomed out, a true-width Thames at Windsor is a fraction of a pixel.
+    const out = render(1000, 600, 80, { ...OVERLAY_PRESETS.full, coastline: false })
+    for (const s of coastStrokes(out)) expect(s.width).toBeGreaterThanOrEqual(1)
+  })
+
+  it('switches each layer independently', () => {
+    // The river shares the coastline's colour -- it is water -- so proving
+    // the switches are separate means turning them off one at a time.
+    const noWater = render(1000, 600, 80, {
+      ...OVERLAY_PRESETS.full,
+      coastline: false,
+      rivers: false,
+    })
+    expect(coastStrokes(noWater)).toHaveLength(0)
+    expect(firStrokes(noWater).length).toBeGreaterThan(0)
+
+    // Coast off but river on: whatever is left in the water colour is the
+    // Thames, so the river has its own switch and is not riding on the
+    // coastline's.
+    const riverOnly = render(1000, 600, 80, { ...OVERLAY_PRESETS.full, coastline: false })
+    expect(riverOnly.strokes.length).toBeGreaterThan(noWater.strokes.length)
+    expect(coastStrokes(riverOnly).length).toBeGreaterThan(0)
+
+    const noFir = render(1000, 600, 80, { ...OVERLAY_PRESETS.full, firBoundary: false })
+    expect(firStrokes(noFir)).toHaveLength(0)
+    expect(coastStrokes(noFir).length).toBeGreaterThan(0)
+  })
+
+  it('leaves the whole map out of the minimal picture', () => {
+    const minimal = render(1000, 600, 80, OVERLAY_PRESETS.minimal)
+    expect(coastStrokes(minimal)).toHaveLength(0)
+    expect(firStrokes(minimal)).toHaveLength(0)
+  })
+
+  it('follows the palette', () => {
+    setPalette('amber')
+    const wide = render(1000, 600, 80)
+    expect(coastStrokes(wide, palettes.amber).length).toBeGreaterThan(0)
+    expect(coastStrokes(wide, palettes.beige)).toHaveLength(0)
+    setPalette('beige')
+  })
+
+  it('counts the new layers in the overlay readout', () => {
+    // The total is read off OVERLAY_ITEMS, so it cannot go stale.
+    const { labels } = render(1400, 800, 80)
+    expect(labels.some((s) => s.includes(`/${OVERLAY_ITEMS.length}`))).toBe(true)
   })
 })

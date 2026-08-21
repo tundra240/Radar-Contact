@@ -154,3 +154,124 @@ describe('Camera zoom limits', () => {
     expect(Number.isFinite(c.rangeNM)).toBe(true)
   })
 })
+
+describe('the fence', () => {
+  // Keeps the view inside the drawn map: past the edge of the coastline
+  // data there is nothing but empty ground.
+  const MAP = { min: { x: -200, y: -150 }, max: { x: 180, y: 160 } }
+
+  function fenced(rangeNM = 20, w = 800, h = 600): Camera {
+    const cam = new Camera({ x: 0, y: 0 }, rangeNM, { maxNM: 400 })
+    cam.setViewport(w, h)
+    cam.setBounds(MAP)
+    return cam
+  }
+
+  it('is off by default, so an unfenced camera pans anywhere', () => {
+    const cam = new Camera({ x: 0, y: 0 }, 20)
+    cam.setViewport(800, 600)
+    cam.panByPx(-100000, 0)
+    expect(cam.bounds).toBeNull()
+    expect(cam.centre.x).toBeGreaterThan(1000)
+  })
+
+  it('stops a pan at the edge of the map', () => {
+    const cam = fenced()
+    // 600 / 2 / 20 = 15 px per NM, so this is a 10000 NM drag east.
+    cam.panByPx(-150000, 0)
+    // Half the viewport stays inside: 400 px of width is 26.67 NM.
+    expect(cam.centre.x).toBeCloseTo(MAP.max.x - 800 / 2 / cam.pxPerNM, 6)
+    expect(cam.centre.x).toBeLessThan(MAP.max.x)
+  })
+
+  it('fences all four sides', () => {
+    const halfW = (cam: Camera): number => cam.width / 2 / cam.pxPerNM
+    const halfH = (cam: Camera): number => cam.height / 2 / cam.pxPerNM
+
+    const east = fenced()
+    east.panByPx(-150000, 0)
+    expect(east.centre.x).toBeCloseTo(MAP.max.x - halfW(east), 6)
+
+    const west = fenced()
+    west.panByPx(150000, 0)
+    expect(west.centre.x).toBeCloseTo(MAP.min.x + halfW(west), 6)
+
+    const north = fenced()
+    north.panByPx(0, 150000)
+    expect(north.centre.y).toBeCloseTo(MAP.max.y - halfH(north), 6)
+
+    const south = fenced()
+    south.panByPx(0, -150000)
+    expect(south.centre.y).toBeCloseTo(MAP.min.y + halfH(south), 6)
+  })
+
+  it('keeps the visible area inside, not merely the centre', () => {
+    // The point of adjusting for the half-extents: the edge of the map
+    // should stop at the edge of the screen, not run into the middle of it.
+    const cam = fenced()
+    cam.panByPx(-150000, 0)
+    const rightEdge = cam.screenToWorld({ x: cam.width, y: cam.height / 2 })
+    expect(rightEdge.x).toBeCloseTo(MAP.max.x, 6)
+  })
+
+  it('pulls the view back in when zooming out past the edge', () => {
+    const cam = fenced(20)
+    cam.panByPx(-150000, 0)
+    const wasAt = cam.centre.x
+    cam.setRangeNM(120)
+    expect(cam.centre.x).toBeLessThan(wasAt)
+    const rightEdge = cam.screenToWorld({ x: cam.width, y: cam.height / 2 })
+    expect(rightEdge.x).toBeLessThanOrEqual(MAP.max.x + 1e-6)
+  })
+
+  it('pulls the view back in on a resize', () => {
+    const cam = fenced(20)
+    cam.panByPx(-150000, 0)
+    // A wider window shows more, so the same centre would now overrun.
+    cam.setViewport(2400, 600)
+    const rightEdge = cam.screenToWorld({ x: cam.width, y: cam.height / 2 })
+    expect(rightEdge.x).toBeLessThanOrEqual(MAP.max.x + 1e-6)
+  })
+
+  it('centres an axis the map cannot fill', () => {
+    // Zoomed far enough out that the map is narrower than the viewport,
+    // there is nothing to choose between positions that all show
+    // everything, so it settles in the middle.
+    const cam = fenced(400)
+    cam.panByPx(-150000, -150000)
+    expect(cam.centre.x).toBeCloseTo((MAP.min.x + MAP.max.x) / 2, 6)
+    expect(cam.centre.y).toBeCloseTo((MAP.min.y + MAP.max.y) / 2, 6)
+  })
+
+  it('fences a zoom about the cursor too', () => {
+    const cam = fenced(20)
+    // Zoom out repeatedly at a corner: without the fence this walks the
+    // centre off the map.
+    for (let i = 0; i < 40; i += 1) cam.zoomAt({ x: 0, y: 0 }, 1 / 1.1)
+    expect(cam.centre.x).toBeGreaterThanOrEqual(MAP.min.x)
+    expect(cam.centre.x).toBeLessThanOrEqual(MAP.max.x)
+    expect(cam.centre.y).toBeGreaterThanOrEqual(MAP.min.y)
+    expect(cam.centre.y).toBeLessThanOrEqual(MAP.max.y)
+  })
+
+  it('constrains a centre set directly', () => {
+    const cam = fenced()
+    cam.setCentre({ x: 99999, y: 99999 })
+    expect(cam.centre.x).toBeLessThan(MAP.max.x)
+    expect(cam.centre.y).toBeLessThan(MAP.max.y)
+  })
+
+  it('can be removed again', () => {
+    const cam = fenced()
+    cam.setBounds(null)
+    cam.panByPx(-150000, 0)
+    expect(cam.centre.x).toBeGreaterThan(1000)
+  })
+
+  it('brings an already-outside camera back on being fenced', () => {
+    const cam = new Camera({ x: 5000, y: 0 }, 20, { maxNM: 400 })
+    cam.setViewport(800, 600)
+    cam.setBounds(MAP)
+    expect(cam.centre.x).toBeLessThan(MAP.max.x)
+  })
+})

@@ -43,6 +43,31 @@ and OCK is two and a half times closer in than LAM. That asymmetry is most of th
 **[TUTORIAL.md](TUTORIAL.md) covers sequencing in full** -- stack discipline, base legs,
 spacing and the errors that cost the most.
 
+### The map
+
+The scope is not an empty grid. Under the airspace it draws real geography, so zooming out
+gives you somewhere to be rather than a blank ground:
+
+| Layer | What it is |
+|---|---|
+| Coastline | Natural Earth 10m, out to roughly 180 NM -- the south coast, the Thames estuary, East Anglia, and the French, Belgian and Dutch shore |
+| River Thames | Drawn at its **real width**, a thread at Windsor and visibly a mile across off Canvey |
+| London FIR boundary | The lateral limit of UK airspace, down the Channel and up the North Sea |
+| Aerodromes | 40 fields, from Northolt at 6 NM out to Birmingham, Bristol and East Midlands, each on its real runway bearing |
+
+Accuracy is measured rather than asserted: the drawn coastline is within 0.25 NM of Dover,
+Brighton, Southend and Harwich, and the Thames passes within a mile of Windsor, Richmond,
+Westminster, Tower Bridge, Woolwich and Gravesend. See [ATTRIBUTION.md](ATTRIBUTION.md) for
+sources and for the one piece of approximated geometry -- the river's width profile.
+
+**The zoom limit is unchanged.** The scope still stops at 80 NM, twice the area of
+responsibility. The map extends what is drawn, not how far out you can go.
+
+**Panning stops at the edge of the map.** The coastline data runs out at roughly 230 NM west
+and 190 NM east of the field, and the camera is fenced to that, so a drag cannot take you out
+into blank ground. The fence adjusts for the size of the window, so it is the edge of the
+*picture* that stops at the edge of the screen rather than the middle of it.
+
 ### An arrival, end to end
 
 ```
@@ -70,16 +95,29 @@ spacing and the errors that cost the most.
 
 ### What is playable today
 
-The radar picture is on screen and interactive -- real airspace, the four holds, the runways
-and their centrelines, the surrounding traffic picture -- along with the strip bay, the
-simulation clock and its rate control.
+The radar picture is on screen and interactive -- real airspace, the map, the four holds, the
+runways and their centrelines -- along with the logon screen, the strip bay, the simulation
+clock and its rate control. Arrivals are generated onto the holds with real callsigns and
+types, and appear on their strips.
 
-**There is no traffic yet.** The strip bay is fed a frozen placeholder roster, and aircraft
-physics, clearances and ILS capture are Day 1 and Day 2 of the roadmap in
-[ARCHITECTURE.md](ARCHITECTURE.md). So the sections above describe the game being built rather
-than a game you can currently play -- but every figure in them is already live in the config,
-and the geometry they depend on is already drawn correctly. See **Status** below for the
-detail.
+**Nothing moves yet.** There is no physics step, so an arrival stays where it was released and
+the flow stalls once every fix is occupied. Aircraft motion, clearances and ILS capture are
+Day 1 and Day 2 of the roadmap in [ARCHITECTURE.md](ARCHITECTURE.md). So the sections above
+describe the game being built rather than one you can play through -- but every figure in them
+is live in the config, and the geometry they depend on is already drawn correctly. See
+**Status** below for the detail.
+
+## Logging on
+
+The session starts at a main menu: a system logon window over the scope, showing what the
+radar has loaded and asking for your operating initials -- two or three letters. The
+simulation clock is held stopped behind it, so no traffic builds up while you set the display
+up, and **Settings** on that window opens the same options menu the scope uses, so anything
+you change before logging on is what applies afterwards.
+
+There is no account and no password. Initials identify the position, in the sense a controller
+means it -- once you are on, they appear in the scope's title block with the position, as
+`EGLL_APP  NF`.
 
 ## Running it
 
@@ -96,29 +134,46 @@ npm run dev        # http://localhost:5173
 | `npm run test:watch` | Vitest, watching |
 | `npm run typecheck` | Type-check only |
 
-On the scope: drag to pan, wheel to zoom, `R` to reset the view, `D` to switch between the
-display schemes, `O` to open the overlay panel, and space to pause. The buttons in the top
-right do the same.
+On the scope: drag to pan, wheel to zoom, `R` to reset the view, space to pause, `D` to cycle
+the display schemes, and `M` to open the menu (`O` does too).
 
 Arrivals are released onto the four holds by `sim/spawner.ts`, on a timer that tightens as
 the session goes on. They do not move yet -- there is no physics step -- so the flow stalls at
 four, one per hold, and the `TRAFFIC n HELD n` readout shows the spacing rule refusing to
 stack more on top.
 
-Controls click. `SND` mutes them, and the choice persists.
+### The guide
 
-The simulation runs in fixed 50 ms steps at 20 Hz and the rate buttons run it at 0.5x, 1x, 2x
-or 4x. Changing the rate changes how many steps happen per real second, never the size of a
-step, so fast-forward is the same simulation sooner rather than a different one. The status
-bar clock keeps simulated time and stops when paused.
+The book button in the top right opens the how-to-play guide in a window. **It is not a copy
+of anything** -- it reads [TUTORIAL.md](TUTORIAL.md) and renders it, so that one file is both
+the document you would edit and the guide the game shows.
 
-Three display schemes cycle in order: **beige** (a Windows-2000-era desktop with a tan tube),
-**dark** (a colour CRT), and **amber** (a monochrome phosphor tube). The choice persists.
+To change what players read, edit `TUTORIAL.md`. With `npm run dev` running the panel updates
+as soon as you save; a production build takes whatever the file said at build time. There is
+nothing else to keep in step.
 
-The overlay panel controls how much context is drawn -- airspace, traffic zones, other
-aerodromes, other navaids, labels, range rings, centrelines -- with minimal / standard / full
-presets. The runways being worked, the holding fixes and the sector boundary are always
-drawn: they are the job rather than decoration.
+It is reachable before you log on as well, which is where someone opening the game for the
+first time will look for it.
+
+### The menu
+
+One button in the top right of the scope opens everything that is a setting rather than an
+instruction, in three sections. Every preference in it persists.
+
+**Simulation.** Pause, and the four rates. The simulation runs in fixed 50 ms steps at 20 Hz,
+and the rate changes how many steps happen per real second, never the size of a step -- so
+fast-forward is the same simulation sooner rather than a different one. The status bar keeps
+the clock and the current rate on the scope itself, so you can see whether time is running
+without opening anything. Interface sound is switched here too; controls click when it is on.
+
+**Display scheme.** Three period palettes, picked by name: **beige** (a Windows-2000-era
+desktop with a tan tube), **dark** (a colour CRT), and **amber** (a monochrome phosphor tube).
+`D` still cycles them without opening the menu, because that is a by-eye choice.
+
+**Overlays.** How much context is drawn -- coastline, the Thames, the FIR boundary, airspace,
+traffic zones, other aerodromes, other navaids, labels, range rings, centrelines -- with
+minimal / standard / full presets. The runways being worked, the holding fixes and the sector
+boundary are always drawn: they are the job rather than decoration.
 
 ## Where things are
 
@@ -132,7 +187,8 @@ drawn: they are the job rather than decoration.
 | `src/data/` | Airport configuration and its validating loader |
 | `src/render/` | Palettes and the scope renderer |
 | `src/sim/` | The aircraft model, and a placeholder roster until Day 1 |
-| `src/ui/` | The flight progress strip bay |
+| `src/ui/` | The strip bay, the options menu, the logon screen and the guide |
+| `tools/` | Scripts that regenerate the map and aerodrome data from their sources |
 | `src/commands/` | The one instruction type every input path produces |
 | `src/audio/` | Interface sounds |
 

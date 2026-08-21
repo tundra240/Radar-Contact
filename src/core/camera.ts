@@ -1,4 +1,4 @@
-import type { Vec2NM } from './geo'
+import type { BoundsNM, Vec2NM } from './geo'
 
 /**
  * The world -> screen transform: the only place in the codebase that knows
@@ -39,6 +39,15 @@ export class Camera {
 
   private readonly minRange: number
   private readonly maxRange: number
+
+  /**
+   * The rectangle the view is kept inside, or null for a camera that may
+   * be panned anywhere. Callers derive it from the extent of the drawn
+   * map: past that edge there is nothing but empty ground, and being able
+   * to drag out there feels like the display is broken rather than like
+   * freedom.
+   */
+  private fence: BoundsNM | null = null
 
   /**
    * The zoom ceiling is a constructor argument rather than a constant,
@@ -92,17 +101,51 @@ export class Camera {
   }
 
   /** Call on mount and on every resize, in CSS pixels. */
+  /**
+   * Fences the view into a world-space rectangle. Pass null to remove it.
+   *
+   * Applied to the CENTRE, adjusted for the half-extents of the viewport,
+   * so it is the visible area that stays inside the rectangle rather than
+   * just the middle of it. Where the rectangle is smaller than the
+   * viewport on an axis, the view is centred on it instead: there is
+   * nothing useful to choose between two positions that both show
+   * everything.
+   */
+  setBounds(bounds: BoundsNM | null): void {
+    this.fence = bounds
+    this.centreNM = this.constrain(this.centreNM)
+  }
+
+  get bounds(): BoundsNM | null {
+    return this.fence
+  }
+
+  /** Nudges a centre back inside the fence, if there is one. */
+  private constrain(centreNM: Vec2NM): Vec2NM {
+    const f = this.fence
+    if (!f) return centreNM
+    const s = this.pxPerNM
+    return {
+      x: fenceAxis(centreNM.x, f.min.x, f.max.x, this.widthPx / 2 / s),
+      y: fenceAxis(centreNM.y, f.min.y, f.max.y, this.heightPx / 2 / s),
+    }
+  }
+
   setViewport(widthPx: number, heightPx: number): void {
     this.widthPx = Math.max(1, widthPx)
     this.heightPx = Math.max(1, heightPx)
+    // A resize changes the half-extents, so what was inside may not be.
+    this.centreNM = this.constrain(this.centreNM)
   }
 
   setRangeNM(rangeNM: number): void {
     this.range = this.clamp(rangeNM)
+    // Zooming out grows the visible area past the fence.
+    this.centreNM = this.constrain(this.centreNM)
   }
 
   setCentre(centreNM: Vec2NM): void {
-    this.centreNM = centreNM
+    this.centreNM = this.constrain(centreNM)
   }
 
   worldToScreen(p: Vec2NM): Vec2Px {
@@ -134,10 +177,10 @@ export class Camera {
   /** Drags the view by a screen-space delta. */
   panByPx(dxPx: number, dyPx: number): void {
     const s = this.pxPerNM
-    this.centreNM = {
+    this.centreNM = this.constrain({
       x: this.centreNM.x - dxPx / s,
       y: this.centreNM.y + dyPx / s,
-    }
+    })
   }
 
   /**
@@ -149,11 +192,13 @@ export class Camera {
     this.range = this.clamp(this.range / factor)
     const s = this.pxPerNM
 
-    // Solve worldToScreen(before) === anchor for the new centre.
-    this.centreNM = {
+    // Solve worldToScreen(before) === anchor for the new centre. The fence
+    // wins over keeping the anchor put: at the edge of the map the picture
+    // slides slightly under the cursor rather than escaping.
+    this.centreNM = this.constrain({
       x: before.x - (anchor.x - this.widthPx / 2) / s,
       y: before.y + (anchor.y - this.heightPx / 2) / s,
-    }
+    })
   }
 
   /**
@@ -179,7 +224,7 @@ export class Camera {
       if (p.y > maxY) maxY = p.y
     }
 
-    this.centreNM = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 }
+    this.centreNM = this.constrain({ x: (minX + maxX) / 2, y: (minY + maxY) / 2 })
 
     // Range is the radius to the nearer edge, so compare half-extents
     // against the aspect-limited axis.
@@ -190,4 +235,16 @@ export class Camera {
 
     this.setRangeNM(Math.max(needed * margin, this.minRange))
   }
+}
+
+/**
+ * One axis of the fence.
+ *
+ * `half` is the half-extent of the viewport in NM on this axis. When the
+ * fence is narrower than the viewport there is no meaningful choice left,
+ * so the axis is centred on it.
+ */
+function fenceAxis(value: number, min: number, max: number, half: number): number {
+  if (max - min <= half * 2) return (min + max) / 2
+  return Math.min(max - half, Math.max(min + half, value))
 }

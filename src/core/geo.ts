@@ -26,6 +26,15 @@ export interface Vec2NM {
 }
 
 /**
+ * An axis-aligned rectangle in world space, in NM. Used for the extent of
+ * the drawn map and for the fence that keeps the camera inside it.
+ */
+export interface BoundsNM {
+  readonly min: Vec2NM
+  readonly max: Vec2NM
+}
+
+/**
  * One nautical mile is one minute of latitude by definition, so this is
  * exact rather than an approximation.
  */

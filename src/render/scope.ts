@@ -6,11 +6,14 @@ import {
   runwayScaleAt,
   type Airport,
   type AirspaceVolume,
+  type GeoPath,
+  type GeographyFeature,
+  type GeographyKind,
   type Navaid,
   type NeighbourAirport,
   type Runway,
 } from '../data/airport'
-import { countEnabled, densityOf, type Overlays } from './overlays'
+import { OVERLAY_ITEMS, countEnabled, densityOf, type Overlays } from './overlays'
 import { airspaceColour, fonts, formatLevel, theme } from './theme'
 
 /**
@@ -35,6 +38,8 @@ export interface ScopeStatus {
     /** Arrivals held back because no fix was clear, or the sector is full. */
     readonly held: number
   }
+  /** Who is working the position, or null before anyone has logged on. */
+  readonly controller: { readonly initials: string; readonly position: string } | null
 }
 
 export function drawScope(
@@ -47,8 +52,14 @@ export function drawScope(
   g.fillStyle = theme.bg
   g.fillRect(0, 0, cam.width, cam.height)
 
-  // Bottom to top: airspace is the faintest wash, the field being worked
-  // is the boldest thing on the display.
+  // Bottom to top: the map is underneath everything, airspace is a faint
+  // wash over it, and the field being worked is the boldest thing on the
+  // display.
+  for (const feature of airport.geography) {
+    if (!geographyShown(feature.kind, overlays)) continue
+    drawGeography(g, cam, feature)
+  }
+
   const volumes = airport.airspace.filter((v) =>
     v.airspaceClass === 'G' ? overlays.trafficZones : overlays.airspace,
   )
@@ -101,6 +112,136 @@ function drawScreenFrame(g: CanvasRenderingContext2D, cam: Camera): void {
   g.fillStyle = theme.chromeLight
   g.fillRect(0, h - 2, w, 2)
   g.fillRect(w - 2, 0, 2, h)
+}
+
+/* ------------------------------------------------------------ geography */
+
+/**
+ * Which switch governs which feature.
+ *
+ * A switch over the union with no default, so adding a kind of map feature
+ * is a compile error here rather than a layer that quietly cannot be turned
+ * off.
+ */
+function geographyShown(kind: GeographyKind, overlays: Overlays): boolean {
+  switch (kind) {
+    case 'coastline':
+      return overlays.coastline
+    case 'river':
+      return overlays.rivers
+    case 'fir':
+      return overlays.firBoundary
+  }
+}
+
+/**
+ * The coastline, the Thames and the FIR limit.
+ *
+ * All are stroked as open polylines and never closed -- the same rule the
+ * airspace line work follows, and for the coastline it is not optional:
+ * joining the ends of a clipped shoreline would draw a line straight across
+ * the sea.
+ *
+ * Water is water: the river takes the coastline's colour and weight rather
+ * than one of its own, because that is what it is, and giving it a third
+ * colour would imply a distinction that does not exist. The FIR limit is a
+ * different kind of thing and is drawn heavier.
+ *
+ * The kinds are told apart by colour and weight rather than by dash pattern,
+ * because in this codebase dashes mean provenance (see `dashFor`) and all of
+ * these come from an authoritative source. Reusing the dash vocabulary to
+ * mean "different kind of thing" would break that.
+ */
+function drawGeography(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  feature: GeographyFeature,
+): void {
+  const isFir = feature.kind === 'fir'
+
+  // Half-extents of the viewport in NM, grown by a margin so a path that
+  // starts just off-screen still draws the segment that enters it.
+  const halfW = cam.width / 2 / cam.pxPerNM + 1
+  const halfH = cam.height / 2 / cam.pxPerNM + 1
+  const c = cam.centre
+
+  g.save()
+  g.strokeStyle = isFir ? theme.fir : theme.coast
+  g.lineWidth = isFir ? 1.6 : 1
+  g.setLineDash([])
+  g.lineJoin = 'round'
+
+  for (const path of feature.paths) {
+    // Two comparisons reject a whole path, which is most of them at any
+    // useful zoom. Without this the coastline would project a few thousand
+    // points per frame to draw nothing.
+    if (path.minNM.x > c.x + halfW || path.maxNM.x < c.x - halfW) continue
+    if (path.minNM.y > c.y + halfH || path.maxNM.y < c.y - halfH) continue
+
+    if (path.widthsNM) {
+      drawToWidth(g, cam, path)
+      continue
+    }
+
+    g.beginPath()
+    path.pointsNM.forEach((v, i) => {
+      const p = cam.worldToScreen(v)
+      if (i === 0) g.moveTo(p.x, p.y)
+      else g.lineTo(p.x, p.y)
+    })
+    g.stroke()
+  }
+
+  g.restore()
+}
+
+/** Never thinner than this, or the upper river vanishes when zoomed out. */
+const MIN_WATER_PX = 1
+
+/**
+ * Strokes a path at its real width, in pixels, so the Thames is a thread at
+ * Windsor and visibly a mile across off Canvey.
+ *
+ * Consecutive segments of the same drawn width are batched into one stroke:
+ * the width profile is smooth, so quantising to the half pixel turns 150
+ * segments into a handful of runs. Round caps and joins hide the step where
+ * one run meets the next.
+ */
+function drawToWidth(g: CanvasRenderingContext2D, cam: Camera, path: GeoPath): void {
+  const widths = path.widthsNM
+  if (!widths) return
+  const pts = path.pointsNM
+  const scale = cam.pxPerNM
+
+  const widthAt = (i: number): number => {
+    const a = widths[i] ?? 0
+    const b = widths[i + 1] ?? a
+    const px = ((a + b) / 2) * scale
+    // Quantised to the half pixel, purely so neighbouring segments batch.
+    return Math.max(MIN_WATER_PX, Math.round(px * 2) / 2)
+  }
+
+  g.lineCap = 'round'
+  g.lineJoin = 'round'
+
+  let i = 0
+  while (i < pts.length - 1) {
+    const w = widthAt(i)
+    let j = i + 1
+    while (j < pts.length - 1 && widthAt(j) === w) j += 1
+
+    g.lineWidth = w
+    g.beginPath()
+    for (let k = i; k <= j; k += 1) {
+      const v = pts[k]
+      if (!v) continue
+      const p = cam.worldToScreen(v)
+      if (k === i) g.moveTo(p.x, p.y)
+      else g.lineTo(p.x, p.y)
+    }
+    g.stroke()
+    i = j
+  }
 }
 
 /* ------------------------------------------------------------- airspace */
@@ -700,16 +841,28 @@ function drawHud(
   overlays: Overlays,
   status: ScopeStatus,
 ): void {
-  drawTitleBlock(g, airport)
+  drawTitleBlock(g, airport, status)
   drawStatusBar(g, cam, airport, overlays, status)
 }
 
-function drawTitleBlock(g: CanvasRenderingContext2D, airport: Airport): void {
+function drawTitleBlock(
+  g: CanvasRenderingContext2D,
+  airport: Airport,
+  status: ScopeStatus,
+): void {
   const size = 11
   const title = `${airport.icao} APPROACH`
   const sub = airport.name.toUpperCase()
-  const w = Math.ceil(charW(size) * Math.max(title.length, sub.length)) + 18
-  const h = 40
+  // Who is working the position, once someone has logged on. Third line
+  // rather than a status bar cell, because it belongs with the identity of
+  // the display rather than with the readouts that change.
+  const who = status.controller
+    ? `${status.controller.position}  ${status.controller.initials}`
+    : null
+
+  const widest = Math.max(title.length, sub.length, who?.length ?? 0)
+  const w = Math.ceil(charW(size) * widest) + 18
+  const h = who === null ? 40 : 54
 
   bevel(g, 10, 10, w, h)
 
@@ -721,6 +874,10 @@ function drawTitleBlock(g: CanvasRenderingContext2D, airport: Airport): void {
   g.font = fonts.label(9)
   g.fillStyle = theme.chromeDim
   g.fillText(sub, 19, 31)
+  if (who !== null) {
+    g.fillStyle = theme.accent
+    g.fillText(who, 19, 43)
+  }
 }
 
 function drawStatusBar(
@@ -757,7 +914,9 @@ function drawStatusBar(
     },
     {
       label: 'OVERLAYS',
-      value: `${densityOf(overlays).toUpperCase()} ${countEnabled(overlays)}/8`,
+      // Counted from the list rather than written down, so adding a layer
+      // cannot leave the readout claiming a total that is no longer true.
+      value: `${densityOf(overlays).toUpperCase()} ${countEnabled(overlays)}/${OVERLAY_ITEMS.length}`,
     },
     { label: 'AIRSPACE', value: `${published} PUBLISHED / ${ruled} RULE-DERIVED` },
   ]
@@ -797,7 +956,7 @@ function drawStatusBar(
 
   // Key hints sit at the right end, and are the first thing to go when the
   // window is too narrow to hold them.
-  const hint = 'DRAG PAN  WHEEL ZOOM  R RESET  D THEME  O OVERLAYS'
+  const hint = 'DRAG PAN  WHEEL ZOOM  R RESET  D THEME  M MENU'
   const hintW = Math.ceil(cw * hint.length)
   if (right - 8 - hintW > x) {
     g.font = fonts.label(size)

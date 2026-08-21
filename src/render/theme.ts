@@ -39,6 +39,15 @@ export interface Palette {
   readonly neighbour: string
   readonly neighbourLabel: string
 
+  /**
+   * The map underneath the airspace: the coastline, and the lateral limit
+   * of the flight information region. The coast is furniture -- it is
+   * there to orient you and must not compete with traffic -- while the FIR
+   * boundary is a real airspace limit and is read as one.
+   */
+  readonly coast: string
+  readonly fir: string
+
   readonly text: string
   readonly textDim: string
   readonly accent: string
@@ -110,6 +119,12 @@ export const palettes = {
     neighbour: '#46422f',
     neighbourLabel: '#3a3625',
 
+    // Slate for the shoreline, against the tan ground; a darker slate
+    // for the FIR limit, kept clear of the navy and purple used by the
+    // controlled airspace.
+    coast: '#7f8c96',
+    fir: '#2f4858',
+
     text: '#1c1a14',
     textDim: '#4e4939',
     accent: '#006e74',
@@ -158,6 +173,11 @@ export const palettes = {
     neighbour: '#5a6b7a',
     neighbourLabel: '#8092a0',
 
+    // Dim slate for the shoreline; a lighter slate for the FIR limit,
+    // kept clear of the blue and magenta used by controlled airspace.
+    coast: '#26414c',
+    fir: '#6a7f95',
+
     text: '#c4dae6',
     textDim: '#5c7382',
     accent: '#00e5ff',
@@ -205,6 +225,11 @@ export const palettes = {
 
     neighbour: '#96702a',
     neighbourLabel: '#c2913a',
+
+    // Monochrome, so the two are separated by brightness: the shoreline
+    // sits with the grid furniture, the FIR limit well above it.
+    coast: '#5c4210',
+    fir: '#b8801a',
 
     text: '#ffcf80',
     textDim: '#b3822c',

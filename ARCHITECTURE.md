@@ -265,6 +265,47 @@ That is real, not a data error, and it means a holding fix symbol and an aerodro
 land on top of each other; the renderer has to tolerate collisions rather than assume they
 cannot happen. There is a test pinning it.
 
+### The map underneath
+
+`geography` is a fourth section, holding the things the airspace sits on top of: the
+**coastline**, the **River Thames** and the **London FIR boundary** -- the lateral limit of UK
+airspace. `ATTRIBUTION.md` has the sources; `tools/build-geography.mjs` regenerates the block
+from the original downloads and reproduces the committed data exactly.
+
+**Why not part of `airspace`.** None of the three is an airspace volume. There is no class and
+no vertical extent to a coastline, and forcing one in would mean inventing a floor, a ceiling
+and a class letter for a shoreline. So `geography` has its own small schema and its own
+provenance vocabulary: `survey | aip`, rather than airspace's `aip | rule | approx`. Calling a
+surveyed shoreline "aip" would be a small lie in the data, and the point of keeping these
+vocabularies separate is that neither has to stretch.
+
+**Zoom is unchanged.** The map extends what is *drawn*, not how far out the scope will go: the
+ceiling is still twice the area of responsibility. What the coastline fixes is that zooming out
+to that ceiling used to show empty ground.
+
+**Chunking, and why the obvious cull does not work.** The renderer rejects a whole path on its
+bounding box before projecting any of its points. Done naively that achieves nothing: one
+Natural Earth path runs from the Bristol Channel round the south coast to East Anglia, and its
+bounding box *contains Heathrow*, so it would never be rejected however far the scope zoomed
+in. The build script therefore splits every path into chunks spanning at most 12 NM, and
+inserts colinear points along any segment longer than 8 NM so that long straight legs -- the
+FIR boundary is published as a handful of 60 NM legs -- have somewhere to be cut. The drawn
+line is identical; the boxes are tight enough for the test to mean something. 2801 points in
+307 chunks, and at close range almost all of them are rejected on two comparisons.
+
+**The river is drawn at its real width.** `GeoPath` carries an optional per-point width in NM,
+and the Thames is stroked in pixels derived from it -- a thread at Windsor, visibly a mile
+across off Canvey, and wider as the scope zooms in because it is a width rather than a line
+weight. Segments of equal drawn width are batched into one stroke, so the 150-point river costs
+a handful of draw calls rather than 150. Two honest caveats: the widths are **interpolated from
+a table of fifteen real widths**, because the source is a bare centreline, and there is a
+one-pixel floor so the upper river does not vanish when zoomed out.
+
+**Water is water.** The river takes the coastline's colour rather than a third one. The kinds
+are separated by colour and weight, never by dash pattern, because in this codebase dashes mean
+provenance -- reusing that vocabulary to mean "different kind of thing" would break the one
+convention the display is most careful about.
+
 ### Airspace: what is published and what is derived
 
 Airspace boundaries come from the **VATSIM UK Sector File**, an open transcription of UK
@@ -344,7 +385,7 @@ Two separate mechanisms, one source of truth:
   without a real canvas. Cells are dropped when the window is too narrow rather than allowed
   to spill, and the key hints go first.
 - **The window furniture** leans on two details that place the era immediately: a flat
-  saturated caption strip on the overlay panel -- navy with white lettering in the beige
+  saturated caption strip on the menu panel -- navy with white lettering in the beige
   scheme -- and a two-pixel sunken edge around the whole scope, so the display reads as a
   viewport recessed into an application window rather than a picture filling the browser.
 - **The DOM controls** get their colours as CSS custom properties set from the active palette
@@ -355,10 +396,96 @@ Two separate mechanisms, one source of truth:
 Drawing the readouts on the scope rather than in an HTML status bar is also the more faithful
 choice: displays of this era put their data on the tube.
 
+### The options menu
+
+Every setting -- as opposed to every instruction -- lives behind one button in the corner of
+the scope, in `ui/menu.ts`: the simulation rate and pause, interface sound, the display scheme
+and the overlay layers. Before that each was its own floating control, which cost three rows
+of chrome over the radar picture and gave no clue that they belonged together.
+
+Three things make it hold together:
+
+- **The menu is a view, not a state holder.** The loop owns the rate, `theme.ts` owns the
+  palette, `main.ts` owns the overlay record. The menu reports clicks through callbacks and is
+  told what to display by a single `paint(state)` call, so a change made from the keyboard and
+  a change made from the menu cannot end up disagreeing. The only state it keeps is whether it
+  is open.
+- **Nothing is enumerated twice.** The rates come from `SPEEDS`, the schemes from
+  `PALETTE_ORDER`, the layers from `OVERLAY_ITEMS`. A rate or a layer cannot exist in the
+  simulation or the render path without being reachable in the menu.
+- **Hiding the controls must not hide the state.** The status bar already draws the clock and
+  the current rate on the tube, so the menu can be shut without losing sight of whether time
+  is running and how fast. `D` also still cycles the schemes directly, because comparing them
+  is a by-eye decision that should not need a panel open over the picture.
+
+The schemes became named buttons rather than the old cycling toggle: with three of them,
+picking the one you want beats pressing until it comes round. The active rate and scheme are
+drawn pressed in, in the caption colours, so the current setting reads at a glance instead of
+by comparing four buttons with each other.
+
+### The in-game guide
+
+A book button beside the menu opens `TUTORIAL.md` in a window. The text is **not restated in
+the code**: `main.ts` imports the file as raw text and `ui/guide.ts` renders it, so the
+document a person edits and the guide the game shows are the same file. There is no second
+copy to drift.
+
+`import guideSource from '../TUTORIAL.md?raw'` is the whole mechanism. With the dev server
+running, editing the file hot-reloads the panel; a production build inlines it, which costs
+about 20 KB of bundle. The alternative -- fetching it at runtime from `public/` -- was rejected
+because it turns a compile-time guarantee into a possible 404 and gains nothing for a game that
+should work offline.
+
+`ui/markdown.ts` is a small renderer rather than a dependency, because the project has none at
+runtime and this is the only place Markdown is displayed. It implements exactly what the
+project's documents use: headings, paragraphs, bullet and numbered lists, block quotes, fenced
+code, tables, rules, and inline code, bold, italic and links. Three decisions in it are worth
+stating:
+
+- **No HTML pass-through.** Every string reaches the document through `textContent`, never
+  `innerHTML`. The point of reading a file at runtime is that the file can be edited, and that
+  must not double as a way to inject elements. There is a test for it.
+- **Paragraphs join their lines.** The documents are hard-wrapped at 96 columns, so treating
+  each source line as its own paragraph would break sentences in half.
+- **Link text is kept and the target dropped.** Every link in the guide points at a sibling
+  Markdown file, which is not a page inside the app. Something that looked clickable and was
+  not would be worse than plain text.
+
+A test renders the real `TUTORIAL.md` and asserts it comes out with headings, tables, a code
+block and a quote, and with no leftover `|---` or `#` in the text -- so reorganising the
+document into constructs the renderer does not know is caught here rather than noticed on
+screen.
+
+### The main menu
+
+`ui/logon.ts` puts a modal window over the shell before the session starts: the field and
+sector, a boot summary of what the radar actually loaded, a field for operating initials, the
+position being worked, and two buttons.
+
+Three decisions worth stating:
+
+- **Settings are not reimplemented.** The Settings button opens the same `Menu` the scope uses,
+  floated above the logon window in the stacking order. So there is one place the display scheme
+  and the overlays are configured, and a change made before logging on is the change that
+  applies afterwards. Having a second copy of those controls would have been the obvious way to
+  build a main menu, and would have been the bug.
+- **The clock is held stopped behind it.** The loop starts paused and the logon unpauses it, so
+  no traffic accumulates while the display is being set up. The scope draws underneath, dimmed,
+  which also means the radar is visibly already running before anyone logs on -- and if the
+  airport config had failed to load, the boot summary is where that would show.
+- **Nothing is authenticated, and the screen says so.** This is a position logon in the sense a
+  controller means it: who is working, and what they are working. Initials are validated as two
+  or three letters and remembered; there is no password field and no credential of any kind,
+  because there is nothing to check one against and a box that looked like one would be a lie.
+  A line under the buttons states this outright.
+
+Once logged on, the operating initials and the position appear as a third line in the scope's
+title block -- with the identity of the display, rather than among the readouts that change.
+
 ### Overlay density
 
 `render/overlays.ts` defines which layers are optional and three presets over them
-(minimal, standard, full), with the panel built from the same list so a key cannot exist in
+(minimal, standard, full), with the menu built from the same list so a key cannot exist in
 the render path without being switchable. The split is deliberate: the runways being worked,
 the holding fixes, the sector boundary and the readouts are **always drawn**, because they
 are the job. Everything else -- controlled airspace, class G traffic zones, airspace labels,
@@ -370,12 +497,53 @@ ten of them and they are small enough to be noise at range. The preference persi
 storage, read key by key rather than trusting the stored blob, so a stale entry cannot put a
 non-boolean into the render path.
 
-### Zoom limits
+### Where the camera may go
 
-The camera's zoom ceiling is a constructor argument, not a constant: how far out is useful
-depends on the size of the sector. `main.ts` passes twice the area of responsibility, so
-EGLL's 40 NM sector gives an 80 NM maximum -- far enough to see what is coming, close enough
-that the sector still fills the scope. `MAX_RANGE_NM` remains as a fallback only.
+Two separate limits, for two separate reasons.
+
+**The zoom ceiling** is how far out the scope will go. It is a constructor argument rather than
+a constant, because how far out is useful depends on the size of the sector being worked:
+`main.ts` passes twice the area of responsibility, so EGLL's 40 NM sector gives 80 NM -- far
+enough to see what is coming, close enough that the sector still fills the scope.
+`MAX_RANGE_NM` remains as a fallback only.
+
+**The fence** is how far the view may be panned: the bounding box of everything the map draws,
+which `loadAirport` reports as `mapBoundsNM` from the per-path boxes the renderer already culls
+on. So it cannot disagree with what is actually drawn, and a config with no `geography` block is
+simply not fenced. Past that edge there is nothing but empty ground, and being able to drag out
+there reads as a broken display rather than as freedom.
+
+The fence is applied to the **centre, adjusted for the half-extents of the viewport**, so it is
+the edge of the picture that stops at the edge of the screen rather than the middle of it. It
+therefore has to be re-applied on anything that changes those half-extents -- a resize, a range
+change, a zoom about the cursor -- not just on a pan. Where the map is narrower than the
+viewport on an axis, that axis is centred on it instead: there is nothing to choose between two
+positions that both show everything.
+
+For EGLL the map runs about 230 NM west to 190 NM east and 180 south to 190 north, which is
+comfortably more than twice the zoom ceiling on every side. A test asserts that, because a
+fence that bit before the scope had finished zooming out would be worse than no fence at all.
+
+### Keyboard shortcuts
+
+One `keydown` handler for the whole application, not one per feature, and it asks two questions
+before anything else: is a modifier held, and `isTypingTarget(e.target)`.
+
+That guard is not a detail. The shortcuts are bare letters -- R, D, M, N -- which is
+period-correct and was harmless right up until the interface grew a text field: typing operating
+initials into the logon window released aircraft on every N and switched the display scheme on
+every D. Consolidating into one handler means the guard is asked once, and the next shortcut
+cannot be added without it.
+
+`ui/keys.ts` holds the two predicates. They are deliberately not the same question:
+
+- `isTypingTarget` -- a text field, textarea, select or contenteditable. A **checkbox is not**
+  one: a letter pressed while one has focus is still a shortcut.
+- `ownsSpace` -- additionally true for a checkbox, because the space bar is its only keyboard
+  control and the options menu is full of them. Everywhere else space belongs to the clock.
+
+Two shortcuts are also gated on someone having logged on -- pause and the arrival release --
+since there is no shift to pause or add traffic to before then.
 
 ### Display scale
 
