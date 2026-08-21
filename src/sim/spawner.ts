@@ -2,6 +2,7 @@ import type { Clock } from '../core/loop'
 import { distanceNM } from '../core/geo'
 import { makeRng, type Rng } from '../core/rng'
 import type { Airport, Navaid } from '../data/airport'
+import { FlightGenerator } from './flightgen'
 import type { Aircraft } from './types'
 
 /**
@@ -32,12 +33,12 @@ export class Spawner {
   private readonly airport: Airport
   private readonly rng: Rng
   private readonly fixes: readonly Navaid[]
+  private readonly flights: FlightGenerator
 
   private nextSpawnAt: number
   private readonly lastUsedAt = new Map<string, number>()
   private spawnCount = 0
   private deferCount = 0
-  private sequence = 0
 
   /** How long to wait before trying again when a spawn had to be held. */
   private static readonly RETRY_SECONDS = 10
@@ -47,6 +48,7 @@ export class Spawner {
     this.rng = opts.rng ?? makeRng(opts.airport.traffic.seed)
     // Only holds with an entry band: a navaid with neither is a fix on the
     // chart, not a place traffic arrives from.
+    this.flights = new FlightGenerator(opts.airport)
     this.fixes = opts.airport.navaids.filter((n) => n.hold !== null && n.entry !== null)
     this.nextSpawnAt = opts.airport.traffic.firstSpawnSeconds
   }
@@ -142,7 +144,9 @@ export class Spawner {
 
   private build(fix: Navaid, clock: Clock, existing: readonly Aircraft[]): Aircraft {
     const airport = this.airport
-    const type = this.rng.weighted(airport.aircraftTypes, (t) => t.weight)
+    // Who the flight is comes from the generator; where and how it enters
+    // is this module's business.
+    const flight = this.flights.next(this.rng, new Set(existing.map((a) => a.callsign)))
     const altFt = this.entryAltitude(fix)
 
     // Groundspeed only for now: indicated airspeed and the wind that
@@ -151,15 +155,15 @@ export class Spawner {
     // place to revisit when wind arrives.
     const limited = altFt < airport.sector.speedLimitBelowFt
     const gsKts = limited
-      ? Math.min(type.cruiseKts, airport.sector.speedLimitKts)
-      : type.cruiseKts
+      ? Math.min(flight.cruiseKts, airport.sector.speedLimitKts)
+      : flight.cruiseKts
 
     const hdg = fix.hold?.inboundTrue ?? 0
 
     return {
-      callsign: this.callsign(existing),
-      type: type.type,
-      wake: type.wake,
+      callsign: flight.callsign,
+      type: flight.type,
+      wake: flight.wake,
       pos: fix.posNM,
       altFt,
       hdg,
@@ -190,27 +194,5 @@ export class Spawner {
     const highest = Math.floor(ceiling / 1000)
     if (highest < lowest) return floor
     return this.rng.range(lowest, highest) * 1000
-  }
-
-  /**
-   * A callsign not already in use. Retries with a different flight number
-   * rather than risking two aircraft the controller cannot tell apart.
-   */
-  private callsign(existing: readonly Aircraft[]): string {
-    const taken = new Set(existing.map((a) => a.callsign))
-    const airlines = this.airport.traffic.airlines
-
-    for (let attempt = 0; attempt < 24; attempt += 1) {
-      const airline = this.rng.weighted(airlines, (a) => a.weight)
-      const number = this.rng.range(1, 1999)
-      const candidate = `${airline.code}${number}`
-      if (!taken.has(candidate)) return candidate
-    }
-
-    // Exhausted the retries, which needs a great deal of traffic. Fall back
-    // to something guaranteed unique rather than issuing a duplicate.
-    this.sequence += 1
-    const airline = this.rng.weighted(airlines, (a) => a.weight)
-    return `${airline.code}${9000 + this.sequence}`
   }
 }

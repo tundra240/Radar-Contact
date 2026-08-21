@@ -67,6 +67,19 @@ export interface EntryBand {
 export interface Airline {
   readonly code: string
   readonly weight: number
+  /**
+   * Types this operator actually flies. The generator picks from here
+   * rather than from the whole fleet list, because an easyJet A380 or an
+   * Emirates A319 breaks the illusion faster than almost anything else.
+   */
+  readonly fleet: readonly string[]
+  /** Bands its flight numbers fall in. Plausible, not authoritative. */
+  readonly numbers: readonly FlightNumberRange[]
+}
+
+export interface FlightNumberRange {
+  readonly min: number
+  readonly max: number
 }
 
 /**
@@ -153,6 +166,46 @@ export interface AirspaceVolume {
   readonly shape: AirspaceShape
 }
 
+/* --------------------------------------------------------------- geography
+
+   The map the airspace sits on: the shoreline, and the lateral limit of the
+   flight information region. Neither is an airspace volume -- there is no
+   class and no vertical extent to either -- so they are their own section
+   rather than being forced into the airspace schema.                     */
+
+export type GeographyKind = 'coastline' | 'fir'
+
+/**
+ * Where a geographic line came from. Deliberately a different vocabulary
+ * from airspace `Derivation`: a coastline is not published in an AIP, and
+ * calling a surveyed shoreline "aip" would be a small lie in the data.
+ */
+export type GeographySource = 'survey' | 'aip'
+
+/**
+ * One polyline, with its world-space bounding box precomputed.
+ *
+ * The bounds exist so the renderer can reject a whole path with two
+ * comparisons instead of projecting every point in it. A coastline is a few
+ * thousand points and most of it is off-screen at any useful zoom, so this
+ * is the difference between a cheap layer and a wasteful one.
+ */
+export interface GeoPath {
+  readonly pointsNM: readonly Vec2NM[]
+  readonly minNM: Vec2NM
+  readonly maxNM: Vec2NM
+}
+
+export interface GeographyFeature {
+  readonly id: string
+  readonly label: string
+  readonly kind: GeographyKind
+  readonly derivation: GeographySource
+  /** Human-readable provenance, carried so the display can be honest. */
+  readonly source: string
+  readonly paths: readonly GeoPath[]
+}
+
 export interface RenderSettings {
   /** Display-only magnification of the painted runway strip. */
   readonly runwayExaggeration: number
@@ -196,6 +249,8 @@ export interface Airport {
   readonly navaids: readonly Navaid[]
   readonly airports: readonly NeighbourAirport[]
   readonly airspace: readonly AirspaceVolume[]
+  /** Coastline and FIR limit. Empty when the config omits the section. */
+  readonly geography: readonly GeographyFeature[]
   readonly aircraftTypes: readonly AircraftType[]
   /** Navaids that carry a holding pattern, in config order. */
   readonly holdingFixes: readonly Navaid[]
@@ -327,7 +382,6 @@ export function loadAirport(raw: unknown): Airport {
 
   const sector = parseSector(root['sector'])
   const render = parseRender(root['render'])
-  const traffic = parseTraffic(root['traffic'])
 
   const runways = arr(root['runways'], 'runways').map((r, i) =>
     parseRunway(r, `runways[${i}]`, projection),
@@ -341,6 +395,7 @@ export function loadAirport(raw: unknown): Airport {
   const aircraftTypes = arr(root['aircraftTypes'], 'aircraftTypes').map((t, i) =>
     parseAircraftType(t, `aircraftTypes[${i}]`),
   )
+  const traffic = parseTraffic(root['traffic'], new Set(aircraftTypes.map((t) => t.type)))
 
   assertUnique(runways.map((r) => r.id), 'runways[].id')
   assertUnique(navaids.map((n) => n.name), 'navaids[].name')
@@ -358,6 +413,16 @@ export function loadAirport(raw: unknown): Airport {
   )
   assertUnique(airspace.map((v) => v.id), 'airspace[].id')
 
+  // Optional: an airport config without a map around it is still a valid
+  // airport config, and a second field would only ever be added by hand.
+  const geography =
+    root['geography'] === undefined
+      ? []
+      : arr(root['geography'], 'geography').map((f, i) =>
+          parseGeography(f, `geography[${i}]`, projection),
+        )
+  assertUnique(geography.map((f) => f.id), 'geography[].id')
+
   const byId = new Map(runways.map((r) => [r.id, r]))
   const arrivalRunways = sector.activeArrivalRunways.map((id) => {
     const rwy = byId.get(id)
@@ -370,6 +435,9 @@ export function loadAirport(raw: unknown): Airport {
     return rwy
   })
 
+  // Note what is NOT here: the geography. The extent drives the initial
+  // camera fit, and a coastline reaching 200 NM out would open the scope to
+  // a range at which the airport is a dot.
   const extentNM: Vec2NM[] = [
     ...runways.flatMap((r) => [r.thresholdNM, r.farEndNM]),
     ...navaids.map((n) => n.posNM),
@@ -390,6 +458,7 @@ export function loadAirport(raw: unknown): Airport {
     navaids,
     airports,
     airspace,
+    geography,
     aircraftTypes,
     holdingFixes: navaids.filter((n) => n.hold !== null),
     arrivalRunways,
@@ -425,7 +494,7 @@ function parseSector(raw: unknown): Sector {
   }
 }
 
-function parseTraffic(raw: unknown): TrafficConfig {
+function parseTraffic(raw: unknown, knownTypes: ReadonlySet<string>): TrafficConfig {
   const o = obj(raw, 'traffic')
 
   const initial = num(o['initialIntervalSeconds'], 'traffic.initialIntervalSeconds')
@@ -449,10 +518,38 @@ function parseTraffic(raw: unknown): TrafficConfig {
   if (maxConcurrent < 1) throw new ConfigError('traffic.maxConcurrent', 'must be at least 1')
 
   const airlines = arr(o['airlines'], 'traffic.airlines').map((a, i) => {
-    const ao = obj(a, `traffic.airlines[${i}]`)
+    const path = `traffic.airlines[${i}]`
+    const ao = obj(a, path)
+    const code = str(ao['code'], `${path}.code`)
+
+    const fleet = arr(ao['fleet'], `${path}.fleet`).map((v, j) =>
+      str(v, `${path}.fleet[${j}]`),
+    )
+    for (const type of fleet) {
+      if (!knownTypes.has(type)) {
+        // Catches a typo in a fleet list at load rather than as an aircraft
+        // that can never be generated.
+        throw new ConfigError(`${path}.fleet`, `references unknown type "${type}"`)
+      }
+    }
+
+    const numbers = arr(ao['numbers'], `${path}.numbers`).map((v, j) => {
+      const rangePath = `${path}.numbers[${j}]`
+      if (!Array.isArray(v) || v.length !== 2) {
+        throw new ConfigError(rangePath, 'must be a pair [min, max]')
+      }
+      const min = num(v[0], `${rangePath}[0]`)
+      const max = num(v[1], `${rangePath}[1]`)
+      if (min < 1) throw new ConfigError(rangePath, 'must start at 1 or above')
+      if (max < min) throw new ConfigError(rangePath, 'must not end below its start')
+      return { min, max }
+    })
+
     return {
-      code: str(ao['code'], `traffic.airlines[${i}].code`),
-      weight: num(ao['weight'], `traffic.airlines[${i}].weight`),
+      code,
+      weight: num(ao['weight'], `${path}.weight`),
+      fleet,
+      numbers,
     }
   })
   if (!airlines.some((a) => a.weight > 0)) {
@@ -682,6 +779,62 @@ function parseAirspace(
     derivation,
     verticalSource,
     shape,
+  }
+}
+
+function parseGeography(
+  raw: unknown,
+  path: string,
+  projection: Projection,
+): GeographyFeature {
+  const o = obj(raw, path)
+
+  const kind = str(o['kind'], `${path}.kind`)
+  if (kind !== 'coastline' && kind !== 'fir') {
+    throw new ConfigError(`${path}.kind`, `must be "coastline" or "fir" (got ${kind})`)
+  }
+
+  const derivation = str(o['derivation'], `${path}.derivation`)
+  if (derivation !== 'survey' && derivation !== 'aip') {
+    throw new ConfigError(`${path}.derivation`, `must be survey or aip (got ${derivation})`)
+  }
+
+  const paths = arr(o['paths'], `${path}.paths`).map((line, i) => {
+    const pts = arr(line, `${path}.paths[${i}]`)
+    if (pts.length < 2) {
+      throw new ConfigError(`${path}.paths[${i}]`, 'must have at least 2 points')
+    }
+    return geoPath(
+      pts.map((v, j) => projection.toWorld(latLon(v, `${path}.paths[${i}][${j}]`))),
+    )
+  })
+
+  return {
+    id: str(o['id'], `${path}.id`),
+    label: str(o['label'], `${path}.label`),
+    kind,
+    derivation,
+    source: str(o['source'], `${path}.source`),
+    paths,
+  }
+}
+
+/** Wraps a projected polyline with the bounding box the renderer culls on. */
+function geoPath(pointsNM: readonly Vec2NM[]): GeoPath {
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const p of pointsNM) {
+    if (p.x < minX) minX = p.x
+    if (p.x > maxX) maxX = p.x
+    if (p.y < minY) minY = p.y
+    if (p.y > maxY) maxY = p.y
+  }
+  return {
+    pointsNM,
+    minNM: { x: minX, y: minY },
+    maxNM: { x: maxX, y: maxY },
   }
 }
 
