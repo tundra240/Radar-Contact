@@ -172,9 +172,9 @@ describe('refusals are specific', () => {
 })
 
 describe('the rest of the instruction set', () => {
-  // Parsing and flying are separate questions. A hold parses and flies; an
-  // approach parses and is refused by commands/apply.ts, which is where
-  // "not yet" belongs.
+  // Parsing and flying are separate questions. Holds and approaches parse
+  // and fly; the handoff parses and is refused by commands/apply.ts, which
+  // is where "not yet" belongs.
   it('parses an approach clearance', () => {
     expect(commands('BAW178 ILS 27R')[0]).toEqual({
       kind: 'approach',

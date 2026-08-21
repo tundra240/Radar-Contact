@@ -40,6 +40,9 @@ export interface BoundsNM {
  */
 export const NM_PER_DEG_LAT = 60
 
+/** Feet in a nautical mile. */
+export const FT_PER_NM = 6076.11548556
+
 /** Mean Earth radius in nautical miles, for the haversine reference. */
 const EARTH_RADIUS_NM = 3440.065
 
@@ -67,6 +70,17 @@ export function normalizeHeading(deg: number): number {
  * because the scope and the tag menu both print headings and two copies
  * would eventually disagree about north.
  */
+/**
+ * Height gained over a distance on a straight glidepath, in feet.
+ *
+ * The one place this arithmetic is written down. The ILS flies the path and
+ * the airport loader reports altitudes on it, and two copies of it would
+ * eventually disagree about where the glideslope is.
+ */
+export function glidepathRiseFt(glideslopeDeg: number, distNM: number): number {
+  return Math.tan(degToRad(glideslopeDeg)) * distNM * FT_PER_NM
+}
+
 export function headingLabel(deg: number): string {
   return String(deg === 0 ? 360 : deg).padStart(3, '0')
 }

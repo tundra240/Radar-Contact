@@ -64,6 +64,18 @@ describe('isHeavy', () => {
   })
 })
 
+/** An approach clearance, for the fields a strip and a status line read. */
+const ILS_27R = {
+  runway: '27R',
+  thresholdNM: { x: 1.4, y: -0.3 },
+  courseTrue: 270,
+  thresholdElevationFt: 83,
+  glideslopeDeg: 3,
+  fafDistNM: 10,
+  maxInterceptDeg: 30,
+  interceptAltMaxFt: 3000,
+}
+
 describe('statusText', () => {
   it('covers every nav mode', () => {
     // A missing branch would surface as an empty status line rather than a
@@ -79,7 +91,7 @@ describe('statusText', () => {
       'HANDOFF',
     ]
     for (const navMode of modes) {
-      const text = statusText({ ...base, navMode, clearedApproach: '27R' })
+      const text = statusText({ ...base, navMode, clearedApproach: ILS_27R })
       expect(text, navMode).toBeTruthy()
       expect(text, navMode).toBe(text.toUpperCase())
     }
@@ -88,7 +100,7 @@ describe('statusText', () => {
   it('names the fix when holding and the runway when established', () => {
     expect(statusText({ ...base, navMode: 'HOLD', originFix: 'BIG' })).toBe('HOLDING BIG')
     expect(
-      statusText({ ...base, navMode: 'GS_TRACKING', clearedApproach: '27L' }),
+      statusText({ ...base, navMode: 'GS_TRACKING', clearedApproach: { ...ILS_27R, runway: '27L' } }),
     ).toBe('ESTABLISHED 27L')
   })
 

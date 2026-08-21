@@ -1,5 +1,6 @@
 import { normalizeHeading } from '../core/geo'
-import type { Aircraft, HoldClearance } from '../sim/types'
+import { onApproach } from '../sim/ils'
+import type { Aircraft, ApproachClearance, HoldClearance } from '../sim/types'
 import type { Command } from './types'
 
 /**
@@ -37,6 +38,8 @@ export interface ApplyContext {
   readonly envelopeFor: (type: string) => Envelope | null
   /** Null for a fix with no published hold, which refuses the clearance. */
   readonly holdFor: (fix: string) => HoldClearance | null
+  /** Null for a runway with no ILS available, which refuses the clearance. */
+  readonly approachFor: (runway: string) => ApproachClearance | null
 }
 
 export type Outcome =
@@ -60,11 +63,10 @@ export function applyCommand(
       return speed(command.kts, aircraft, ctx)
     case 'hold':
       return hold(command.fix, aircraft, ctx)
-    // The approach logic is Day 2 work, and the handoff needs somewhere to
-    // hand off to. Saying so is better than accepting a clearance and
-    // quietly doing nothing with it.
     case 'approach':
-      return { ok: false, reason: `approach clearances are not flyable yet` }
+      return approach(command.runway, aircraft, ctx)
+    // The handoff still needs somewhere to hand off to. Saying so is better
+    // than accepting a clearance and quietly doing nothing with it.
     case 'handoff':
       return { ok: false, reason: `there is nobody to hand off to yet` }
   }
@@ -78,12 +80,14 @@ function heading(deg: number, a: Aircraft): Outcome {
     aircraft: {
       ...a,
       clearedHdg: to,
-      // A vector takes an aircraft out of the hold. Nothing else about a
-      // heading changes the phase of flight.
-      navMode: a.navMode === 'HOLD' ? 'VECTOR' : a.navMode,
-      // And the pattern goes with it, or the next tick would steer the
-      // aircraft straight back round it.
+      // A vector takes an aircraft out of the hold and off an approach --
+      // breaking somebody off is exactly what a heading is for at that
+      // point. Nothing else about a heading changes the phase of flight.
+      navMode: a.navMode === 'HOLD' || onApproach(a.navMode) ? 'VECTOR' : a.navMode,
+      // And the clearance goes with it, or the next tick would steer the
+      // aircraft straight back onto what it was just taken off.
       hold: a.navMode === 'HOLD' ? null : a.hold,
+      clearedApproach: onApproach(a.navMode) ? null : a.clearedApproach,
     },
     readback: `${a.callsign} HEADING ${pad3(to)}`,
   }
@@ -91,6 +95,16 @@ function heading(deg: number, a: Aircraft): Outcome {
 
 function altitude(ft: number, a: Aircraft, ctx: ApplyContext): Outcome {
   if (!Number.isFinite(ft)) return { ok: false, reason: 'that is not an altitude' }
+
+  // On the glidepath the path owns the level. Accepting a level here and
+  // having the approach overwrite it on the next tick would be the exact
+  // thing this module exists not to do.
+  if (a.navMode === 'GS_TRACKING') {
+    return {
+      ok: false,
+      reason: `${a.callsign} is established on the glidepath -- vector it off first`,
+    }
+  }
   const to = Math.round(ft / STEP_FT) * STEP_FT
 
   if (to < ctx.floorFt || to > ctx.ceilingFt) {
@@ -164,6 +178,28 @@ function hold(fix: string, a: Aircraft, ctx: ApplyContext): Outcome {
       clearedHdg: null,
     },
     readback: `${a.callsign} HOLD AT ${clearance.fix}`,
+  }
+}
+
+function approach(runway: string, a: Aircraft, ctx: ApplyContext): Outcome {
+  const clearance = ctx.approachFor(runway)
+  if (clearance === null) {
+    return { ok: false, reason: `no ILS approach available for ${runway}` }
+  }
+
+  return {
+    ok: true,
+    aircraft: {
+      ...a,
+      // Armed, not established: sim/ils.ts decides tick by tick whether the
+      // geometry actually allows a capture, and an aircraft lined up badly
+      // flies straight through.
+      navMode: 'LOC_ARMED',
+      clearedApproach: clearance,
+      // You cannot be holding and on an approach.
+      hold: null,
+    },
+    readback: `${a.callsign} CLEARED ILS ${clearance.runway}`,
   }
 }
 

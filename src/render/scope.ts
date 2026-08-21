@@ -41,6 +41,8 @@ export interface ScopeStatus {
     readonly spawned: number
     /** Arrivals held back because no fix was clear, or the sector is full. */
     readonly held: number
+    /** Landed this session -- the only number here that is a score. */
+    readonly landed: number
   }
   /** Who is working the position, or null before anyone has logged on. */
   readonly controller: { readonly initials: string; readonly position: string } | null
@@ -1021,6 +1023,7 @@ function drawStatusBar(
       label: 'TRAFFIC',
       value: `${status.traffic.spawned} HELD ${status.traffic.held}`,
     },
+    { label: 'LANDED', value: String(status.traffic.landed) },
     {
       label: 'OVERLAYS',
       // Counted from the list rather than written down, so adding a layer

@@ -465,10 +465,57 @@ at 3 deg/sec, 1500 fpm and 1.5 kt/sec. An integration test runs the whole chain,
 line through the parser and the gate into the autopilot, and asserts the aircraft is actually
 turning ten seconds later.
 
-Approach and handoff commands **parse but are refused**, with a reason saying they are not
-flyable yet. The alternative -- accepting a clearance and doing nothing with it -- would be
-worse than the refusal, and the parser supporting them now means the console and the tag menu
-already speak the same language for when `ils.ts` arrives.
+The handoff command **parses but is refused**, with a reason saying it is not flyable yet: it
+needs somewhere to hand off to. The alternative -- accepting a clearance and doing nothing with
+it -- would be worse than the refusal.
+
+Two clearances refuse for reasons worth noting. A **level is refused once established on the
+glidepath**, because the path owns the level from there and accepting one the approach would
+overwrite on the next tick is exactly what this module exists not to do. A **speed is still
+accepted**, because that is how traffic is spaced on final. And a **heading breaks an aircraft
+off an approach** at any stage, clearing the approach with it -- otherwise the next tick would
+steer it straight back onto the localiser.
+
+### The ILS
+
+`sim/ils.ts`. `CLEARED ILS` only **arms** the capture; every tick the armed test asks all six
+questions together, and an aircraft that fails any of them flies straight through on the vector
+it was given and has to be taken round again -- which is what makes setting up an intercept a
+job worth doing:
+
+    1. on the approach side of the threshold      (not behind it)
+    2. inside localiser coverage
+    3. within half a beam width of the centreline
+    4. within maxInterceptDeg of the inbound course
+    5. at or below the intercept altitude
+    6. and actually closing on the centreline
+
+The first five are the design doc's; the sixth is not implied by them and matters. An aircraft
+tracking parallel to the localiser a mile off, or drifting away from it at twenty degrees, is
+inside the beam and inside thirty degrees, and without the closing test would capture. The
+signs of the offset and of the angle to the course agree when it is converging and disagree
+when it is not, which is the whole test. Inside half-scale deflection it is waived, because an
+aircraft vectored onto the localiser heading two hundred yards off the centreline is exactly
+parallel to it and refusing that capture would be refusing the normal case.
+
+**The centreline is flown by aiming at a point on it a couple of miles ahead**, not by
+correcting in proportion to the offset. That is inherently damped: the intercept angle shrinks
+as the aircraft converges, there is no gain to tune, and there is no weaving about the beam. A
+test asserts the offset after capture never exceeds the offset it captured at.
+
+**The glidepath is captured when it descends onto the aircraft**, not at the fix. Level at
+3,000 ft a three degree path arrives at about 9.2 NM, which is inside the 10 NM fix -- so the
+glideslope is armed from a little outside it and the capture happens where the geometry puts it.
+
+Landing is `toRunNM <= 0`: across the threshold, on the published elevation, and `main.ts`
+takes it off the scope and says so in the console. The approach clearance carries the whole
+geometry, as a hold does, so `sim/` still knows nothing about the airport.
+
+A whole session is tested end to end: the spawner releasing into the stacks, a crude controller
+vectoring each arrival to a gate and clearing it for 27R, every instruction going through
+`applyCommand`, and the ILS flying them down. Half an hour of it lands more than ten and keeps
+the spawner releasing past the concurrency cap -- which it can only do because landings free
+the stacks it is waiting on.
 
 ### Holding
 
@@ -556,7 +603,7 @@ Two rules hold it together:
   `applyCommand` and asserts none of them is refused, because a menu that teaches limits the
   simulation does not have is worse than no menu.
 - **It does not decide what is flyable.** Every kind in the `Command` union appears, including
-  the two that are still refused. `applyCommand` is the one authority on that and it answers
+  the one that is still refused. `applyCommand` is the one authority on that and it answers
   in the console; greying items out here would put the same knowledge in two places, and the
   second copy would go stale the day approaches start working.
 

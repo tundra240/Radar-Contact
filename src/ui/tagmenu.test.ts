@@ -177,7 +177,7 @@ describe('readout', () => {
  * teaches limits the simulation does not have -- is worse than no menu.
  */
 describe('every offer is accepted by commands/apply', () => {
-  const ctx: ApplyContext = { ...LIMITS, envelopeFor, holdFor }
+  const ctx: ApplyContext = { ...LIMITS, envelopeFor, holdFor, approachFor: () => null }
 
   it('accepts every level in the list', () => {
     for (const ft of altitudeChoices(LIMITS)) {

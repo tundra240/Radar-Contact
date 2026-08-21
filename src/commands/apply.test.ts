@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { autopilot } from '../sim/autopilot'
-import type { Aircraft, HoldClearance } from '../sim/types'
+import type { Aircraft, ApproachClearance, HoldClearance, NavMode } from '../sim/types'
 import { parseCommandLine } from './parse'
 import { applyAll, applyCommand, type ApplyContext } from './apply'
 import type { Command } from './types'
@@ -53,6 +53,18 @@ const HOLDS: Record<string, HoldClearance> = {
   },
 }
 
+/** 27R, near enough: threshold west of the field, landing westbound. */
+const ILS_27R: ApproachClearance = {
+  runway: '27R',
+  thresholdNM: { x: 1.4, y: -0.3 },
+  courseTrue: 270,
+  thresholdElevationFt: 83,
+  glideslopeDeg: 3,
+  fafDistNM: 10,
+  maxInterceptDeg: 30,
+  interceptAltMaxFt: 3000,
+}
+
 const ctx: ApplyContext = {
   floorFt: 1500,
   ceilingFt: 15000,
@@ -61,6 +73,7 @@ const ctx: ApplyContext = {
   envelopeFor: (type) =>
     type === 'A320' ? { minSpeedKts: 140, maxSpeedKts: 250 } : null,
   holdFor: (fix) => HOLDS[fix] ?? null,
+  approachFor: (runway) => (runway === '27R' ? ILS_27R : null),
 }
 
 function accept(command: Command, aircraft = base) {
@@ -99,12 +112,23 @@ describe('heading', () => {
     expect(r.aircraft.navMode).toBe('VECTOR')
   })
 
-  it('does not disturb any other phase of flight', () => {
-    const r = accept(
-      { kind: 'heading', callsign: 'BAW178', deg: 270 },
-      ac({ navMode: 'GS_TRACKING' }),
-    )
-    expect(r.aircraft.navMode).toBe('GS_TRACKING')
+  it('breaks an aircraft off an approach, at any stage of it', () => {
+    // Vectoring somebody off the approach is exactly what a heading is for
+    // once they are on one, and the clearance has to go with it or the next
+    // tick steers them straight back onto the localiser.
+    for (const navMode of ['LOC_ARMED', 'LOC_CAPTURED', 'GS_TRACKING'] as NavMode[]) {
+      const r = accept(
+        { kind: 'heading', callsign: 'BAW178', deg: 270 },
+        ac({ navMode, clearedApproach: ILS_27R }),
+      )
+      expect(r.aircraft.navMode, navMode).toBe('VECTOR')
+      expect(r.aircraft.clearedApproach, navMode).toBeNull()
+    }
+  })
+
+  it('leaves a phase of flight it has nothing to do with alone', () => {
+    const r = accept({ kind: 'heading', callsign: 'BAW178', deg: 270 }, ac({ navMode: 'GO_AROUND' }))
+    expect(r.aircraft.navMode).toBe('GO_AROUND')
   })
 
   it('normalises a heading that came from another input path', () => {
@@ -270,9 +294,53 @@ describe('holding', () => {
   })
 })
 
+describe('approach clearances', () => {
+  it('arms the approach and carries the geometry with it', () => {
+    const r = accept({ kind: 'approach', callsign: 'BAW178', runway: '27R' })
+    // Armed, not established: sim/ils.ts decides whether the geometry
+    // actually allows a capture, tick by tick.
+    expect(r.aircraft.navMode).toBe('LOC_ARMED')
+    expect(r.aircraft.clearedApproach).toEqual(ILS_27R)
+    expect(r.readback).toBe('BAW178 CLEARED ILS 27R')
+  })
+
+  it('takes it out of the hold, because it cannot be doing both', () => {
+    const holding = accept({ kind: 'hold', callsign: 'BAW178', fix: 'LAM' }).aircraft
+    const cleared = accept({ kind: 'approach', callsign: 'BAW178', runway: '27R' }, holding).aircraft
+    expect(cleared.navMode).toBe('LOC_ARMED')
+    expect(cleared.hold).toBeNull()
+  })
+
+  it('refuses a runway with no ILS rather than inventing one', () => {
+    expect(refuse({ kind: 'approach', callsign: 'BAW178', runway: '09L' }))
+      .toBe('no ILS approach available for 09L')
+  })
+
+  it('accepts a level while the approach is only armed', () => {
+    // Descending traffic onto the platform altitude is most of setting an
+    // intercept up.
+    const armed = accept({ kind: 'approach', callsign: 'BAW178', runway: '27R' }).aircraft
+    expect(applyCommand({ kind: 'altitude', callsign: 'BAW178', ft: 3000 }, armed, ctx).ok).toBe(true)
+  })
+
+  it('refuses a level once established on the glidepath', () => {
+    // The path owns the level from there. Accepting one and having the
+    // approach overwrite it next tick is the thing this module exists not
+    // to do.
+    const established = ac({ navMode: 'GS_TRACKING', clearedApproach: ILS_27R })
+    expect(refuse({ kind: 'altitude', callsign: 'BAW178', ft: 5000 }, established))
+      .toMatch(/established on the glidepath/)
+  })
+
+  it('still takes a speed on the glidepath, which is how you space traffic', () => {
+    const established = ac({ navMode: 'GS_TRACKING', clearedApproach: ILS_27R })
+    expect(applyCommand({ kind: 'speed', callsign: 'BAW178', kts: 160 }, established, ctx).ok)
+      .toBe(true)
+  })
+})
+
 describe('the instructions that are not flyable yet', () => {
   it('says so plainly rather than accepting and doing nothing', () => {
-    expect(refuse({ kind: 'approach', callsign: 'BAW178', runway: '27R' })).toMatch(/not flyable yet/)
     expect(refuse({ kind: 'handoff', callsign: 'BAW178' })).toMatch(/nobody to hand off to/)
   })
 })

@@ -1,8 +1,10 @@
 import {
+  FT_PER_NM,
   advance,
   bearingDeg,
   degToRad,
   distanceNM,
+  glidepathRiseFt,
   makeProjection,
   normalizeHeading,
   type BoundsNM,
@@ -21,7 +23,7 @@ import {
  * airport means adding a JSON file. See ARCHITECTURE.md sections 2 and 4.
  */
 
-export const FT_PER_NM = 6076.11548556
+
 export const M_PER_NM = 1852
 
 export type WakeCategory = 'L' | 'M' | 'H' | 'J'
@@ -1075,8 +1077,7 @@ export function centrelinePoint(runway: Runway, distNM: number): Vec2NM {
  * threshold, using a straight-line approximation of the glide path.
  */
 export function glideslopeAltFt(runway: Runway, distNM: number): number {
-  const rise = Math.tan((runway.ils.glideslopeDeg * Math.PI) / 180) * distNM * FT_PER_NM
-  return runway.thresholdElevationFt + rise
+  return runway.thresholdElevationFt + glidepathRiseFt(runway.ils.glideslopeDeg, distNM)
 }
 
 /**

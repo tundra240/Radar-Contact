@@ -109,7 +109,7 @@ const STATUS: ScopeStatus = {
   clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 12 * 3600 },
   speed: 1,
   paused: false,
-  traffic: { spawned: 0, held: 0 },
+  traffic: { spawned: 0, held: 0, landed: 0 },
   controller: null,
 }
 
@@ -772,7 +772,7 @@ describe('the clock and rate readouts', () => {
       clock: { ticks: 1200, elapsedSeconds: 60, timeOfDaySeconds: 13 * 3600 + 61 },
       speed: 1,
       paused: false,
-      traffic: { spawned: 0, held: 0 },
+      traffic: { spawned: 0, held: 0, landed: 0 },
   controller: null,
     })
     expect(labels).toContain('TIME')
@@ -790,7 +790,7 @@ describe('the clock and rate readouts', () => {
         clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
         speed,
         paused: false,
-        traffic: { spawned: 0, held: 0 },
+        traffic: { spawned: 0, held: 0, landed: 0 },
   controller: null,
       })
       expect(labels, `x${speed}`).toContain('RATE')
@@ -804,7 +804,7 @@ describe('the clock and rate readouts', () => {
       clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
       speed: 4,
       paused: true,
-      traffic: { spawned: 0, held: 0 },
+      traffic: { spawned: 0, held: 0, landed: 0 },
   controller: null,
     })
     expect(labels).toContain('PAUSED')
@@ -823,7 +823,7 @@ describe('the traffic readout', () => {
       clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
       speed: 1,
       paused: false,
-      traffic: { spawned: 7, held: 3 },
+      traffic: { spawned: 7, held: 3, landed: 2 },
       controller: null,
     })
     const labels = rec.texts.map((t) => t.s)

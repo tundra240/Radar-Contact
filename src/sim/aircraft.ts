@@ -1,6 +1,7 @@
 import { advance, angleDelta, normalizeHeading, type Vec2NM } from '../core/geo'
 import { autopilot, STANDARD_RATES, type Rates } from './autopilot'
 import { holdSteer } from './hold'
+import { ilsGuidance } from './ils'
 import type { Aircraft } from './types'
 
 /**
@@ -85,17 +86,33 @@ export function stepAircraft(
   elapsedSeconds: number,
   rates: Rates = STANDARD_RATES,
 ): Aircraft {
+  // An aircraft on an approach is flown by the approach, one in a hold by
+  // the pattern, and anything else by whatever the controller last said.
+  // The approach comes first because it is the one that ends the flight.
+  const guided = ilsGuidance(a)
+
+  // Down and stopped. It keeps its last position for the tick it takes the
+  // world to notice, rather than rolling on through the airfield.
+  if (guided !== null && guided.navMode === 'LANDED') {
+    return { ...a, ...guided, altFt: guided.clearedAltFt, vsFpm: 0 }
+  }
+
   // A holding aircraft navigates itself: the pattern picks the heading and
   // the controller's cleared heading is set aside until a vector ends the
   // hold. Level and speed are untouched, because a hold is a track and not
   // a different aeroplane.
-  const steer = holdSteer(a)
-  const flown = autopilot(steer === null ? a : { ...a, clearedHdg: steer }, dtSeconds, rates)
+  const steer = guided === null ? holdSteer(a) : null
+  const flying =
+    guided !== null ? { ...a, ...guided } : steer === null ? a : { ...a, clearedHdg: steer }
+  const flown = autopilot(flying, dtSeconds, rates)
   const pos = advancePosition(a.pos, a.hdg, flown.hdg, flown.gsKts, dtSeconds)
   const trail = stepTrail(a, a.pos, elapsedSeconds)
 
   return {
     ...a,
+    // Whatever the approach decided about mode, track and level stands on
+    // the record, or the next tick would start it over from armed.
+    ...(guided ?? {}),
     hdg: flown.hdg,
     altFt: flown.altFt,
     vsFpm: flown.vsFpm,

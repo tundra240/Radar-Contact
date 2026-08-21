@@ -486,6 +486,25 @@ function start(
         ? null
         : { minSpeedKts: t.approachKts, maxSpeedKts: t.cruiseKts }
     },
+    approachFor: (runway) => {
+      const wanted = runway.trim().toUpperCase()
+      const rwy = airport.arrivalRunways.find((r) => r.id.toUpperCase() === wanted)
+      if (rwy === undefined || !rwy.ils.available) return null
+      // The whole geometry travels with the clearance, so the flight model
+      // never has to reach back into the airport for it.
+      return {
+        runway: rwy.id,
+        thresholdNM: rwy.thresholdNM,
+        courseTrue: rwy.bearingTrue,
+        thresholdElevationFt: rwy.thresholdElevationFt,
+        glideslopeDeg: rwy.ils.glideslopeDeg,
+        fafDistNM: rwy.ils.fafDistNM,
+        // Published as a minimum in the config, used as what it is: the
+        // widest angle the localiser will capture from.
+        maxInterceptDeg: rwy.ils.minInterceptDeg,
+        interceptAltMaxFt: airport.sector.interceptAltMaxFt,
+      }
+    },
     holdFor: (fix) => {
       const wanted = fix.trim().toUpperCase()
       const navaid = airport.navaids.find((n) => n.name.toUpperCase() === wanted)
@@ -577,6 +596,9 @@ function start(
   // main menu is up.
   let controller: LogonDetails | null = null
 
+  /** How many have been landed this session. */
+  let landed = 0
+
   // ---- the loop --------------------------------------------------------
 
   // Every fourth step, so five times a simulated second: past what anyone
@@ -589,10 +611,23 @@ function start(
     tick: (dt, clock) => {
       simAdvanced = true
 
-      // Fly everything, then release whatever has crossed the sector.
-      const flown = traffic
-        .map((a) => stepAircraft(a, dt, clock.elapsedSeconds))
-        .filter((a) => distanceNM(ORIGIN, a.pos) <= handoffRadiusNM)
+      // Fly everything, then take off the scope whatever has finished with
+      // it: on the ground, or across the sector boundary.
+      const flown: Aircraft[] = []
+      for (const a of traffic.map((x) => stepAircraft(x, dt, clock.elapsedSeconds))) {
+        if (a.navMode === 'LANDED') {
+          landed += 1
+          // The one thing in the whole simulation that counts as a win, so
+          // it says so rather than the aircraft simply vanishing.
+          commandConsole.write(
+            `${a.callsign} landed ${a.clearedApproach?.runway ?? ''}`.trimEnd(),
+            'readback',
+          )
+          continue
+        }
+        if (distanceNM(ORIGIN, a.pos) > handoffRadiusNM) continue
+        flown.push(a)
+      }
 
       // The spawner sees the world as it is after the step, so a fix that
       // has just been vacated is available again on the same tick.
@@ -619,7 +654,7 @@ function start(
           clock: loop.clock,
           speed: loop.speed,
           paused: loop.paused,
-          traffic: { spawned: spawner.spawned, held: spawner.deferred },
+          traffic: { spawned: spawner.spawned, held: spawner.deferred, landed },
           controller,
         },
         { aircraft: traffic, selected, drag: currentDrag() },

@@ -13,8 +13,10 @@ overlays and the rest of the interface are in [README.md](README.md); the code l
 > their own, stacked in 1,000 ft layers -- so the sector fills up and waits for you. They take
 > headings, altitudes, speeds
 > and holding instructions -- an aircraft sent to a hold flies the real racetrack and stays
-> there until you vector it out. Approach clearances and the ILS are not built yet, so nothing
-> lands: an aircraft vectored to the centreline will fly through it. Traffic is different every
+> there until you vector it out -- **and they land**: clear one for the ILS, and if you have
+> lined it up properly it captures the localiser, picks up the glidepath and flies it to the
+> numbers. Line it up badly and it flies straight through, which is the job. Traffic is
+> different every
 > session -- the console prints the seed at logon, and `?seed=<number>` in the address flies the
 > same one again. Every figure below marked *(config)* is read
 > live from `src/data/egll.json`, so it is what the game actually enforces.

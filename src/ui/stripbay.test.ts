@@ -28,6 +28,18 @@ function ac(over: Partial<Aircraft>): Aircraft {
   return { ...base, ...over }
 }
 
+/** An approach clearance, for the fields a strip and a status line read. */
+const ILS_27R = {
+  runway: '27R',
+  thresholdNM: { x: 1.4, y: -0.3 },
+  courseTrue: 270,
+  thresholdElevationFt: 83,
+  glideslopeDeg: 3,
+  fafDistNM: 10,
+  maxInterceptDeg: 30,
+  interceptAltMaxFt: 3000,
+}
+
 interface Harness {
   bay: StripBay
   mount: HTMLElement
@@ -148,7 +160,7 @@ describe('strip content', () => {
   })
 
   it('carries the nav mode as a styling hook', () => {
-    h.bay.update([ac({ navMode: 'GS_TRACKING', clearedApproach: '27R' })], null)
+    h.bay.update([ac({ navMode: 'GS_TRACKING', clearedApproach: ILS_27R })], null)
     const strip = strips()[0]
     expect(strip?.dataset['mode']).toBe('GS_TRACKING')
     expect(strip?.querySelector('.strip-status')?.textContent).toBe('ESTABLISHED 27R')
@@ -162,7 +174,7 @@ describe('syncing with the world', () => {
     ac({
       callsign: 'SWR318',
       navMode: 'GS_TRACKING',
-      clearedApproach: '27R',
+      clearedApproach: ILS_27R,
       pos: { x: 6, y: 0 },
     }),
   ]

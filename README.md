@@ -103,11 +103,17 @@ types, and appear on their strips.
 Arrivals fly, and they take headings, altitudes and speeds -- typed, or picked off the
 right-click menu on the target.
 
-**Nothing lands yet.** Approach clearances and the ILS are the piece still missing, so an
-aircraft vectored onto the centreline flies straight through it and out of the sector. Conflict
-detection and scoring are Day 3. So the sections above describe the game being built rather than
-one you can play through to a landing -- but every figure in them is live in the config, the
-geometry is drawn correctly, and the vectoring works. See **Status** below for the detail.
+**Aircraft land.** `CLEARED ILS 27R` arms the approach; the localiser is captured when the
+geometry actually allows it -- inside the beam, within 30 degrees of the course, at or below
+3,000 ft, on the approach side and closing -- and the glidepath is picked up when it descends
+onto the aircraft. From there it flies the path to the numbers and comes off the scope, and the
+`LANDED` cell on the status bar counts them.
+
+An aircraft lined up badly **flies straight through the localiser** and has to be taken round
+again, which is the point: setting the intercept up is the job. A heading breaks one off an
+approach at any stage.
+
+Conflict detection and scoring are still to come. See **Status** below.
 
 ## Logging on
 

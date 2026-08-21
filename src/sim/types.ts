@@ -51,6 +51,32 @@ export interface HoldClearance {
 }
 
 /**
+ * An approach as it was cleared.
+ *
+ * Carries the whole geometry, like a hold does, so the flight model still
+ * knows nothing about the airport: an approach clearance is something the
+ * aeroplane is holding, not a lookup into a runway table.
+ */
+export interface ApproachClearance {
+  readonly runway: string
+  readonly thresholdNM: Vec2NM
+  /** The inbound course: direction of travel on landing, degrees true. */
+  readonly courseTrue: number
+  readonly thresholdElevationFt: number
+  readonly glideslopeDeg: number
+  /** Final approach fix, in miles before the threshold. */
+  readonly fafDistNM: number
+  /**
+   * Widest angle off the inbound course the localiser will capture from.
+   * This is `ils.minInterceptDeg` in the config, which is 30 -- a maximum
+   * intercept angle despite the name it is published under there.
+   */
+  readonly maxInterceptDeg: number
+  /** At or below this before the FAF, or the capture will not arm. */
+  readonly interceptAltMaxFt: number
+}
+
+/**
  * Beyond this from its fix, an aircraft carrying a hold is still on its way
  * there rather than established in the pattern.
  *
@@ -82,8 +108,8 @@ export interface Aircraft {
   readonly clearedAltFt: number
   readonly clearedSpdKts: number
   readonly navMode: NavMode
-  /** Runway identifier once an approach clearance has been issued. */
-  readonly clearedApproach: string | null
+  /** The approach being flown once one has been cleared, and null before. */
+  readonly clearedApproach: ApproachClearance | null
   /** The pattern being flown while `navMode` is HOLD, and null otherwise. */
   readonly hold: HoldClearance | null
 
@@ -141,11 +167,11 @@ export function statusText(a: Aircraft): string {
     case 'VECTOR':
       return 'VECTORING'
     case 'LOC_ARMED':
-      return a.clearedApproach ? `CLEARED ILS ${a.clearedApproach}` : 'APPROACH ARMED'
+      return a.clearedApproach ? `CLEARED ILS ${a.clearedApproach.runway}` : 'APPROACH ARMED'
     case 'LOC_CAPTURED':
-      return a.clearedApproach ? `LOC ${a.clearedApproach}` : 'LOCALIZER'
+      return a.clearedApproach ? `LOC ${a.clearedApproach.runway}` : 'LOCALIZER'
     case 'GS_TRACKING':
-      return a.clearedApproach ? `ESTABLISHED ${a.clearedApproach}` : 'ESTABLISHED'
+      return a.clearedApproach ? `ESTABLISHED ${a.clearedApproach.runway}` : 'ESTABLISHED'
     case 'GO_AROUND':
       return 'GO AROUND'
     case 'LANDED':
