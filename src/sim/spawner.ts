@@ -238,6 +238,7 @@ export class Spawner {
       clearedApproach: null,
       originFix: fix.name,
       trail: [],
+      trailAt: clock.elapsedSeconds,
       spawnedAt: clock.elapsedSeconds,
     }
   }

@@ -269,6 +269,7 @@ describe('flow management', () => {
       clearedApproach: null,
       originFix: fix.name,
       trail: [],
+      trailAt: 0,
       spawnedAt: 0,
     }))
 
@@ -464,6 +465,7 @@ describe('on command', () => {
       clearedApproach: null,
       originFix: fix.name,
       trail: [],
+      trailAt: 0,
       spawnedAt: 0,
     }))
     expect(spawner.spawnNow(clockAt(0), blockers)).toHaveLength(0)
@@ -493,6 +495,7 @@ describe('on command', () => {
         clearedApproach: null,
         originFix: null,
         trail: [],
+        trailAt: 0,
         spawnedAt: 0,
       }),
     )

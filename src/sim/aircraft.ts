@@ -1,0 +1,106 @@
+import { advance, angleDelta, normalizeHeading, type Vec2NM } from '../core/geo'
+import { autopilot, STANDARD_RATES, type Rates } from './autopilot'
+import type { Aircraft } from './types'
+
+/**
+ * Flight physics: where an aircraft goes, and the trail it leaves behind.
+ *
+ * The step is always passed in rather than measured, because the loop runs
+ * a fixed 50 ms tick and the whole point of that is a simulation that does
+ * not depend on frame rate. Everything here is pure: given the same
+ * aircraft and the same step it produces the same result, which is what
+ * makes a session replayable.
+ */
+
+/** Points kept in the history trail. */
+export const TRAIL_POINTS = 5
+
+/**
+ * Simulated seconds between trail points, standing in for the sweep of the
+ * antenna. Real returns arrive once per rotation, and drawing one per
+ * simulation step would be both wrong and a thousand points a minute.
+ */
+export const TRAIL_INTERVAL_SECONDS = 4
+
+const SECONDS_PER_HOUR = 3600
+
+/**
+ * Advance a position along the track flown during the step.
+ *
+ * The heading used is the midpoint between where the turn started and
+ * where it ended, so a turning aircraft traces the arc instead of cutting
+ * the chord. At a fifty-millisecond step the difference is a fraction of a
+ * metre, but it costs one line and it stops error accumulating through a
+ * long turn.
+ */
+export function advancePosition(
+  pos: Vec2NM,
+  hdgFrom: number,
+  hdgTo: number,
+  gsKts: number,
+  dtSeconds: number,
+): Vec2NM {
+  if (dtSeconds <= 0 || gsKts <= 0) return pos
+  const distanceNM = (gsKts / SECONDS_PER_HOUR) * dtSeconds
+  const mid = normalizeHeading(hdgFrom + angleDelta(hdgFrom, hdgTo) / 2)
+  return advance(pos, mid, distanceNM)
+}
+
+/**
+ * Lay down a trail point if the sweep is due.
+ *
+ * The point recorded is where the aircraft was, not where it now is, so the
+ * trail sits behind the target rather than under it.
+ */
+export function stepTrail(
+  a: Aircraft,
+  previousPos: Vec2NM,
+  elapsedSeconds: number,
+): { readonly trail: readonly Vec2NM[]; readonly trailAt: number } {
+  // A hair of tolerance: simulated time is a tick count times a step that
+  // has no exact binary form, so a sweep boundary can land just short of
+  // the interval. Without this a trail point is silently skipped.
+  const EPSILON = 1e-9
+  if (elapsedSeconds - a.trailAt < TRAIL_INTERVAL_SECONDS - EPSILON) {
+    return { trail: a.trail, trailAt: a.trailAt }
+  }
+  return {
+    // Newest first, so a renderer can fade by index without counting.
+    trail: [previousPos, ...a.trail].slice(0, TRAIL_POINTS),
+    trailAt: elapsedSeconds,
+  }
+}
+
+/**
+ * One simulation step for one aircraft: fly the autopilot, move, then
+ * record the trail.
+ *
+ * That order matters. The autopilot decides the heading for this step, the
+ * move uses it, and the trail records where the aircraft was before it.
+ */
+export function stepAircraft(
+  a: Aircraft,
+  dtSeconds: number,
+  elapsedSeconds: number,
+  rates: Rates = STANDARD_RATES,
+): Aircraft {
+  const flown = autopilot(a, dtSeconds, rates)
+  const pos = advancePosition(a.pos, a.hdg, flown.hdg, flown.gsKts, dtSeconds)
+  const trail = stepTrail(a, a.pos, elapsedSeconds)
+
+  return {
+    ...a,
+    hdg: flown.hdg,
+    altFt: flown.altFt,
+    vsFpm: flown.vsFpm,
+    gsKts: flown.gsKts,
+    pos,
+    trail: trail.trail,
+    trailAt: trail.trailAt,
+  }
+}
+
+/** Distance flown over a step, in nautical miles. */
+export function distanceFlownNM(gsKts: number, dtSeconds: number): number {
+  return (gsKts / SECONDS_PER_HOUR) * Math.max(0, dtSeconds)
+}

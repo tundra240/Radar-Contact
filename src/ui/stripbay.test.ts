@@ -20,6 +20,7 @@ const base: Aircraft = {
   clearedApproach: null,
   originFix: 'LAM',
   trail: [],
+  trailAt: 0,
   spawnedAt: 0,
 }
 

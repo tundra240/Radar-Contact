@@ -60,7 +60,14 @@ export interface Aircraft {
   /* bookkeeping */
   /** The feeder fix this arrival entered on. */
   readonly originFix: string | null
+  /**
+   * Past positions, newest first. One point per radar sweep rather than one
+   * per simulation step, or a twenty-hertz simulation would bank a thousand
+   * points a minute for a trail six long.
+   */
   readonly trail: readonly Vec2NM[]
+  /** Simulated time the last trail point was laid down. */
+  readonly trailAt: number
   readonly spawnedAt: number
 }
 
