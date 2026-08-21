@@ -306,23 +306,23 @@ function drawAirspaceLabels(
     let at: { x: number; y: number } | null = null
     let box: LabelBox | null = null
     for (const [dx, dy] of offsets) {
-      const rawX = anchor.x + dx - w / 2
-      const rawY = anchor.y + dy - lineH - 4
+      const candidate: LabelBox = {
+        x: anchor.x + dx - w / 2,
+        y: anchor.y + dy - lineH - 4,
+        w,
+        h,
+      }
 
-      // A label whose airspace is entirely out of view should not consume a
-      // slot an on-screen one could use.
-      if (rawX + w < 0 || rawX > cam.width) continue
-      if (rawY + h < 0 || rawY > cam.height) continue
-
-      // Partly visible is not good enough: half a clipped word reads as a
-      // rendering fault. Pull it fully inside instead, which keeps it
-      // against the boundary that runs off the edge.
-      const x = Math.min(Math.max(rawX, 2), Math.max(2, cam.width - w - 2))
-      const y = Math.min(Math.max(rawY, 2), Math.max(2, cam.height - h - 2))
-      const candidate: LabelBox = { x, y, w, h }
+      // Must fit entirely on screen, and is never nudged in to make it fit.
+      // Clamping a label into the viewport makes it slide along the edge as
+      // the scope is panned, so it appears to follow the view rather than
+      // stay with its airspace. Dropping it is the honest behaviour: the
+      // label belongs to a place, and that place is off screen.
+      if (candidate.x < 0 || candidate.x + w > cam.width) continue
+      if (candidate.y < 0 || candidate.y + h > cam.height) continue
       if (placed.some((q) => overlaps(candidate, q))) continue
 
-      at = { x: x + w / 2, y: y + lineH + 4 }
+      at = { x: anchor.x + dx, y: anchor.y + dy }
       box = candidate
       break
     }

@@ -516,3 +516,74 @@ describe('airspace label placement', () => {
     }
   })
 })
+
+describe('labels stay with their airspace when panning', () => {
+  const AIRSPACE = [
+    'LONDON TMA',
+    'LONDON CTR',
+    'STANSTED CTA',
+    'LUTON CTR',
+    'LUTON CTA',
+    'GATWICK CTR',
+    'GATWICK CTA',
+    'CITY CTA',
+    'FARNBOROUGH CTR',
+    'FARNBOROUGH CTA',
+  ]
+
+  function renderCentred(centre: { x: number; y: number }, rangeNM = 30) {
+    const cam = new Camera(centre, rangeNM, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.full)
+    return { ...rec, cam }
+  }
+
+  it('moves labels with the world rather than holding them still', () => {
+    const before = renderCentred({ x: 0, y: 0 })
+    const after = renderCentred({ x: 2, y: 0 })
+    // Panning the camera 2 NM east moves the picture left by 2 NM of pixels.
+    const expected = -2 * before.cam.pxPerNM
+
+    let compared = 0
+    for (const name of AIRSPACE) {
+      const a = before.texts.find((t) => t.s === name)
+      const b = after.texts.find((t) => t.s === name)
+      if (!a || !b) continue
+      compared += 1
+      expect(Math.abs(b.x - a.x - expected), name).toBeLessThan(8)
+    }
+    expect(compared, 'labels compared across the pan').toBeGreaterThan(2)
+  })
+
+  it('drops a label rather than parking it against the edge', () => {
+    // This is the fault being guarded: clamping an off-screen anchor into
+    // the viewport made labels slide along the edge as the scope panned, so
+    // they appeared to follow the view instead of staying with their
+    // airspace. Nothing should end up hugging the border.
+    for (const centre of [
+      { x: 60, y: 0 },
+      { x: -60, y: 0 },
+      { x: 0, y: 60 },
+      { x: 0, y: -60 },
+    ]) {
+      const { texts, cam } = renderCentred(centre)
+      for (const t of texts.filter((x) => AIRSPACE.includes(x.s))) {
+        expect(t.x, `${t.s} at ${centre.x},${centre.y}`).toBeGreaterThan(4)
+        expect(t.x, `${t.s} at ${centre.x},${centre.y}`).toBeLessThan(cam.width - 4)
+        expect(t.y, `${t.s} at ${centre.x},${centre.y}`).toBeGreaterThan(4)
+        expect(t.y, `${t.s} at ${centre.x},${centre.y}`).toBeLessThan(cam.height - 4)
+      }
+    }
+  })
+
+  it('shows fewer airspace labels the further the field is from view', () => {
+    // A sanity check on the same property: pan away and labels go, because
+    // the airspace they name has gone.
+    const near = renderCentred({ x: 0, y: 0 })
+    const far = renderCentred({ x: 120, y: 120 })
+    const count = (r: { texts: { s: string }[] }): number =>
+      r.texts.filter((t) => AIRSPACE.includes(t.s)).length
+    expect(count(far)).toBeLessThan(count(near))
+  })
+})
