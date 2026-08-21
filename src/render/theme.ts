@@ -4,12 +4,10 @@
  * One file, by design: tuning a radar display is done by eye, and hunting
  * hex codes across a dozen render modules is how palettes drift.
  *
- * Two complete palettes live here. `beige` is the shipped look -- a warm
- * chart-paper ground with dim, saturated accents, after the early-2000s
- * terminal displays that drew dark symbology on a light ground. `dark` is
- * the earlier near-black scheme, kept intact so switching is one line
- * rather than a rewrite. Accents are NOT shared between them: a colour that
- * glows on black turns to mud on beige, so each palette is tuned whole.
+ * Two complete palettes live here, described where they are defined
+ * below. Accents are NOT shared between them: a colour that glows on black
+ * turns to mud on beige, so each palette is tuned whole against its own
+ * ground and the contrast is asserted in theme.test.ts.
  */
 
 export interface Palette {
@@ -60,87 +58,111 @@ export interface Palette {
   readonly chromeWell: string
 }
 
+/**
+ * Two period palettes.
+ *
+ * `beige` takes its cue from the desktop software of the era rather than
+ * from a modern light theme: a warm tan tube, an interface face in the
+ * canonical #d4d0c8 with white and grey bevels, and symbology drawn from
+ * the VGA system colours -- navy, teal, olive, maroon, purple. Those
+ * colours are dark and saturated, which is exactly what stays readable on
+ * a light ground where a modern neon would turn to mud.
+ *
+ * `dark` is the same instrument as a colour CRT: near-black with bright
+ * cyan symbology and phosphor amber for anything the controller is holding
+ * in mind.
+ *
+ * Accents are never shared between the two. Each palette is tuned whole
+ * against its own ground, and theme.test.ts asserts the contrast so a
+ * later tweak cannot quietly make the display unreadable.
+ */
 export const palettes: Record<'beige' | 'dark', Palette> = {
   beige: {
-    bg: '#c9bfa3',
+    bg: '#c3bda9',
 
-    ringFaint: '#bcb094',
-    ring: '#a89b76',
-    ringStrong: '#8a7d55',
-    cardinal: '#94875f',
-    ringLabel: '#5f5636',
+    ringFaint: '#b4ae9a',
+    ring: '#9a9482',
+    ringStrong: '#7c7663',
+    cardinal: '#8a8472',
+    ringLabel: '#55503f',
 
-    airspaceHigh: '#2d4f7c',
-    airspaceControl: '#7a2f5f',
-    airspaceLocal: '#6b5a20',
-    airspaceLabel: '#4a4028',
+    // VGA system navy, purple and olive: class A, the control zones, and
+    // class G, in that order of authority.
+    airspaceHigh: '#000080',
+    airspaceControl: '#7a0060',
+    airspaceLocal: '#6b6a00',
+    airspaceLabel: '#46422f',
 
-    runway: '#17150f',
-    runwayLabel: '#2f2a1c',
-    centreline: '#6f6547',
-    centrelineTick: '#574e33',
-    fafTick: '#0a6b74',
+    runway: '#1a1a14',
+    runwayLabel: '#2b2a1e',
+    centreline: '#6b6552',
+    centrelineTick: '#524d3c',
+    fafTick: '#006e74',
 
-    navaid: '#0d6a73',
-    navaidLabel: '#0a4d54',
-    navaidFreq: '#6a6040',
-    hold: '#8a5000',
+    navaid: '#00686e',
+    navaidLabel: '#00565c',
+    navaidFreq: '#5f5a48',
+    hold: '#8a4e00',
 
-    neighbour: '#463f2b',
-    neighbourLabel: '#3a3423',
+    neighbour: '#46422f',
+    neighbourLabel: '#3a3625',
 
-    text: '#241f14',
-    textDim: '#5f5636',
-    accent: '#0a6b74',
-    warn: '#a32000',
+    text: '#1c1a14',
+    textDim: '#4e4939',
+    accent: '#006e74',
+    warn: '#a00000',
 
-    chromeFace: '#bfb59a',
-    chromeLight: '#e4dcc6',
-    chromeShadow: '#736a51',
-    chromeText: '#241f14',
-    chromeDim: '#6b6248',
-    chromeWell: '#ada291',
+    // The canonical button face of the era, with a white highlight and a
+    // mid-grey shadow. Nothing dates an interface faster than getting
+    // these three wrong.
+    chromeFace: '#d4d0c8',
+    chromeLight: '#ffffff',
+    chromeShadow: '#808080',
+    chromeText: '#1c1a14',
+    chromeDim: '#565246',
+    chromeWell: '#aeaaa2',
   },
 
   dark: {
-    bg: '#0a0e14',
+    bg: '#080e13',
 
-    ringFaint: '#121c24',
-    ringStrong: '#1d3b47',
-    ring: '#152b34',
-    cardinal: '#24485a',
-    ringLabel: '#3d5a68',
+    ringFaint: '#0d1a21',
+    ring: '#13303c',
+    ringStrong: '#1d4756',
+    cardinal: '#245363',
+    ringLabel: '#3f6d80',
 
-    airspaceHigh: '#2f5f8f',
-    airspaceControl: '#a04080',
-    airspaceLocal: '#8a7a30',
-    airspaceLabel: '#7f8c99',
+    airspaceHigh: '#5a8ad8',
+    airspaceControl: '#d060b0',
+    airspaceLocal: '#b0a030',
+    airspaceLabel: '#8092a0',
 
-    runway: '#e6f7ff',
+    runway: '#e8f8ff',
     runwayLabel: '#9fd4e6',
-    centreline: '#1b4453',
-    centrelineTick: '#2a6376',
-    fafTick: '#00b8d4',
+    centreline: '#1b4152',
+    centrelineTick: '#2d7089',
+    fafTick: '#00e0c8',
 
-    navaid: '#00b8d4',
-    navaidLabel: '#84dbec',
-    navaidFreq: '#4a6b78',
-    hold: '#c98a2a',
+    navaid: '#00c8d8',
+    navaidLabel: '#7fdcea',
+    navaidFreq: '#4a707e',
+    // Phosphor amber, for the fixes traffic is actually holding at.
+    hold: '#ffb000',
 
-    neighbour: '#5a6b7c',
-    neighbourLabel: '#7f8c99',
+    neighbour: '#5a6b7a',
+    neighbourLabel: '#8092a0',
 
-    text: '#c8d4e0',
-    textDim: '#5a6b7c',
+    text: '#c4dae6',
+    textDim: '#5c7382',
     accent: '#00e5ff',
     warn: '#ff5252',
 
-    chromeFace: '#1b232c',
-    chromeLight: '#33424f',
-    chromeShadow: '#05080b',
-    chromeText: '#c8d4e0',
-    chromeDim: '#6b7d8c',
-    chromeWell: '#101720',
+    chromeFace: '#18222b',
+    chromeLight: '#3d5162',
+    chromeShadow: '#040709',
+    chromeText: '#c4dae6',
+    chromeDim: '#6c8494',
+    chromeWell: '#0d151c',
   },
 }
 

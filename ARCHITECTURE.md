@@ -300,6 +300,26 @@ Using the published data earned its keep immediately: **Biggin Hill's ATZ is not
 2.5 NM**, where the runway-length rule gives 2 NM. The rule was wrong, and the source
 corrected it.
 
+### Colour
+
+The palettes are period references rather than a light and a dark theme of the same design.
+`beige` follows the desktop software of the era: a warm tan tube at `#c3bda9`, an interface
+face in the canonical `#d4d0c8` with a white highlight and a mid-grey shadow, and symbology
+taken from the VGA system colours -- navy for class A, purple for the control zones, olive
+for class G, teal for navaids, burnt amber for holds. Those are dark and saturated, which is
+what survives on a light ground; a modern neon turns to mud there. `dark` is the same
+instrument as a colour CRT: near-black with bright cyan symbology and phosphor amber for the
+holds.
+
+Legibility is a test, not a hope. `theme.test.ts` measures WCAG contrast for every colour
+against its own ground and asserts that primary text and runways clear 4.5:1, all symbology
+clears 3:1, dim text clears 3.5:1, and the grid furniture stays in a band -- faint enough to
+recede, but never invisible. There is an **upper** bound on the grid deliberately: rings that
+shout compete with the traffic. Writing those tests immediately caught two things by eye I
+would have missed: the per-mile centreline ticks are symbology rather than furniture, because
+they are how spacing is judged, and the dark palette's bevel highlight was too weak to read
+as raised.
+
 ### Chrome and readouts
 
 The interface furniture is deliberately in the idiom of early-2000s terminal software:

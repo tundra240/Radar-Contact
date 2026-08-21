@@ -3,8 +3,8 @@
    question 1 -- the background shade is not settled yet). */
 
 :root {
-  --bg-page: #c9bfa3;
-  --fg-page: #241f14;
+  --bg-page: #c3bda9;
+  --fg-page: #1c1a14;
   font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace;
 }
 
@@ -43,13 +43,16 @@ canvas {
    main.ts, so no hex value is duplicated between here and theme.ts.       */
 
 :root {
-  --face: #bfb59a;
-  --well: #ada291;
-  --bevel-light: #e4dcc6;
-  --bevel-shadow: #736a51;
-  --chrome-text: #241f14;
-  --chrome-dim: #6b6248;
-  --accent: #0a6b74;
+  /* Fallbacks only: main.ts overwrites these from the active palette on
+     start-up. They match the beige scheme so the first paint is not a
+     different colour from the second. */
+  --face: #d4d0c8;
+  --well: #aeaaa2;
+  --bevel-light: #ffffff;
+  --bevel-shadow: #808080;
+  --chrome-text: #1c1a14;
+  --chrome-dim: #565246;
+  --accent: #006e74;
 }
 
 .controls {
