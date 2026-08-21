@@ -491,3 +491,10 @@ canvas {
   min-width: 26px;
   font-weight: bold;
 }
+
+/* Sound sits with the time controls but is a different kind of thing, so
+   it gets a little air. */
+.time-sound {
+  margin-left: 5px;
+  min-width: 34px;
+}

@@ -22,6 +22,8 @@ On the scope: drag to pan, wheel to zoom, `R` to reset the view, `D` to switch b
 display schemes, `O` to open the overlay panel, and space to pause. The buttons in the top
 right do the same.
 
+Controls click. `SND` mutes them, and the choice persists.
+
 The simulation runs in fixed 50 ms steps at 20 Hz and the rate buttons run it at 0.5x, 1x, 2x
 or 4x. Changing the rate changes how many steps happen per real second, never the size of a
 step, so fast-forward is the same simulation sooner rather than a different one. The status

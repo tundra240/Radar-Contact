@@ -390,6 +390,33 @@ third of a pixel at 40 NM.
 
 ---
 
+### Interface sound
+
+`audio/sfx.ts` plays one short sample on every control press. Three properties matter more
+than the sound:
+
+- **It cannot break the interface.** No Web Audio, a blocked context, a missing sample, one
+  that will not decode -- every path ends in silence and a `failed` flag, never an exception
+  out of an event handler.
+- **It starts inside a gesture.** Browsers create audio contexts suspended until the user has
+  interacted, so the context is built at load, the sample decoded up front, and the context
+  resumed on the first press. That way the first press is audible rather than swallowed.
+- **Presses overlap.** Each play gets its own source node; a shared one would cut the previous
+  press short. Presses closer together than 25 ms are dropped, so a held key cannot stack.
+
+One delegated listener on the shell rather than a handler per control, because the strip bay
+creates and destroys buttons as traffic comes and goes. `isClickable` decides what sounds:
+buttons and checkboxes, never the scope -- a click on every pan would be maddening, and
+dragging the map is not pressing a control. Disabled controls stay silent, since nothing
+happened.
+
+The context factory and the fetch are constructor arguments, so the tests cover the autoplay
+resume, the rate limit and all four failure paths without Web Audio or a network.
+
+The sample is 13 KB. The source recording was 487 KB, of which 2.5 of its 2.8 seconds was
+silence after the click; it is trimmed to 150 ms and downmixed to mono, with a short fade so
+it cannot end on a discontinuity -- which would itself be an audible click.
+
 ### The clock and the loop
 
 `core/loop.ts` runs the simulation in fixed 50 ms steps at 20 Hz and draws on

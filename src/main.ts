@@ -5,6 +5,8 @@ import egllConfig from './data/egll.json'
 import { DEMO_ROSTER } from './sim/demoRoster'
 import { describeCommand, type Command } from './commands/types'
 import { StripBay } from './ui/stripbay'
+import clickUrl from './assets/click.wav'
+import { Sfx, isClickable } from './audio/sfx'
 import { GameLoop, SPEEDS, formatSpeed, type Speed } from './core/loop'
 import { drawScope } from './render/scope'
 import {
@@ -143,6 +145,53 @@ function start(
     if (e.key === 'r' || e.key === 'R') reset()
   })
 
+  // ---- interface sound -------------------------------------------------
+  // One delegated listener rather than a handler per control: the strip bay
+  // creates and destroys buttons as traffic comes and goes, and they should
+  // sound without anyone remembering to wire them up.
+
+  const SOUND_STORAGE = 'radar-contact:muted'
+
+  const storedMuted = (): boolean => {
+    try {
+      return window.localStorage.getItem(SOUND_STORAGE) === '1'
+    } catch {
+      return false
+    }
+  }
+
+  const sfx = new Sfx({ url: clickUrl })
+  sfx.setMuted(storedMuted())
+  // Fetch and decode up front so the very first press is audible. The
+  // context stays suspended until a gesture resumes it, which is allowed.
+  void sfx.prime()
+
+  shell.addEventListener('click', (e: MouseEvent) => {
+    if (isClickable(e.target)) sfx.play()
+  })
+
+  const soundButton = document.createElement('button')
+  soundButton.type = 'button'
+  soundButton.className = 'time-button time-sound'
+  soundButton.textContent = 'SND'
+
+  const paintSound = (): void => {
+    const on = !sfx.muted
+    soundButton.classList.toggle('is-active', on)
+    soundButton.setAttribute('aria-pressed', String(on))
+    soundButton.title = on ? 'Mute the interface sound' : 'Unmute the interface sound'
+  }
+
+  soundButton.addEventListener('click', () => {
+    const muted = sfx.toggleMuted()
+    try {
+      window.localStorage.setItem(SOUND_STORAGE, muted ? '1' : '0')
+    } catch {
+      /* preference simply will not persist */
+    }
+    paintSound()
+  })
+
   // ---- time control ----------------------------------------------------
   // The loop keeps simulated time; these only ask it to go faster, slower
   // or stop. Nothing else in the codebase knows the rate has changed.
@@ -171,6 +220,8 @@ function start(
     timePanel.appendChild(b)
     speedButtons.set(speed, b)
   }
+
+  timePanel.appendChild(soundButton)
 
   const paintTime = (): void => {
     const paused = loop.paused
@@ -259,6 +310,7 @@ function start(
 
   syncStrips()
   paintTime()
+  paintSound()
   resize()
   loop.start()
 
