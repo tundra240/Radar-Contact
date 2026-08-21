@@ -23,9 +23,18 @@ body {
 }
 
 #app {
-  display: block;
+  display: flex;
   width: 100vw;
   height: 100vh;
+}
+
+/* The drawing area. min-width lets it shrink rather than forcing the bay
+   off the side of the window. */
+.scope {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
 }
 
 canvas {
@@ -55,6 +64,9 @@ canvas {
   --accent: #006e74;
   --title-bar: #000080;
   --title-text: #ffffff;
+  --hold: #8a4e00;
+  --established: #006e74;
+  --warn: #a00000;
 }
 
 .controls {
@@ -194,4 +206,231 @@ canvas {
 .overlay-row input:focus-visible {
   outline: 1px dotted var(--chrome-text);
   outline-offset: 1px;
+}
+
+/* ------------------------------------------------------------ strip bay
+
+   Flight progress strips down the right-hand side. Same idiom as the rest
+   of the furniture: a caption strip, a sunken well for the list, and each
+   strip a raised card inside it.                                        */
+
+.strip-bay {
+  flex: 0 0 272px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--face);
+  box-shadow:
+    inset 2px 0 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+  font-size: 11px;
+  color: var(--chrome-text);
+}
+
+.strip-bay.is-collapsed {
+  flex-basis: 26px;
+}
+
+.strip-bay.is-collapsed .strip-count,
+.strip-bay.is-collapsed .strip-list,
+.strip-bay.is-collapsed .strip-empty,
+.strip-bay.is-collapsed .strip-bay-title span,
+.strip-bay.is-collapsed .strip-badge {
+  display: none;
+}
+
+.strip-bay-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px;
+  padding: 4px 4px 4px 7px;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--title-text);
+  background: var(--title-bar);
+}
+
+.strip-bay-title span:first-child {
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Says plainly that the traffic is not real. Goes away with the roster. */
+.strip-badge {
+  flex: 0 0 auto;
+  padding: 1px 4px;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: var(--title-bar);
+  background: var(--title-text);
+}
+
+.strip-collapse {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 9px;
+  line-height: 1.4;
+  color: var(--accent);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+  cursor: pointer;
+}
+
+.strip-collapse:active {
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.strip-count {
+  margin: 0 7px 6px;
+  padding: 3px 6px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--chrome-dim);
+  background: var(--well);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.strip-list {
+  flex: 1 1 auto;
+  margin: 0 7px 7px;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--well);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.strip-empty {
+  margin: 0 7px 7px;
+  padding: 8px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--chrome-dim);
+  background: var(--well);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.strip {
+  margin-bottom: 4px;
+  padding: 5px 6px;
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+  cursor: pointer;
+}
+
+.strip:last-child {
+  margin-bottom: 0;
+}
+
+/* Selection inverts the card, the way a chosen row in a list of the era
+   picked up the caption colours. */
+.strip.is-selected {
+  color: var(--title-text);
+  background: var(--title-bar);
+}
+
+.strip.is-selected .strip-status,
+.strip.is-selected .strip-body {
+  color: var(--title-text);
+}
+
+.strip:focus-visible {
+  outline: 1px dotted var(--chrome-text);
+  outline-offset: -3px;
+}
+
+.strip-head {
+  font-weight: bold;
+  letter-spacing: 0.06em;
+  white-space: pre;
+}
+
+.strip-body {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--chrome-text);
+  white-space: pre;
+}
+
+.strip-status {
+  margin-top: 2px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--chrome-dim);
+}
+
+/* Status colour follows the nav mode, so the phase of flight reads without
+   parsing the words. */
+.strip[data-mode='HOLD'] .strip-status {
+  color: var(--hold);
+}
+
+.strip[data-mode='GS_TRACKING'] .strip-status,
+.strip[data-mode='LOC_CAPTURED'] .strip-status {
+  color: var(--established);
+}
+
+.strip[data-mode='GO_AROUND'] .strip-status {
+  color: var(--warn);
+  font-weight: bold;
+}
+
+.strip-actions {
+  display: flex;
+  gap: 3px;
+  margin-top: 5px;
+}
+
+.strip-action {
+  flex: 1 1 auto;
+  padding: 3px 2px;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+  cursor: pointer;
+}
+
+.strip-action:active {
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.strip-action:disabled {
+  color: var(--chrome-dim);
+  cursor: default;
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
 }

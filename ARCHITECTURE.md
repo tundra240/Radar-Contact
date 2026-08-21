@@ -390,6 +390,43 @@ third of a pixel at 40 NM.
 
 ---
 
+### The flight strip bay and the sync seam
+
+The bay is built ahead of the simulation, which is only possible because the seam between
+them is a data contract rather than a call graph:
+
+```
+   sim/types.ts          ui/stripbay.ts             commands/types.ts
+   Aircraft[]  ------->  update(snapshot, selected)  ------->  Command
+   (the world)           (a view, no state)                   (one sink)
+```
+
+Three consequences worth stating:
+
+- **The bay holds no aircraft state.** A strip is a view over an `Aircraft` record, so there
+  is nothing to keep in step and no chance of the panel and the scope disagreeing. Day 1
+  swaps the frozen `sim/demoRoster.ts` for the live world and the bay does not change.
+- **Every button produces a `Command`.** Nothing applies them yet -- the sink currently logs
+  a readback -- but the strip path is already the same path the mouse and the console will
+  take, which is decision 5 honoured rather than promised.
+- **Refreshing is diffed, not rebuilt.** The bay updates at 5 Hz forever. Rows are keyed by
+  callsign, every field is compared before it is written, and rows are moved rather than
+  recreated when the running order changes. A test observes the DOM through a
+  `MutationObserver` and asserts that an unchanged snapshot produces **zero** mutations --
+  otherwise an idle scope would fight text selection and scrolling five times a second. That
+  requirement is also why `hidden` is guarded before assignment: setting an attribute to the
+  value it already holds still counts as a mutation.
+
+Strips are ordered by what needs attention soonest -- go-around, established, on the
+localizer, being vectored, holding, finished -- rather than alphabetically or by arrival time.
+The approach quick-button offers the runway an aircraft is already assigned to rather than the
+active one, because quietly re-clearing an aircraft onto the other runway is a genuinely
+dangerous thing for a button to do, and it disables itself once there is nothing left to
+clear.
+
+Placeholder traffic is badged `DEMO` in the caption, so a frozen picture is never mistaken
+for running traffic. The badge goes when the roster does.
+
 ## 5. Revised Roadmap
 
 The design doc's three days hold, with a short foundation block pulled to the front. The

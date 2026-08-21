@@ -39,12 +39,19 @@ drawn: they are the job rather than decoration.
 | `src/core/` | Geodesy, world/screen camera, game loop |
 | `src/data/` | Airport configuration and its validating loader |
 | `src/render/` | Palettes and the scope renderer |
+| `src/sim/` | The aircraft model, and a placeholder roster until Day 1 |
+| `src/ui/` | The flight progress strip bay |
+| `src/commands/` | The one instruction type every input path produces |
 
 ## Status
 
 Day 0 of the roadmap is complete: real EGLL data, the coordinate converter, the canvas
 scaler, the surrounding traffic picture and published airspace boundaries, all rendered.
-There is no aircraft simulation yet -- that is Day 1.
+
+The flight progress strip bay is built and wired to its sync seam, but **there is no aircraft
+simulation yet** -- that is Day 1. The bay is currently fed a frozen placeholder roster and
+says so with a DEMO badge; its quick-action buttons produce real `Command` objects and log a
+readback, because Day 2 points that sink at `commands/apply.ts`.
 
 ## Licensing
 

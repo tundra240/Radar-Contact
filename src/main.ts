@@ -2,6 +2,9 @@ import './style.css'
 import { Camera } from './core/camera'
 import { loadAirport } from './data/airport'
 import egllConfig from './data/egll.json'
+import { DEMO_ROSTER } from './sim/demoRoster'
+import { describeCommand, type Command } from './commands/types'
+import { StripBay } from './ui/stripbay'
 import { drawScope } from './render/scope'
 import {
   DEFAULT_OVERLAYS,
@@ -36,15 +39,22 @@ const airport = loadAirport(egllConfig)
 const host = document.querySelector<HTMLDivElement>('#app')
 if (!host) throw new Error('#app not found in index.html')
 
+// The scope gets its own box so the camera measures the drawing area and
+// not the window: the strip bay takes width off the side of it.
+const scopeEl = document.createElement('div')
+scopeEl.className = 'scope'
+host.appendChild(scopeEl)
+
 const canvas = document.createElement('canvas')
-host.appendChild(canvas)
+scopeEl.appendChild(canvas)
 
 const g = canvas.getContext('2d')
 if (!g) throw new Error('2D canvas context unavailable')
 
-start(host, canvas, g)
+start(host, scopeEl, canvas, g)
 
 function start(
+  shell: HTMLDivElement,
   container: HTMLDivElement,
   surface: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
@@ -130,6 +140,44 @@ function start(
   window.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'r' || e.key === 'R') reset()
   })
+
+  // ---- flight progress strips -----------------------------------------
+  // The bay is a view over the world, so it holds no aircraft state of its
+  // own. Today the snapshot is a frozen roster; Day 1 swaps DEMO_ROSTER for
+  // the live world and nothing else here changes.
+
+  let selected: string | null = null
+
+  const bay = new StripBay({
+    mount: shell,
+    demo: true,
+    quickDescendFt: airport.sector.interceptAltMaxFt,
+    quickSpeedKts: 160,
+    defaultRunway: airport.arrivalRunways[0]?.id ?? '27R',
+    onSelect: (callsign) => {
+      // Clicking the same strip again clears the selection, which is how
+      // you let go of a target without picking another.
+      selected = selected === callsign ? null : callsign
+      syncStrips()
+      requestDraw()
+    },
+    onCommand: (command: Command) => {
+      // Temporary sink. Day 2 points this at commands/apply.ts; until then
+      // the readback proves the strip buttons produce real commands.
+      console.info('command:', describeCommand(command), command)
+    },
+    onLayoutChange: () => resize(),
+  })
+
+  const syncStrips = (): void => {
+    bay.update(DEMO_ROSTER, selected)
+  }
+
+  // Five times a second: past what anyone can read, and far short of the
+  // twenty ticks a second the simulation will run at.
+  const SYNC_INTERVAL_MS = 200
+  syncStrips()
+  window.setInterval(syncStrips, SYNC_INTERVAL_MS)
 
   resize()
 
@@ -283,6 +331,10 @@ function start(
     root.setProperty('--accent', theme.accent)
     root.setProperty('--title-bar', theme.chromeTitleBar)
     root.setProperty('--title-text', theme.chromeTitleText)
+    // Strip status colours, so the phase of flight reads at a glance.
+    root.setProperty('--hold', theme.hold)
+    root.setProperty('--established', theme.fafTick)
+    root.setProperty('--warn', theme.warn)
     document.body.style.background = theme.bg
     document.body.style.color = theme.text
   }
