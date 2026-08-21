@@ -14,6 +14,8 @@ import {
   type Overlays,
 } from './render/overlays'
 import {
+  isPaletteName,
+  nextPaletteName,
   paletteName,
   setPalette,
   theme,
@@ -232,7 +234,7 @@ function start(
   const storedPalette = (): PaletteName | null => {
     try {
       const v = window.localStorage.getItem(STORAGE_KEY)
-      return v === 'beige' || v === 'dark' ? v : null
+      return isPaletteName(v) ? v : null
     } catch {
       // Private browsing and blocked storage both throw; a missing
       // preference is not worth failing the whole display over.
@@ -260,12 +262,12 @@ function start(
   document.body.appendChild(controls)
 
   const paintChrome = (): void => {
-    const dark = paletteName() === 'dark'
-    // Shows the current display rather than the destination, which is what
-    // aria-pressed reports and what a state indicator of the era would do.
-    toggle.textContent = dark ? 'Mode dark' : 'Mode beige'
-    toggle.title = dark ? 'Switch to the beige display' : 'Switch to the dark display'
-    toggle.setAttribute('aria-pressed', String(dark))
+    // Shows the current scheme rather than the destination: with three of
+    // them a "switch to X" label would be a guess about what you wanted.
+    const name = paletteName()
+    toggle.textContent = `Mode ${name}`
+    toggle.title = `Display scheme: ${name}. Click for ${nextPaletteName()}.`
+    toggle.setAttribute('aria-label', `Display scheme ${name}, click for ${nextPaletteName()}`)
     // Colours live in TypeScript, so the chrome is styled from the palette
     // rather than duplicating hex values in the stylesheet.
     // Chrome colours travel as CSS custom properties, so the stylesheet
@@ -279,6 +281,8 @@ function start(
     root.setProperty('--chrome-text', theme.chromeText)
     root.setProperty('--chrome-dim', theme.chromeDim)
     root.setProperty('--accent', theme.accent)
+    root.setProperty('--title-bar', theme.chromeTitleBar)
+    root.setProperty('--title-text', theme.chromeTitleText)
     document.body.style.background = theme.bg
     document.body.style.color = theme.text
   }
@@ -290,14 +294,10 @@ function start(
     requestDraw()
   }
 
-  toggle.addEventListener('click', () => {
-    applyPalette(paletteName() === 'dark' ? 'beige' : 'dark')
-  })
+  toggle.addEventListener('click', () => applyPalette(nextPaletteName()))
 
   window.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.key === 'd' || e.key === 'D') {
-      applyPalette(paletteName() === 'dark' ? 'beige' : 'dark')
-    }
+    if (e.key === 'd' || e.key === 'D') applyPalette(nextPaletteName())
     if (e.key === 'o' || e.key === 'O') showPanel(!panelOpen)
   })
 

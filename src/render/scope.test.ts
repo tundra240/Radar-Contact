@@ -4,7 +4,7 @@ import { loadAirport, runwayScaleAt } from '../data/airport'
 import raw from '../data/egll.json'
 import { drawScope } from './scope'
 import { OVERLAY_PRESETS, type Overlays } from './overlays'
-import { palettes, setPalette } from './theme'
+import { PALETTE_ORDER, palettes, setPalette } from './theme'
 
 /**
  * End-to-end check on the coordinate pipeline: published lat/lon -> world
@@ -409,5 +409,32 @@ describe('period chrome', () => {
     expect(fills).toContain(palettes.dark.chromeFace)
     expect(fills).not.toContain(palettes.beige.chromeFace)
     setPalette('beige')
+  })
+})
+
+describe('display schemes', () => {
+  afterEach(() => {
+    setPalette('beige')
+  })
+
+  it('renders the full picture in every scheme', () => {
+    for (const name of PALETTE_ORDER) {
+      setPalette(name)
+      const { labels, fills } = render()
+      expect(labels, name).toContain('EGLL APPROACH')
+      expect(labels, name).toContain('LAM')
+      expect(labels, name).toContain('LONDON TMA')
+      // Ground and chrome both painted from the scheme in force.
+      expect(fills[0], name).toBe(palettes[name].bg)
+      expect(fills, name).toContain(palettes[name].chromeFace)
+    }
+  })
+
+  it('sinks the scope into a bevelled frame', () => {
+    // Drawn last so it sits above the picture, using the chrome edges: the
+    // display should read as a viewport recessed into a window.
+    const { fills } = render()
+    expect(fills).toContain(palettes.beige.chromeShadow)
+    expect(fills).toContain(palettes.beige.chromeLight)
   })
 })

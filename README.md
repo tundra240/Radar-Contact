@@ -19,8 +19,10 @@ npm run dev        # http://localhost:5173
 | `npm run typecheck` | Type-check only |
 
 On the scope: drag to pan, wheel to zoom, `R` to reset the view, `D` to switch between the
-beige and dark displays, `O` to open the overlay panel. The buttons in the top right do the
-same.
+display schemes, `O` to open the overlay panel. The buttons in the top right do the same.
+
+Three display schemes cycle in order: **beige** (a Windows-2000-era desktop with a tan tube),
+**dark** (a colour CRT), and **amber** (a monochrome phosphor tube). The choice persists.
 
 The overlay panel controls how much context is drawn -- airspace, traffic zones, other
 aerodromes, other navaids, labels, range rings, centrelines -- with minimal / standard / full

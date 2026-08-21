@@ -70,6 +70,23 @@ export function drawScope(
   }
 
   drawHud(g, cam, airport, overlays)
+  drawScreenFrame(g, cam)
+}
+
+/**
+ * A two-pixel sunken edge around the whole scope, so the display reads as
+ * a viewport recessed into an application window rather than as a picture
+ * that happens to fill the browser.
+ */
+function drawScreenFrame(g: CanvasRenderingContext2D, cam: Camera): void {
+  const w = cam.width
+  const h = cam.height
+  g.fillStyle = theme.chromeShadow
+  g.fillRect(0, 0, w, 2)
+  g.fillRect(0, 0, 2, h)
+  g.fillStyle = theme.chromeLight
+  g.fillRect(0, h - 2, w, 2)
+  g.fillRect(w - 2, 0, 2, h)
 }
 
 /* ------------------------------------------------------------- airspace */

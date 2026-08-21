@@ -56,6 +56,9 @@ export interface Palette {
   readonly chromeText: string
   readonly chromeDim: string
   readonly chromeWell: string
+  /** Panel caption strip -- the most period detail in the whole interface. */
+  readonly chromeTitleBar: string
+  readonly chromeTitleText: string
 }
 
 /**
@@ -76,7 +79,7 @@ export interface Palette {
  * against its own ground, and theme.test.ts asserts the contrast so a
  * later tweak cannot quietly make the display unreadable.
  */
-export const palettes: Record<'beige' | 'dark', Palette> = {
+export const palettes = {
   beige: {
     bg: '#c3bda9',
 
@@ -121,6 +124,9 @@ export const palettes: Record<'beige' | 'dark', Palette> = {
     chromeText: '#1c1a14',
     chromeDim: '#565246',
     chromeWell: '#aeaaa2',
+    // Navy with white lettering: nothing else says this decade so quickly.
+    chromeTitleBar: '#000080',
+    chromeTitleText: '#ffffff',
   },
 
   dark: {
@@ -163,10 +169,70 @@ export const palettes: Record<'beige' | 'dark', Palette> = {
     chromeText: '#c4dae6',
     chromeDim: '#6c8494',
     chromeWell: '#0d151c',
+    chromeTitleBar: '#123c52',
+    chromeTitleText: '#cfe6f2',
   },
-}
+  /**
+   * An amber phosphor tube. Monochrome by intent, which means the airspace
+   * classes cannot be told apart by hue -- they are separated by brightness
+   * instead, the way a single-gun display had to. The brightest thing on
+   * the scope is what traffic is holding at.
+   */
+  amber: {
+    bg: '#140d03',
+
+    ringFaint: '#241804',
+    ring: '#3d2a08',
+    ringStrong: '#5c400e',
+    cardinal: '#4e360b',
+    ringLabel: '#a87516',
+
+    airspaceHigh: '#8a6412',
+    airspaceControl: '#c28a1a',
+    airspaceLocal: '#805c12',
+    airspaceLabel: '#a87c28',
+
+    runway: '#ffd9a0',
+    runwayLabel: '#e6b055',
+    centreline: '#4a3308',
+    centrelineTick: '#96690f',
+    fafTick: '#ffb000',
+
+    navaid: '#e89600',
+    navaidLabel: '#ffc860',
+    navaidFreq: '#96702a',
+    hold: '#fff2cc',
+
+    neighbour: '#96702a',
+    neighbourLabel: '#c2913a',
+
+    text: '#ffcf80',
+    textDim: '#b3822c',
+    accent: '#ffb000',
+    warn: '#ff6a1a',
+
+    chromeFace: '#2b1d07',
+    chromeLight: '#634516',
+    chromeShadow: '#0d0801',
+    chromeText: '#ffcf80',
+    chromeDim: '#bb8c32',
+    chromeWell: '#170f03',
+    chromeTitleBar: '#5c3f0d',
+    chromeTitleText: '#ffe4ad',
+  },
+} satisfies Record<string, Palette>
 
 export type PaletteName = keyof typeof palettes
+
+/**
+ * Cycle order for the display control. Beige first because it is the
+ * shipped look; amber last because it is the most opinionated.
+ */
+export const PALETTE_ORDER: readonly PaletteName[] = ['beige', 'dark', 'amber']
+
+export function isPaletteName(value: unknown): value is PaletteName {
+  return typeof value === 'string' && (PALETTE_ORDER as readonly string[]).includes(value)
+}
 
 type Writable<T> = { -readonly [K in keyof T]: T[K] }
 
@@ -193,8 +259,15 @@ export function setPalette(name: PaletteName): void {
   activeName = name
 }
 
-export function togglePalette(): PaletteName {
-  setPalette(activeName === 'beige' ? 'dark' : 'beige')
+/** The next scheme in the cycle, without switching to it. */
+export function nextPaletteName(): PaletteName {
+  const i = PALETTE_ORDER.indexOf(activeName)
+  return PALETTE_ORDER[(i + 1) % PALETTE_ORDER.length] ?? 'beige'
+}
+
+/** Advances to the next scheme and returns it. */
+export function cyclePalette(): PaletteName {
+  setPalette(nextPaletteName())
   return activeName
 }
 

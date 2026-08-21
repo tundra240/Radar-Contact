@@ -2,11 +2,14 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   airspaceColour,
   formatLevel,
+  PALETTE_ORDER,
+  cyclePalette,
+  isPaletteName,
+  nextPaletteName,
   palettes,
   paletteName,
   setPalette,
   theme,
-  togglePalette,
 } from './theme'
 
 afterEach(() => {
@@ -21,17 +24,23 @@ describe('palettes', () => {
     expect(theme.bg).toBe(palettes.beige.bg)
   })
 
-  it('defines every colour in both palettes', () => {
+  it('defines every colour in every palette', () => {
     // Guards the failure mode of adding a colour to one scheme and getting
-    // `undefined` as a fillStyle in the other, which silently draws black.
-    const beige = Object.keys(palettes.beige).sort()
-    const dark = Object.keys(palettes.dark).sort()
-    expect(dark).toEqual(beige)
-    for (const key of beige) {
-      const k = key as keyof typeof palettes.beige
-      expect(palettes.beige[k], `beige.${key}`).toBeTruthy()
-      expect(palettes.dark[k], `dark.${key}`).toBeTruthy()
+    // `undefined` as a fillStyle in another, which silently draws black.
+    const reference = Object.keys(palettes.beige).sort()
+    for (const name of PALETTE_ORDER) {
+      const p = palettes[name]
+      expect(Object.keys(p).sort(), name).toEqual(reference)
+      for (const key of reference) {
+        expect(p[key as keyof typeof p], `${name}.${key}`).toBeTruthy()
+      }
     }
+  })
+
+  it('recognises its own names and rejects anything else', () => {
+    for (const name of PALETTE_ORDER) expect(isPaletteName(name)).toBe(true)
+    expect(isPaletteName('chartreuse')).toBe(false)
+    expect(isPaletteName(null)).toBe(false)
   })
 
   it('switches the whole scheme through the shared object', () => {
@@ -44,19 +53,30 @@ describe('palettes', () => {
     expect(theme).toBe(ref)
   })
 
-  it('toggles back and forth', () => {
-    expect(togglePalette()).toBe('dark')
-    expect(togglePalette()).toBe('beige')
+  it('cycles through every scheme and wraps', () => {
+    expect(nextPaletteName()).toBe('dark')
+    expect(cyclePalette()).toBe('dark')
+    expect(cyclePalette()).toBe('amber')
+    expect(cyclePalette()).toBe('beige')
     expect(theme.bg).toBe(palettes.beige.bg)
   })
 
-  it('keeps the two grounds genuinely light and dark', () => {
+  it('keeps one light ground and two dark ones', () => {
     const lum = (hex: string): number => {
       const n = parseInt(hex.slice(1), 16)
       return (((n >> 16) & 255) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114) / 255
     }
     expect(lum(palettes.beige.bg)).toBeGreaterThan(0.6)
     expect(lum(palettes.dark.bg)).toBeLessThan(0.15)
+    expect(lum(palettes.amber.bg)).toBeLessThan(0.15)
+  })
+
+  it('gives the amber tube a warm cast rather than a neutral one', () => {
+    // A monochrome scheme that is not actually tinted is just a dark theme.
+    const n = parseInt(palettes.amber.bg.slice(1), 16)
+    expect((n >> 16) & 255).toBeGreaterThan(n & 255)
+    const a = parseInt(palettes.amber.accent.slice(1), 16)
+    expect((a >> 16) & 255).toBeGreaterThan(a & 255)
   })
 })
 
@@ -132,7 +152,7 @@ describe('palette legibility', () => {
   // lower one: rings that shout compete with the traffic.
   const FURNITURE = ['ring', 'ringStrong', 'cardinal', 'centreline'] as const
 
-  for (const name of ['beige', 'dark'] as const) {
+  for (const name of PALETTE_ORDER) {
     describe(name, () => {
       const p = palettes[name]
 
@@ -166,6 +186,10 @@ describe('palette legibility', () => {
         expect(contrast(p.chromeDim, p.chromeFace), 'chromeDim').toBeGreaterThanOrEqual(3)
         expect(contrast(p.chromeDim, p.chromeWell), 'chromeDim on well').toBeGreaterThanOrEqual(3)
         expect(contrast(p.accent, p.chromeFace), 'accent on face').toBeGreaterThanOrEqual(3)
+        expect(
+          contrast(p.chromeTitleText, p.chromeTitleBar),
+          'title bar lettering',
+        ).toBeGreaterThanOrEqual(4.5)
       })
 
       it('gives the bevel edges something to work with', () => {

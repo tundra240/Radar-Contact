@@ -53,6 +53,8 @@ canvas {
   --chrome-text: #1c1a14;
   --chrome-dim: #565246;
   --accent: #006e74;
+  --title-bar: #000080;
+  --title-text: #ffffff;
 }
 
 .controls {
@@ -114,17 +116,17 @@ canvas {
   display: none;
 }
 
+/* Caption strip: a flat saturated bar with light lettering, which is the
+   single most period detail in the interface. */
 .overlay-title {
   margin: 2px 2px 6px;
   padding: 4px 7px;
   font-size: 9px;
+  font-weight: bold;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--chrome-dim);
-  background: var(--well);
-  box-shadow:
-    inset 1px 1px 0 0 var(--bevel-shadow),
-    inset -1px -1px 0 0 var(--bevel-light);
+  color: var(--title-text);
+  background: var(--title-bar);
 }
 
 .overlay-density {

@@ -309,7 +309,14 @@ taken from the VGA system colours -- navy for class A, purple for the control zo
 for class G, teal for navaids, burnt amber for holds. Those are dark and saturated, which is
 what survives on a light ground; a modern neon turns to mud there. `dark` is the same
 instrument as a colour CRT: near-black with bright cyan symbology and phosphor amber for the
-holds.
+holds. `amber` is a monochrome phosphor tube, and being monochrome is the constraint that
+makes it interesting: the airspace classes cannot be separated by hue, so they are separated
+by brightness the way a single-gun display had to, and the brightest thing on the scope is
+whatever traffic is holding at.
+
+Schemes cycle rather than toggle -- `PALETTE_ORDER` is the single place that order is
+stated, and the control, the keyboard shortcut and the stored preference all read from it, so
+adding a fourth scheme is a palette plus one array entry.
 
 Legibility is a test, not a hope. `theme.test.ts` measures WCAG contrast for every colour
 against its own ground and asserts that primary text and runways clear 4.5:1, all symbology
@@ -336,6 +343,10 @@ Two separate mechanisms, one source of truth:
   advance-width arithmetic rather than `measureText`, so it is deterministic and testable
   without a real canvas. Cells are dropped when the window is too narrow rather than allowed
   to spill, and the key hints go first.
+- **The window furniture** leans on two details that place the era immediately: a flat
+  saturated caption strip on the overlay panel -- navy with white lettering in the beige
+  scheme -- and a two-pixel sunken edge around the whole scope, so the display reads as a
+  viewport recessed into an application window rather than a picture filling the browser.
 - **The DOM controls** get their colours as CSS custom properties set from the active palette
   in `main.ts`, so the stylesheet owns the bevel geometry and `theme.ts` stays the only
   place a hex value is written down. Checkboxes are restyled to square sunken indicators,
