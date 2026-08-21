@@ -58,6 +58,41 @@ export interface HoldPattern {
   readonly inboundIsDerived: boolean
 }
 
+/** Altitude band an arrival may enter the sector at, over a hold. */
+export interface EntryBand {
+  readonly minAltFt: number
+  readonly maxAltFt: number
+}
+
+export interface Airline {
+  readonly code: string
+  readonly weight: number
+}
+
+/**
+ * Arrival flow settings. All gameplay values rather than published data:
+ * real arrival rates and altitudes depend on the STAR, the flow and the
+ * day. This is the first thing to tune if the traffic feels wrong.
+ */
+export interface TrafficConfig {
+  /** Fixes the arrival stream, so a scenario can be repeated exactly. */
+  readonly seed: number
+  readonly firstSpawnSeconds: number
+  /** Gap between arrivals at the start, before the ramp. */
+  readonly initialIntervalSeconds: number
+  /** Gap the ramp works down to. */
+  readonly minIntervalSeconds: number
+  readonly rampMinutes: number
+  /** Fraction either side of the interval, so arrivals are not metronomic. */
+  readonly intervalJitter: number
+  readonly maxConcurrent: number
+  /** A fix with traffic this close is not given another arrival. */
+  readonly minFixSpacingNM: number
+  /** Nor one that recently had an arrival. */
+  readonly minFixSpacingSeconds: number
+  readonly airlines: readonly Airline[]
+}
+
 export interface Navaid {
   readonly name: string
   readonly fullName: string
@@ -66,6 +101,8 @@ export interface Navaid {
   readonly station: { readonly type: string; readonly freqMHz: number } | null
   /** Non-null when this navaid is one of the approach holding fixes. */
   readonly hold: HoldPattern | null
+  /** Altitude band arrivals enter at. Only meaningful with a hold. */
+  readonly entry: EntryBand | null
   readonly distanceFromArpNM: number
   readonly bearingFromArpTrue: number
 }
@@ -141,6 +178,8 @@ export interface AircraftType {
   readonly wake: WakeCategory
   readonly cruiseKts: number
   readonly approachKts: number
+  /** Share of the fleet mix. Zero excludes a type without deleting it. */
+  readonly weight: number
 }
 
 export interface Airport {
@@ -152,6 +191,7 @@ export interface Airport {
   readonly projection: Projection
   readonly sector: Sector
   readonly render: RenderSettings
+  readonly traffic: TrafficConfig
   readonly runways: readonly Runway[]
   readonly navaids: readonly Navaid[]
   readonly airports: readonly NeighbourAirport[]
@@ -287,6 +327,7 @@ export function loadAirport(raw: unknown): Airport {
 
   const sector = parseSector(root['sector'])
   const render = parseRender(root['render'])
+  const traffic = parseTraffic(root['traffic'])
 
   const runways = arr(root['runways'], 'runways').map((r, i) =>
     parseRunway(r, `runways[${i}]`, projection),
@@ -344,6 +385,7 @@ export function loadAirport(raw: unknown): Airport {
     projection,
     sector,
     render,
+    traffic,
     runways,
     navaids,
     airports,
@@ -381,6 +423,65 @@ function parseSector(raw: unknown): Sector {
     defaultRangeNM: num(o['defaultRangeNM'], 'sector.defaultRangeNM'),
     activeArrivalRunways: active,
   }
+}
+
+function parseTraffic(raw: unknown): TrafficConfig {
+  const o = obj(raw, 'traffic')
+
+  const initial = num(o['initialIntervalSeconds'], 'traffic.initialIntervalSeconds')
+  const min = num(o['minIntervalSeconds'], 'traffic.minIntervalSeconds')
+  if (min <= 0) throw new ConfigError('traffic.minIntervalSeconds', 'must be positive')
+  if (min > initial) {
+    // The ramp works downwards, so a floor above the starting gap would
+    // make the traffic get lighter over time.
+    throw new ConfigError(
+      'traffic.minIntervalSeconds',
+      'must not exceed traffic.initialIntervalSeconds',
+    )
+  }
+
+  const jitter = num(o['intervalJitter'], 'traffic.intervalJitter')
+  if (jitter < 0 || jitter >= 1) {
+    throw new ConfigError('traffic.intervalJitter', 'must be within 0..1')
+  }
+
+  const maxConcurrent = num(o['maxConcurrent'], 'traffic.maxConcurrent')
+  if (maxConcurrent < 1) throw new ConfigError('traffic.maxConcurrent', 'must be at least 1')
+
+  const airlines = arr(o['airlines'], 'traffic.airlines').map((a, i) => {
+    const ao = obj(a, `traffic.airlines[${i}]`)
+    return {
+      code: str(ao['code'], `traffic.airlines[${i}].code`),
+      weight: num(ao['weight'], `traffic.airlines[${i}].weight`),
+    }
+  })
+  if (!airlines.some((a) => a.weight > 0)) {
+    throw new ConfigError('traffic.airlines', 'needs at least one positive weight')
+  }
+
+  return {
+    seed: num(o['seed'], 'traffic.seed'),
+    firstSpawnSeconds: num(o['firstSpawnSeconds'], 'traffic.firstSpawnSeconds'),
+    initialIntervalSeconds: initial,
+    minIntervalSeconds: min,
+    rampMinutes: num(o['rampMinutes'], 'traffic.rampMinutes'),
+    intervalJitter: jitter,
+    maxConcurrent,
+    minFixSpacingNM: num(o['minFixSpacingNM'], 'traffic.minFixSpacingNM'),
+    minFixSpacingSeconds: num(o['minFixSpacingSeconds'], 'traffic.minFixSpacingSeconds'),
+    airlines,
+  }
+}
+
+function parseEntry(raw: unknown, path: string): EntryBand | null {
+  if (raw === undefined) return null
+  const o = obj(raw, path)
+  const minAltFt = num(o['minAltFt'], `${path}.minAltFt`)
+  const maxAltFt = num(o['maxAltFt'], `${path}.maxAltFt`)
+  if (maxAltFt < minAltFt) {
+    throw new ConfigError(`${path}.maxAltFt`, 'must not be below minAltFt')
+  }
+  return { minAltFt, maxAltFt }
 }
 
 function parseRender(raw: unknown): RenderSettings {
@@ -449,6 +550,7 @@ function parseNavaid(raw: unknown, path: string, projection: Projection): Navaid
     latLon: location,
     station,
     hold: parseHold(o['hold'], `${path}.hold`, posNM),
+    entry: parseEntry(o['entry'], `${path}.entry`),
     distanceFromArpNM: distanceNM(origin, posNM),
     bearingFromArpTrue: bearingDeg(origin, posNM),
   }
@@ -608,6 +710,7 @@ function parseAircraftType(raw: unknown, path: string): AircraftType {
     wake: wake(o['wake'], `${path}.wake`),
     cruiseKts: num(o['cruiseKts'], `${path}.cruiseKts`),
     approachKts: num(o['approachKts'], `${path}.approachKts`),
+    weight: o['weight'] === undefined ? 1 : num(o['weight'], `${path}.weight`),
   }
 }
 

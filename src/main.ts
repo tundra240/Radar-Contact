@@ -2,21 +2,18 @@ import './style.css'
 import { Camera } from './core/camera'
 import { loadAirport } from './data/airport'
 import egllConfig from './data/egll.json'
-import { DEMO_ROSTER } from './sim/demoRoster'
+import { Spawner } from './sim/spawner'
+import type { Aircraft } from './sim/types'
 import { describeCommand, type Command } from './commands/types'
 import { StripBay } from './ui/stripbay'
+import { Menu } from './ui/menu'
 import clickUrl from './assets/click.wav'
 import { Sfx, isClickable } from './audio/sfx'
-import { GameLoop, SPEEDS, formatSpeed, type Speed } from './core/loop'
+import { GameLoop } from './core/loop'
 import { drawScope } from './render/scope'
 import {
   DEFAULT_OVERLAYS,
   OVERLAY_ITEMS,
-  OVERLAY_PRESETS,
-  densityOf,
-  nextDensity,
-  type DensityName,
-  type OverlayKey,
   type Overlays,
 } from './render/overlays'
 import {
@@ -170,76 +167,57 @@ function start(
     if (isClickable(e.target)) sfx.play()
   })
 
-  const soundButton = document.createElement('button')
-  soundButton.type = 'button'
-  soundButton.className = 'time-button time-sound'
-  soundButton.textContent = 'SND'
-
-  const paintSound = (): void => {
-    const on = !sfx.muted
-    soundButton.classList.toggle('is-active', on)
-    soundButton.setAttribute('aria-pressed', String(on))
-    soundButton.title = on ? 'Mute the interface sound' : 'Unmute the interface sound'
-  }
-
-  soundButton.addEventListener('click', () => {
+  const toggleSound = (): void => {
     const muted = sfx.toggleMuted()
     try {
       window.localStorage.setItem(SOUND_STORAGE, muted ? '1' : '0')
     } catch {
       /* preference simply will not persist */
     }
-    paintSound()
-  })
+    paintMenu()
+  }
 
-  // ---- time control ----------------------------------------------------
-  // The loop keeps simulated time; these only ask it to go faster, slower
-  // or stop. Nothing else in the codebase knows the rate has changed.
+  // ---- the options menu ------------------------------------------------
+  // Everything that is a setting rather than an instruction lives behind
+  // one button: the simulation rate, the interface sound, the display
+  // scheme and the overlay layers. Three floating controls over the radar
+  // picture became one.
+  //
+  // The menu keeps none of that state. It reports clicks through these
+  // callbacks and is told what to show by paintMenu, so the menu and the
+  // keyboard shortcuts cannot end up disagreeing about what is set.
 
-  const timePanel = document.createElement('div')
-  timePanel.className = 'time-control'
-
-  const pauseButton = document.createElement('button')
-  pauseButton.type = 'button'
-  pauseButton.className = 'time-button time-pause'
-  timePanel.appendChild(pauseButton)
-
-  const speedButtons = new Map<Speed, HTMLButtonElement>()
-  for (const speed of SPEEDS) {
-    const b = document.createElement('button')
-    b.type = 'button'
-    b.className = 'time-button'
-    b.textContent = formatSpeed(speed)
-    b.addEventListener('click', () => {
+  const menu = new Menu({
+    // Mounted in the scope rather than on the body: the strip bay owns the
+    // right-hand edge of the window, and fixed positioning put controls
+    // straight on top of it.
+    mount: container,
+    onOverlays: (next) => setOverlays(next),
+    onPalette: (next) => applyPalette(next),
+    onSpeed: (speed) => {
       loop.setSpeed(speed)
       // Choosing a rate implies wanting it to run.
       loop.setPaused(false)
-      paintTime()
+      paintMenu()
       requestDraw()
-    })
-    timePanel.appendChild(b)
-    speedButtons.set(speed, b)
-  }
-
-  timePanel.appendChild(soundButton)
-
-  const paintTime = (): void => {
-    const paused = loop.paused
-    pauseButton.textContent = paused ? '>' : '||'
-    pauseButton.title = paused ? 'Resume' : 'Pause'
-    pauseButton.setAttribute('aria-pressed', String(paused))
-    for (const [speed, button] of speedButtons) {
-      const active = !paused && loop.speed === speed
-      button.classList.toggle('is-active', active)
-      button.setAttribute('aria-pressed', String(active))
-    }
-  }
-
-  pauseButton.addEventListener('click', () => {
-    loop.togglePaused()
-    paintTime()
-    requestDraw()
+    },
+    onTogglePause: () => {
+      loop.togglePaused()
+      paintMenu()
+      requestDraw()
+    },
+    onToggleSound: toggleSound,
   })
+
+  const paintMenu = (): void => {
+    menu.paint({
+      overlays,
+      palette: paletteName(),
+      speed: loop.speed,
+      paused: loop.paused,
+      muted: sfx.muted,
+    })
+  }
 
   // ---- flight progress strips -----------------------------------------
   // The bay is a view over the world, so it holds no aircraft state of its
@@ -269,8 +247,13 @@ function start(
     onLayoutChange: () => resize(),
   })
 
+  // The spawner owns the arrival flow; this list is the world until there
+  // is a world module to own it.
+  const spawner = new Spawner({ airport })
+  let traffic: readonly Aircraft[] = []
+
   const syncStrips = (): void => {
-    bay.update(DEMO_ROSTER, selected)
+    bay.update(traffic, selected)
   }
 
   // ---- the loop --------------------------------------------------------
@@ -284,7 +267,12 @@ function start(
   const loop = new GameLoop({
     tick: (_dt, clock) => {
       simAdvanced = true
-      // Day 1: this is where world.tick goes.
+      // Day 1: world.tick goes here, between the spawner and the strips.
+      // Until it exists the traffic the spawner releases stays where it is
+      // put, which is why the flow stalls once every fix is occupied -- the
+      // HELD counter on the status bar is the spacing rule doing its job.
+      const arrivals = spawner.update(clock, traffic)
+      if (arrivals.length > 0) traffic = [...traffic, ...arrivals]
       if (clock.ticks % SYNC_EVERY_TICKS === 0) syncStrips()
     },
     render: () => {
@@ -295,6 +283,7 @@ function start(
         clock: loop.clock,
         speed: loop.speed,
         paused: loop.paused,
+        traffic: { spawned: spawner.spawned, held: spawner.deferred },
       })
     },
   })
@@ -304,13 +293,12 @@ function start(
     // Otherwise space scrolls the page or re-triggers a focused button.
     e.preventDefault()
     loop.togglePaused()
-    paintTime()
+    paintMenu()
     requestDraw()
   })
 
   syncStrips()
-  paintTime()
-  paintSound()
+  paintMenu()
   resize()
   loop.start()
 
@@ -347,66 +335,14 @@ function start(
     }
   }
 
-  const panel = document.createElement('div')
-  panel.className = 'overlay-panel'
-  panel.hidden = true
-
-  const panelTitle = document.createElement('div')
-  panelTitle.className = 'overlay-title'
-  panelTitle.textContent = 'Display overlays'
-  panel.appendChild(panelTitle)
-
-  const densityButton = document.createElement('button')
-  densityButton.type = 'button'
-  densityButton.className = 'overlay-density'
-  panel.appendChild(densityButton)
-
-  const boxes = new Map<OverlayKey, HTMLInputElement>()
-  for (const item of OVERLAY_ITEMS) {
-    const row = document.createElement('label')
-    row.className = 'overlay-row'
-    const box = document.createElement('input')
-    box.type = 'checkbox'
-    box.addEventListener('change', () => {
-      setOverlays({ ...overlays, [item.key]: box.checked })
-    })
-    row.appendChild(box)
-    row.appendChild(document.createTextNode(item.label))
-    panel.appendChild(row)
-    boxes.set(item.key, box)
-  }
-
-  const overlayButton = document.createElement('button')
-  overlayButton.type = 'button'
-  overlayButton.className = 'mode-toggle overlay-button'
-  overlayButton.textContent = 'OVERLAYS'
-
   const setOverlays = (value: Overlays): void => {
     overlays = value
     rememberOverlays(value)
-    for (const [key, box] of boxes) box.checked = value[key]
-    densityButton.textContent = 'PRESET: ' + densityOf(value).toUpperCase()
+    paintMenu()
     requestDraw()
   }
 
-  densityButton.addEventListener('click', () => {
-    const next: DensityName = nextDensity(densityOf(overlays))
-    setOverlays(OVERLAY_PRESETS[next])
-  })
-
-  // Tracked explicitly rather than read back off the element: the DOM
-  // hidden property is typed string | boolean because it also accepts
-  // "until-found", which is not a state this panel wants to reason about.
-  let panelOpen = false
-  const showPanel = (visible: boolean): void => {
-    panelOpen = visible
-    panel.hidden = !visible
-    overlayButton.setAttribute('aria-expanded', String(visible))
-  }
-
-  overlayButton.addEventListener('click', () => showPanel(!panelOpen))
-
-  // ---- light / dark control -------------------------------------------
+  // ---- display scheme --------------------------------------------------
   // The palette is a live object shared by every render module, so
   // switching it and asking for a redraw is the whole implementation.
 
@@ -431,28 +367,7 @@ function start(
     }
   }
 
-  const toggle = document.createElement('button')
-  toggle.type = 'button'
-  toggle.className = 'mode-toggle theme-button'
-
-  const controls = document.createElement('div')
-  controls.className = 'controls'
-  controls.appendChild(overlayButton)
-  controls.appendChild(toggle)
-  controls.appendChild(timePanel)
-  controls.appendChild(panel)
-  // Mounted in the scope rather than on the body: the strip bay owns the
-  // right-hand edge of the window, and fixed positioning put these
-  // straight on top of it.
-  container.appendChild(controls)
-
   const paintChrome = (): void => {
-    // Shows the current scheme rather than the destination: with three of
-    // them a "switch to X" label would be a guess about what you wanted.
-    const name = paletteName()
-    toggle.textContent = `Mode ${name}`
-    toggle.title = `Display scheme: ${name}. Click for ${nextPaletteName()}.`
-    toggle.setAttribute('aria-label', `Display scheme ${name}, click for ${nextPaletteName()}`)
     // Chrome colours travel as CSS custom properties, so the stylesheet
     // owns the bevel geometry and theme.ts stays the only place a hex
     // value is written down.
@@ -478,14 +393,17 @@ function start(
     setPalette(name)
     remember(name)
     paintChrome()
+    paintMenu()
     requestDraw()
   }
 
-  toggle.addEventListener('click', () => applyPalette(nextPaletteName()))
-
   window.addEventListener('keydown', (e: KeyboardEvent) => {
+    // D still cycles the schemes without opening anything, because trying
+    // them against live traffic is a by-eye decision.
     if (e.key === 'd' || e.key === 'D') applyPalette(nextPaletteName())
-    if (e.key === 'o' || e.key === 'O') showPanel(!panelOpen)
+    // O kept as well as M: the overlays are what the menu is most often
+    // opened for, and that shortcut is already documented.
+    if (e.key === 'm' || e.key === 'M' || e.key === 'o' || e.key === 'O') menu.toggle()
   })
 
   setOverlays(readOverlays() ?? DEFAULT_OVERLAYS)

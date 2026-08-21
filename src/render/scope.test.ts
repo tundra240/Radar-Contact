@@ -78,6 +78,7 @@ const STATUS: ScopeStatus = {
   clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 12 * 3600 },
   speed: 1,
   paused: false,
+  traffic: { spawned: 0, held: 0 },
 }
 
 // Most tests assert that a feature draws, so they render everything; the
@@ -723,6 +724,7 @@ describe('the clock and rate readouts', () => {
       clock: { ticks: 1200, elapsedSeconds: 60, timeOfDaySeconds: 13 * 3600 + 61 },
       speed: 1,
       paused: false,
+      traffic: { spawned: 0, held: 0 },
     })
     expect(labels).toContain('TIME')
     expect(labels).toContain('13:01:01')
@@ -739,6 +741,7 @@ describe('the clock and rate readouts', () => {
         clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
         speed,
         paused: false,
+        traffic: { spawned: 0, held: 0 },
       })
       expect(labels, `x${speed}`).toContain('RATE')
       expect(labels, `x${speed}`).toContain(shown)
@@ -751,8 +754,28 @@ describe('the clock and rate readouts', () => {
       clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
       speed: 4,
       paused: true,
+      traffic: { spawned: 0, held: 0 },
     })
     expect(labels).toContain('PAUSED')
     expect(labels).not.toContain('x4')
+  })
+})
+
+describe('the traffic readout', () => {
+  it('shows what has been released and what is being held', () => {
+    // The held count is how the spacing rule explains itself: an arrival
+    // due but with no clear fix is a held one, not a missing one.
+    const cam = new Camera({ x: 0, y: 0 }, 30, { maxNM: 200 })
+    cam.setViewport(1200, 700)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.full, {
+      clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
+      speed: 1,
+      paused: false,
+      traffic: { spawned: 7, held: 3 },
+    })
+    const labels = rec.texts.map((t) => t.s)
+    expect(labels).toContain('TRAFFIC')
+    expect(labels).toContain('7 HELD 3')
   })
 })

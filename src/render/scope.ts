@@ -30,6 +30,11 @@ export interface ScopeStatus {
   readonly clock: Clock
   readonly speed: Speed
   readonly paused: boolean
+  readonly traffic: {
+    readonly spawned: number
+    /** Arrivals held back because no fix was clear, or the sector is full. */
+    readonly held: number
+  }
 }
 
 export function drawScope(
@@ -732,6 +737,9 @@ function drawStatusBar(
   const ruled = shown.filter((v) => v.derivation === 'rule').length
   const scale = runwayScaleAt(airport.render, cam.pxPerNM)
 
+  // Ordered by what a controller needs when the window is too narrow to
+  // hold them all: cells are dropped from the right, so the ones that
+  // matter most come first.
   const cells: Cell[] = [
     // Simulated time, not wall clock: it runs at whatever rate the loop is
     // set to, and stops when the loop is paused.
@@ -743,6 +751,10 @@ function drawStatusBar(
     { label: 'RANGE', value: `${cam.rangeNM.toFixed(0)} NM` },
     { label: 'ARR', value: airport.arrivalRunways.map((r) => r.id).join('/') },
     { label: 'RWY', value: `x${scale.toFixed(1)}` },
+    {
+      label: 'TRAFFIC',
+      value: `${status.traffic.spawned} HELD ${status.traffic.held}`,
+    },
     {
       label: 'OVERLAYS',
       value: `${densityOf(overlays).toUpperCase()} ${countEnabled(overlays)}/8`,

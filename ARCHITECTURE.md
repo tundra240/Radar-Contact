@@ -390,6 +390,40 @@ third of a pixel at 40 NM.
 
 ---
 
+### The arrival spawner
+
+`sim/spawner.ts` reads the holding fixes and their entry bands from the airport config and
+releases arrivals onto them. Two things make it a flow manager rather than a metronome:
+
+- **It will not stack an arrival on top of existing traffic.** A fix with an aircraft within
+  `minFixSpacingNM`, or one used inside `minFixSpacingSeconds`, is skipped; if no fix is
+  clear, or the sector is at `maxConcurrent`, the arrival is held and retried. Spawning
+  regardless would hand the controller a separation loss that existed before they touched
+  anything, which is the worst kind of unfair.
+- **It runs on the tick clock, not the wall clock.** So it follows the rate control, stops
+  dead when paused, and produces the same stream for a given seed however the session was
+  played.
+
+The interval ramps from `initialIntervalSeconds` down to `minIntervalSeconds` over
+`rampMinutes`, with jitter either side so arrivals are not metronomic. Entry altitude is a
+whole thousand inside the fix's band, clamped to the sector; groundspeed is the type's cruise,
+reduced to the sector limit below the limit altitude.
+
+Aircraft types and airlines are weighted, so the arrival stream is mostly A320-family with
+British Airways prominent, which is what actually fills Heathrow. Those weights, the entry
+bands and everything under `traffic` are **gameplay values, not published data** -- flagged
+as such in the config provenance, and the first thing to tune if the traffic feels wrong.
+
+`core/rng.ts` is a seeded mulberry32, deliberately not `Math.random`. Traffic generation is
+the part of the simulation that invents things, so it is the part that has to be reproducible:
+a seed plus a tick count identifies a session exactly, which makes a scenario repeatable, a
+bug report actionable and a replay possible.
+
+**Until the physics step exists the flow stalls at four**, one per fix, because nothing ever
+leaves the fix it arrived at and the spacing rule correctly refuses to pile more on top. The
+`TRAFFIC n HELD n` cell on the status bar exists so that reads as the rule working rather
+than as the spawner breaking.
+
 ### Interface sound
 
 `audio/sfx.ts` plays one short sample on every control press. Three properties matter more

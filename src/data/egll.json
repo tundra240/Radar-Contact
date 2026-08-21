@@ -112,6 +112,10 @@
       "hold": {
         "turns": "right",
         "legMins": 1
+      },
+      "entry": {
+        "minAltFt": 8000,
+        "maxAltFt": 14000
       }
     },
     {
@@ -126,6 +130,10 @@
       "hold": {
         "turns": "right",
         "legMins": 1
+      },
+      "entry": {
+        "minAltFt": 7000,
+        "maxAltFt": 13000
       }
     },
     {
@@ -140,6 +148,10 @@
       "hold": {
         "turns": "right",
         "legMins": 1
+      },
+      "entry": {
+        "minAltFt": 7000,
+        "maxAltFt": 13000
       }
     },
     {
@@ -154,6 +166,10 @@
       "hold": {
         "turns": "right",
         "legMins": 1
+      },
+      "entry": {
+        "minAltFt": 7000,
+        "maxAltFt": 12000
       }
     },
     {
@@ -4219,49 +4235,57 @@
       "type": "A319",
       "wake": "M",
       "cruiseKts": 250,
-      "approachKts": 135
+      "approachKts": 135,
+      "weight": 10
     },
     {
       "type": "A320",
       "wake": "M",
       "cruiseKts": 250,
-      "approachKts": 140
+      "approachKts": 140,
+      "weight": 18
     },
     {
       "type": "A321",
       "wake": "M",
       "cruiseKts": 250,
-      "approachKts": 142
+      "approachKts": 142,
+      "weight": 14
     },
     {
       "type": "B738",
       "wake": "M",
       "cruiseKts": 250,
-      "approachKts": 142
+      "approachKts": 142,
+      "weight": 6
     },
     {
       "type": "A350",
       "wake": "H",
       "cruiseKts": 280,
-      "approachKts": 148
+      "approachKts": 148,
+      "weight": 8
     },
     {
       "type": "B789",
       "wake": "H",
       "cruiseKts": 280,
-      "approachKts": 150
+      "approachKts": 150,
+      "weight": 9
     },
     {
       "type": "B77W",
       "wake": "H",
       "cruiseKts": 280,
-      "approachKts": 152
+      "approachKts": 152,
+      "weight": 10
     },
     {
       "type": "A388",
       "wake": "J",
       "cruiseKts": 280,
-      "approachKts": 145
+      "approachKts": 145,
+      "weight": 3
     }
   ],
   "provenance": {
@@ -4278,8 +4302,119 @@
       "render.runwayExaggeration is a display-only magnification of the painted runway strip, applied from the threshold so approach geometry stays exact, and faded out as the scope zooms in.",
       "Airspace boundaries come from the VATSIM UK Sector File and are drawn as LINE WORK, not closed polygons. That is what the source is: each record is an independent boundary line, and only 2 of 60 regions chained into a closed ring. Closing them would have invented false edges of up to 30 NM, so regions are stored as one or more open polylines and stroked without closure. A consequence is that these volumes cannot answer \"is this aircraft inside the zone\" -- containment tests would need ordered closed rings, which is separate work.",
       "Traffic zones for aerodromes the sector file does not cover are still computed from the UK rule and carry derivation \"rule\". Where the source does publish one, it wins: Biggin Hill is notified as 2.5 NM, whereas the runway-length rule would have given 2 NM. That disagreement is exactly why the published data is preferred.",
-      "verticalSource records where each volume vertical extent came from: \"file\" straight from the sector file header, \"rule\" for ATZ tops at 2000 ft above aerodrome level, \"assumed\" where the source header omitted limits (London City CTA, both Gatwick volumes, and the Odiham MATZ)."
+      "verticalSource records where each volume vertical extent came from: \"file\" straight from the sector file header, \"rule\" for ATZ tops at 2000 ft above aerodrome level, \"assumed\" where the source header omitted limits (London City CTA, both Gatwick volumes, and the Odiham MATZ).",
+      "Entry altitude bands per hold, the fleet mix weights and everything under traffic are GAMEPLAY values, not published data. Real arrival altitudes depend on the STAR, the flow and the day; these are chosen to give a playable spread and are the first thing to tune if the traffic feels wrong.",
+      "traffic.seed makes the arrival stream reproducible: the same seed and the same tick count give the same aircraft, which is what allows a scenario to be repeated and a bug report to be acted on."
     ],
     "airspace": "Airspace boundaries are from the VATSIM UK Sector File (github.com/VATSIM-UK/UK-Sector-File), licensed GPL-3.0. See ATTRIBUTION.md. Retrieved 2026-08-21."
+  },
+  "traffic": {
+    "seed": 20260821,
+    "firstSpawnSeconds": 10,
+    "initialIntervalSeconds": 150,
+    "minIntervalSeconds": 70,
+    "rampMinutes": 12,
+    "intervalJitter": 0.25,
+    "maxConcurrent": 14,
+    "minFixSpacingNM": 8,
+    "minFixSpacingSeconds": 60,
+    "airlines": [
+      {
+        "code": "BAW",
+        "weight": 30
+      },
+      {
+        "code": "SHT",
+        "weight": 6
+      },
+      {
+        "code": "VIR",
+        "weight": 6
+      },
+      {
+        "code": "AAL",
+        "weight": 5
+      },
+      {
+        "code": "UAL",
+        "weight": 4
+      },
+      {
+        "code": "DAL",
+        "weight": 4
+      },
+      {
+        "code": "DLH",
+        "weight": 4
+      },
+      {
+        "code": "AFR",
+        "weight": 3
+      },
+      {
+        "code": "KLM",
+        "weight": 3
+      },
+      {
+        "code": "SWR",
+        "weight": 3
+      },
+      {
+        "code": "IBE",
+        "weight": 3
+      },
+      {
+        "code": "UAE",
+        "weight": 3
+      },
+      {
+        "code": "ETD",
+        "weight": 2
+      },
+      {
+        "code": "QTR",
+        "weight": 2
+      },
+      {
+        "code": "SIA",
+        "weight": 2
+      },
+      {
+        "code": "QFA",
+        "weight": 2
+      },
+      {
+        "code": "ACA",
+        "weight": 2
+      },
+      {
+        "code": "JAL",
+        "weight": 2
+      },
+      {
+        "code": "ANA",
+        "weight": 2
+      },
+      {
+        "code": "CPA",
+        "weight": 2
+      },
+      {
+        "code": "EIN",
+        "weight": 2
+      },
+      {
+        "code": "TAP",
+        "weight": 2
+      },
+      {
+        "code": "TOM",
+        "weight": 1
+      },
+      {
+        "code": "EZY",
+        "weight": 1
+      }
+    ]
   }
 }

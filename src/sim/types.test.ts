@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { DEMO_ROSTER } from './demoRoster'
 import {
   isHeavy,
   modeC,
@@ -122,24 +121,3 @@ describe('stripOrder', () => {
   })
 })
 
-describe('demo roster', () => {
-  it('is a plausible spread of arrivals to design against', () => {
-    expect(DEMO_ROSTER.length).toBeGreaterThanOrEqual(4)
-    const modes = new Set(DEMO_ROSTER.map((a) => a.navMode))
-    expect(modes.size).toBeGreaterThanOrEqual(3)
-    // A heavy and a super, so the wake indicator has something to show.
-    expect(DEMO_ROSTER.some((a) => a.wake === 'H')).toBe(true)
-    expect(DEMO_ROSTER.some((a) => a.wake === 'J')).toBe(true)
-  })
-
-  it('has unique callsigns', () => {
-    const seen = new Set(DEMO_ROSTER.map((a) => a.callsign))
-    expect(seen.size).toBe(DEMO_ROSTER.length)
-  })
-
-  it('is static, which is why the bay badges it', () => {
-    // Nothing integrates these, so every trail is empty. If a future
-    // change starts moving them, this is the reminder to drop the badge.
-    for (const a of DEMO_ROSTER) expect(a.trail.length, a.callsign).toBe(0)
-  })
-})
