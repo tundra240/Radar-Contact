@@ -438,3 +438,81 @@ describe('display schemes', () => {
     expect(fills).toContain(palettes.beige.chromeLight)
   })
 })
+
+describe('airspace label placement', () => {
+  const AIRSPACE_NAMES = [
+    'LONDON TMA',
+    'LONDON CTR',
+    'STANSTED CTA',
+    'LUTON CTR',
+    'LUTON CTA',
+    'GATWICK CTR',
+    'GATWICK CTA',
+    'CITY CTA',
+    'FARNBOROUGH CTR',
+    'FARNBOROUGH CTA',
+  ]
+
+  it('never stacks two labels on the same spot', () => {
+    // The reported bug: Stansted's CTA and the TMA's lowest band are built
+    // from shared boundary lines and have the identical northernmost
+    // vertex, so both labels were drawn on the same pixel and the text
+    // turned to mush.
+    for (const range of [12, 20, 30, 40, 60]) {
+      const { texts } = render(1000, 600, range)
+      const seen = new Set<string>()
+      for (const t of texts) {
+        const key = `${Math.round(t.x)},${Math.round(t.y)}`
+        expect(seen.has(key), `two labels at ${key} at range ${range}: ${t.s}`).toBe(false)
+        seen.add(key)
+      }
+    }
+  })
+
+  it('separates the Stansted and TMA labels that share a vertex', () => {
+    const { texts } = render()
+    const stansted = texts.find((t) => t.s === 'STANSTED CTA')
+    const tma = texts.find((t) => t.s === 'LONDON TMA')
+    expect(stansted).toBeDefined()
+    expect(tma).toBeDefined()
+    if (!stansted || !tma) return
+    expect(Math.hypot(stansted.x - tma.x, stansted.y - tma.y)).toBeGreaterThan(10)
+  })
+
+  it('does not name the same airspace over and over', () => {
+    // The TMA has nine bands and Farnborough nine. Naming each one crowds
+    // out the zones that have not been named at all.
+    const { texts } = render()
+    for (const name of AIRSPACE_NAMES) {
+      const n = texts.filter((t) => t.s === name).length
+      expect(n, `${name} drawn ${n} times`).toBeLessThanOrEqual(2)
+    }
+  })
+
+  it('still names the surface zones around the field', () => {
+    // These are the ones worth the space, so they must survive the cull.
+    const { labels } = render()
+    for (const name of ['LONDON CTR', 'LUTON CTR', 'GATWICK CTR']) {
+      expect(labels, name).toContain(name)
+    }
+  })
+
+  it('prefers the lowest base when it can only name one band', () => {
+    // Of the TMA's nine bands the 2500 ft base is the one that matters:
+    // it is the first thing an aircraft would climb into.
+    const { labels } = render()
+    expect(labels).toContain('2500-FL195')
+  })
+
+  it('keeps airspace labels inside the viewport', () => {
+    // Only the airspace labels: compass marks sit on the sector ring, which
+    // is deliberately outside the view at close range.
+    const { texts, cam } = render(900, 500, 25)
+    for (const t of texts.filter((x) => AIRSPACE_NAMES.includes(x.s))) {
+      expect(t.x, t.s).toBeGreaterThan(0)
+      expect(t.x, t.s).toBeLessThan(cam.width)
+      expect(t.y, t.s).toBeGreaterThan(0)
+      expect(t.y, t.s).toBeLessThan(cam.height)
+    }
+  })
+})

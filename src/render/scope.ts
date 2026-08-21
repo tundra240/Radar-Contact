@@ -155,12 +155,21 @@ interface AirspaceLabel {
   limits: string
   colour: string
   assumed: boolean
+  /** On-screen extent, used to break ties within a tier. */
+  priority: number
+  /**
+   * Claim on the space, lowest first. Ranked by usefulness rather than
+   * size, or the enormous upper-area bands would squeeze out every control
+   * zone around them.
+   */
+  tier: number
+  /** Base of the volume, so the lowest band of an airspace is named first. */
+  floorFt: number
 }
 
 /**
  * One label per name and altitude band, placed at the northernmost point
- * of the volume. The London TMA alone is twenty volumes across six bands,
- * so labelling each one individually would bury the display.
+ * of the volume.
  */
 function airspaceLabel(cam: Camera, volume: AirspaceVolume): AirspaceLabel | null {
   const shape = volume.shape
@@ -189,6 +198,12 @@ function airspaceLabel(cam: Camera, volume: AirspaceVolume): AirspaceLabel | nul
   if (!at || size < 40) return null
 
   const limits = `${formatLevel(volume.floorFt)}-${formatLevel(volume.ceilingFt)}`
+
+  // Surface-based zones name a specific field and are what you are working
+  // next to, so they get first claim. Upper-area bands go last: they are
+  // the biggest thing on the scope and there are a great many of them.
+  const tier = volume.floorFt === 0 ? 0 : volume.airspaceClass === 'A' ? 2 : 1
+
   return {
     key: `${volume.label}|${limits}`,
     at,
@@ -196,31 +211,133 @@ function airspaceLabel(cam: Camera, volume: AirspaceVolume): AirspaceLabel | nul
     limits,
     colour: airspaceColour(volume.airspaceClass),
     assumed: volume.verticalSource === 'assumed',
+    priority: size,
+    tier,
+    floorFt: volume.floorFt,
   }
 }
 
+interface LabelBox {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+function overlaps(a: LabelBox, b: LabelBox, pad = 2): boolean {
+  return (
+    a.x - pad < b.x + b.w &&
+    a.x + a.w + pad > b.x &&
+    a.y - pad < b.y + b.h &&
+    a.y + a.h + pad > b.y
+  )
+}
+
+/**
+ * Places airspace labels, largest volume first, and drops any that would
+ * collide with one already placed.
+ *
+ * Deduplicating by name and band is not enough on its own: adjacent bands
+ * of the same airspace are built from the same boundary lines, so they
+ * share vertices and their labels land on the identical pixel. Stansted had
+ * two volumes with the same northernmost point and different limits, which
+ * drew one label directly on top of the other. The London TMA has nine
+ * distinct bands and Farnborough nine, so the problem is structural rather
+ * than one bad record.
+ *
+ * Dropping a colliding label loses information, which is the right trade:
+ * two labels in the same place convey nothing at all.
+ */
 function drawAirspaceLabels(
   g: CanvasRenderingContext2D,
   cam: Camera,
   volumes: readonly AirspaceVolume[],
 ): void {
-  const seen = new Map<string, AirspaceLabel>()
+  const unique = new Map<string, AirspaceLabel>()
   for (const v of volumes) {
     const l = airspaceLabel(cam, v)
-    if (l && !seen.has(l.key)) seen.set(l.key, l)
+    if (!l) continue
+    const existing = unique.get(l.key)
+    // Keep the largest instance of a repeated band, so the label lands on
+    // the most prominent piece of that airspace.
+    if (!existing || l.priority > existing.priority) unique.set(l.key, l)
   }
 
-  g.font = fonts.label(9)
+  const size = 9
+  const lineH = 11
+  // Within a tier the lowest base wins: of the TMA's nine bands the one
+  // with the lowest floor is the one that matters, since it is the first
+  // thing an aircraft would climb into.
+  const candidates = [...unique.values()].sort(
+    (a, b) => a.tier - b.tier || a.floorFt - b.floorFt || b.priority - a.priority,
+  )
+  const placed: LabelBox[] = []
+  // The TMA alone has nine bands and Farnborough nine. Naming the same
+  // airspace more than twice tells you nothing further and crowds out the
+  // zones that have not been named at all.
+  const MAX_PER_NAME = 2
+  const drawnPerName = new Map<string, number>()
+
+  g.font = fonts.label(size)
   g.textAlign = 'center'
-  for (const l of seen.values()) {
-    const p = cam.worldToScreen(l.at)
+
+  const h = lineH * 2 + 6
+
+  for (const l of candidates) {
+    if ((drawnPerName.get(l.text) ?? 0) >= MAX_PER_NAME) continue
+
+    const anchor = cam.worldToScreen(l.at)
+    const limits = l.assumed ? `(${l.limits})` : l.limits
+    const w = charW(size) * Math.max(l.text.length, limits.length) + 8
+
+    // Try the anchor first, then a few nudges. Different airspaces are
+    // built from shared boundary lines and genuinely land on the same
+    // vertex, so shifting keeps the information rather than throwing a
+    // whole label away for want of a few pixels.
+    const offsets: readonly (readonly [number, number])[] = [
+      [0, 0],
+      [0, h],
+      [0, -h],
+      [-w * 0.62, 0],
+      [w * 0.62, 0],
+      [0, h * 2],
+    ]
+
+    let at: { x: number; y: number } | null = null
+    let box: LabelBox | null = null
+    for (const [dx, dy] of offsets) {
+      const rawX = anchor.x + dx - w / 2
+      const rawY = anchor.y + dy - lineH - 4
+
+      // A label whose airspace is entirely out of view should not consume a
+      // slot an on-screen one could use.
+      if (rawX + w < 0 || rawX > cam.width) continue
+      if (rawY + h < 0 || rawY > cam.height) continue
+
+      // Partly visible is not good enough: half a clipped word reads as a
+      // rendering fault. Pull it fully inside instead, which keeps it
+      // against the boundary that runs off the edge.
+      const x = Math.min(Math.max(rawX, 2), Math.max(2, cam.width - w - 2))
+      const y = Math.min(Math.max(rawY, 2), Math.max(2, cam.height - h - 2))
+      const candidate: LabelBox = { x, y, w, h }
+      if (placed.some((q) => overlaps(candidate, q))) continue
+
+      at = { x: x + w / 2, y: y + lineH + 4 }
+      box = candidate
+      break
+    }
+    if (!at || !box) continue
+
+    placed.push(box)
+    drawnPerName.set(l.text, (drawnPerName.get(l.text) ?? 0) + 1)
+
     g.fillStyle = theme.airspaceLabel
     g.textBaseline = 'bottom'
-    g.fillText(l.text, p.x, p.y - 3)
+    g.fillText(l.text, at.x, at.y - 3)
     g.fillStyle = l.colour
     g.textBaseline = 'top'
     // Parentheses mark limits the source did not state.
-    g.fillText(l.assumed ? `(${l.limits})` : l.limits, p.x, p.y + 2)
+    g.fillText(limits, at.x, at.y + 2)
   }
 }
 

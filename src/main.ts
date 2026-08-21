@@ -307,7 +307,10 @@ function start(
   controls.appendChild(overlayButton)
   controls.appendChild(toggle)
   controls.appendChild(panel)
-  document.body.appendChild(controls)
+  // Mounted in the scope rather than on the body: the strip bay owns the
+  // right-hand edge of the window, and fixed positioning put these
+  // straight on top of it.
+  container.appendChild(controls)
 
   const paintChrome = (): void => {
     // Shows the current scheme rather than the destination: with three of
