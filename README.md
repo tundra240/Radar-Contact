@@ -124,6 +124,12 @@ the aircraft.
 drawn dimmed, listed at the bottom of the strip bay as `INBOUND` with no sequence number. Any
 clearance for one is refused -- *"not in your airspace yet"* -- until it crosses in.
 
+**Sessions save and load.** SAVE and LOAD in the menu, under *Session*. A save is the shift as
+it stands -- every aircraft and its clearances, the clock, the score, who is on position, and
+how far through the current gap the spawner is -- and a load puts it back and pauses so you can
+read the picture first. One slot; a save from another airport or another version is refused
+rather than loaded.
+
 **There is a score.** `SCORE` on the status bar: +100 for a landing, -50 for an aircraft lost
 off the boundary unlanded. Losing one costs less than landing one earns, so landing most of
 your traffic still climbs.

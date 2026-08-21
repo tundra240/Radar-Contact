@@ -24,6 +24,12 @@ export interface FlightIdentity {
   readonly approachKts: number
 }
 
+/** Everything a FlightGenerator remembers between flights. */
+export interface FlightGeneratorState {
+  readonly issued: readonly string[]
+  readonly fallbackSequence: number
+}
+
 export class FlightGenerator {
   private readonly airlines: readonly Airline[]
   /** Each operator's fleet, resolved to the type records once. */
@@ -51,6 +57,26 @@ export class FlightGenerator {
       // making the airline ungeneratable.
       this.fleets.set(airline.code, fleet.length > 0 ? fleet : airport.aircraftTypes)
     }
+  }
+
+  /**
+   * The generator's whole mutable state, for saving a session.
+   *
+   * Only the two things it actually remembers: which callsigns have been
+   * used, and the fallback counter. The airlines and their fleets come from
+   * the config, so a save carries neither.
+   */
+  snapshot(): FlightGeneratorState {
+    return {
+      issued: [...this.issued],
+      fallbackSequence: this.fallbackSequence,
+    }
+  }
+
+  restore(state: FlightGeneratorState): void {
+    this.issued.clear()
+    for (const callsign of state.issued) this.issued.add(callsign)
+    this.fallbackSequence = state.fallbackSequence
   }
 
   /** How many flights have been issued this session. */

@@ -52,6 +52,19 @@ and the strip bay lists them at the bottom marked **INBOUND** with the distance 
 The moment one crosses the boundary it is yours -- full brightness, a sequence number, and it
 will take instructions.
 
+### Saving and coming back
+
+**SAVE** and **LOAD** live in the menu, under *Session*. Saving takes the shift exactly as it
+stands: every aircraft where it is and what it has been cleared for, the clock, the score, who
+is on position, and where the next arrival is in its gap. Loading puts it all back.
+
+A loaded session always arrives **paused**, so you get to read the picture before it starts
+moving again. Press space when you are ready.
+
+There is one slot, and saving overwrites it. A save is tied to the airport it was flown at and
+to this version of the game; anything else is refused with a reason rather than loaded into a
+world it does not fit.
+
 ### Keeping score
 
 **SCORE** on the status bar. Landing an aircraft is worth **+100**; losing one off the boundary

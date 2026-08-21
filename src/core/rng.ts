@@ -31,14 +31,32 @@ export interface Rng {
   chance(probability: number): boolean
 }
 
+/** The step mulberry32 adds to its state on every draw. */
+const STEP = 0x6d2b79f5
+
 export function makeRng(seed: number): Rng {
+  return makeRngAt(seed, 0)
+}
+
+/**
+ * An Rng resumed part way through, at a given number of draws.
+ *
+ * mulberry32 advances its state by a fixed constant every draw, so the
+ * state after n of them is the seed plus n times that constant, modulo
+ * 2^32. Which means a saved session can be resumed exactly without
+ * replaying the draws that got it there -- and an hour of traffic is tens
+ * of thousands of them.
+ */
+export function makeRngAt(seed: number, atDraw: number): Rng {
   // Keep the seed in 32 bits, and avoid a zero state.
-  let state = (Math.floor(seed) >>> 0) || 0x9e3779b9
-  let draws = 0
+  const base = (Math.floor(seed) >>> 0) || 0x9e3779b9
+  let draws = Math.max(0, Math.floor(atDraw))
+  // imul multiplies modulo 2^32, which is exactly the arithmetic wanted.
+  let state = (base + Math.imul(draws, STEP)) >>> 0
 
   const next = (): number => {
     draws += 1
-    state = (state + 0x6d2b79f5) >>> 0
+    state = (state + STEP) >>> 0
     let t = state
     t = Math.imul(t ^ (t >>> 15), t | 1)
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61)

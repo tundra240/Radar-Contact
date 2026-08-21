@@ -51,6 +51,8 @@ export interface MenuOptions {
   readonly onSpeed: (next: Speed) => void
   readonly onTogglePause: () => void
   readonly onToggleSound: () => void
+  readonly onSave: () => void
+  readonly onLoad: () => void
 }
 
 /**
@@ -167,6 +169,31 @@ export class Menu {
       this.schemeButtons.set(name, b)
     }
     display.appendChild(schemes)
+
+    /* ---- the session -------------------------------------------------- */
+
+    // Above the overlays, because saving a shift is a bigger thing than
+    // which layers are drawn -- and below the display scheme, because it is
+    // not something you reach for every minute either.
+    const session = this.section('Session')
+    const buttons = document.createElement('div')
+    buttons.className = 'menu-choices'
+    for (const [label, run] of [
+      ['SAVE', (): void => this.opts.onSave()],
+      ['LOAD', (): void => this.opts.onLoad()],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.className = 'menu-key'
+      b.textContent = label
+      b.title =
+        label === 'SAVE'
+          ? 'Save the traffic, the clock and the score as they are'
+          : 'Go back to the saved session'
+      b.addEventListener('click', run)
+      buttons.appendChild(b)
+    }
+    session.appendChild(buttons)
 
     /* ---- overlays ----------------------------------------------------- */
 

@@ -102,6 +102,20 @@ export class GameLoop {
     }
   }
 
+  /**
+   * Puts the simulated clock back to a given tick.
+   *
+   * For loading a saved session, and for nothing else: the clock is
+   * otherwise the one thing in here that only ever moves forwards. Banked
+   * time is discarded with it, or the first tick after a load would carry
+   * the backlog of the moment before it.
+   */
+  setTicks(ticks: number): void {
+    this.simTicks = Math.max(0, Math.floor(ticks))
+    this.accumulatorMs = 0
+    this.lastNowMs = this.nowMs()
+  }
+
   get running(): boolean {
     return this.isRunning
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { makeRng } from './rng'
+import { makeRng, makeRngAt } from './rng'
 
 describe('makeRng', () => {
   it('produces the same sequence for the same seed', () => {
@@ -152,5 +152,54 @@ describe('chance', () => {
       expect(r.chance(0)).toBe(false)
       expect(r.chance(1)).toBe(true)
     }
+  })
+})
+
+describe('makeRngAt', () => {
+  /**
+   * Resuming a saved session. The state has to land exactly where replaying
+   * would have left it, or a loaded game deals different traffic from the
+   * one that was saved.
+   */
+  it('lands exactly where replaying the draws would have', () => {
+    for (const seed of [1, 42, 20260821, 0xffffffff]) {
+      const replayed = makeRng(seed)
+      for (let i = 0; i < 5000; i += 1) replayed.next()
+
+      const resumed = makeRngAt(seed, 5000)
+      expect(resumed.draws, String(seed)).toBe(replayed.draws)
+      expect(resumed.seed, String(seed)).toBe(replayed.seed)
+      // Twenty more from each, which is a stronger claim than one.
+      const next20 = (r: typeof resumed): number[] =>
+        Array.from({ length: 20 }, () => r.next())
+      expect(next20(resumed), String(seed)).toEqual(next20(replayed))
+    }
+  })
+
+  it('is the plain generator at zero draws', () => {
+    const fresh = makeRng(7)
+    const at0 = makeRngAt(7, 0)
+    expect(at0.draws).toBe(0)
+    expect(at0.next()).toBe(fresh.next())
+  })
+
+  it('keeps counting from where it resumed', () => {
+    const r = makeRngAt(7, 1234)
+    r.next()
+    expect(r.draws).toBe(1235)
+  })
+
+  it('treats a negative or fractional draw count as a whole one', () => {
+    expect(makeRngAt(7, -5).draws).toBe(0)
+    expect(makeRngAt(7, 3.7).draws).toBe(3)
+  })
+
+  it('survives a very large draw count without losing precision', () => {
+    // The multiply is modulo 2^32 by construction, so a long session cannot
+    // drift the way a floating-point product would.
+    const big = 5_000_000
+    const replayed = makeRng(99)
+    for (let i = 0; i < big; i += 1) replayed.next()
+    expect(makeRngAt(99, big).next()).toBe(replayed.next())
   })
 })

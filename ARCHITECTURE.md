@@ -562,6 +562,46 @@ Two things that had to be got right and were not obvious:
   inside and now is not" rule can never fire for it and it would fly outward for ever. Nothing
   exists beyond the ring arrivals are released on, plus a little.
 
+### Saving a session
+
+`sim/savegame.ts`. **A snapshot, not a replay.** The seeded generator means a session *could*
+be rebuilt from its seed plus a log of every command, and that is a lovely property -- but
+loading would mean replaying the whole shift, and any change to how the simulation behaves
+would invalidate every save ever written. A snapshot loads in constant time and says what it
+means.
+
+What goes in is everything that cannot be worked out again: the traffic with its clearances, the
+clock, the score, who is on position, and the spawner's cadence, counters and random stream.
+What stays out is everything derived from the airport config -- the airspace, the holds, the
+runways. A save that carried those could quietly disagree with the config it was loaded into;
+one that omits them is instead **refused outright** if it was flown at another airport.
+
+Three parts of that were more interesting than they look:
+
+- **The random stream resumes in closed form.** mulberry32 advances its state by a fixed
+  constant every draw, so the state after n draws is the seed plus n times that constant modulo
+  2^32. `makeRngAt` jumps straight there, and a test asserts it lands exactly where replaying
+  five million draws would have. Without it a load would have to replay the draws, or -- worse,
+  and the bug a test is pointed at -- keep the seed and forget the count, and deal the whole
+  session again from the top.
+- **The cadence is part of the state.** A save taken forty seconds into a fifty second gap
+  resumes with ten seconds left, not with a fresh gap.
+- **The issued callsigns are too.** That set is session-long, so a load that dropped it would
+  put a second BAW178 on the frequency.
+
+A save comes from outside the program, so it is **validated field by field** in the same shape
+as the airport loader: small helpers that throw with the path that failed, wrapped once so the
+caller gets a reason rather than an exception. A corrupt save cannot put an aeroplane at a null
+position; it gets refused with `save.traffic[0].pos.x is not a number`.
+
+The test that actually proves this works does not inspect fields. It runs twenty simulated
+minutes, saves, runs twenty more, then loads the save and runs the same twenty -- and asserts
+the two finish **identical**, down to six decimal places of position. Any error in the stream,
+the cadence or the callsigns would diverge.
+
+Loading always pauses. Dropping a controller into moving traffic they have not looked at yet is
+how a saved session gets lost twice.
+
 ### The score
 
 `sim/score.ts`. Two events move it, because two things happen to an arrival: +100 for a

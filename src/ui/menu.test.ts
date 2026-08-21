@@ -34,6 +34,8 @@ interface Harness {
   speeds: Speed[]
   pauses: number
   sounds: number
+  saves: number
+  loads: number
 }
 
 let live: Menu | null = null
@@ -51,6 +53,8 @@ function mountMenu(): Harness {
     speeds: [],
     pauses: 0,
     sounds: 0,
+    saves: 0,
+    loads: 0,
   }
 
   h.menu = new Menu({
@@ -60,6 +64,12 @@ function mountMenu(): Harness {
     onSpeed: (next) => h.speeds.push(next),
     onTogglePause: () => {
       h.pauses += 1
+    },
+    onSave: () => {
+      h.saves += 1
+    },
+    onLoad: () => {
+      h.loads += 1
     },
     onToggleSound: () => {
       h.sounds += 1
@@ -328,7 +338,7 @@ describe('structure', () => {
   it('groups the controls under headings', () => {
     const { mount } = mountMenu()
     const headings = [...mount.querySelectorAll('.menu-heading')].map((h) => h.textContent)
-    expect(headings).toEqual(['Simulation', 'Display scheme', 'Overlays'])
+    expect(headings).toEqual(['Simulation', 'Display scheme', 'Session', 'Overlays'])
   })
 
   it('mounts exactly one panel, inside the element it was given', () => {
@@ -344,5 +354,41 @@ describe('structure', () => {
     // And stops answering the document, so a stale menu cannot swallow an
     // Escape meant for whatever replaced it.
     expect(() => press('Escape')).not.toThrow()
+  })
+})
+
+describe('saving and loading', () => {
+  const sessionButtons = (mount: HTMLElement): HTMLButtonElement[] => {
+    const section = [...mount.querySelectorAll('.menu-section')].find(
+      (s) => s.querySelector('.menu-heading')?.textContent === 'Session',
+    )
+    if (!section) throw new Error('no Session section')
+    return [...section.querySelectorAll<HTMLButtonElement>('button')]
+  }
+
+  it('offers a save and a load', () => {
+    const { mount } = mountMenu()
+    expect(sessionButtons(mount).map((b) => b.textContent)).toEqual(['SAVE', 'LOAD'])
+  })
+
+  it('reports a save', () => {
+    const h = mountMenu()
+    sessionButtons(h.mount)[0]?.click()
+    expect(h.saves).toBe(1)
+    expect(h.loads).toBe(0)
+  })
+
+  it('reports a load', () => {
+    const h = mountMenu()
+    sessionButtons(h.mount)[1]?.click()
+    expect(h.loads).toBe(1)
+    expect(h.saves).toBe(0)
+  })
+
+  it('says what each one does, since neither is undoable', () => {
+    const { mount } = mountMenu()
+    for (const b of sessionButtons(mount)) {
+      expect(b.title.length, b.textContent ?? '').toBeGreaterThan(10)
+    }
   })
 })

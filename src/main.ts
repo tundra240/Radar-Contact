@@ -4,6 +4,12 @@ import { loadAirport, outerLimitNM } from './data/airport'
 import egllConfig from './data/egll.json'
 import { departureOf, enterSector, isInSector, stepAircraft } from './sim/aircraft'
 import { NO_SCORE, pointsFor, scoreDeparture, type Score } from './sim/score'
+import {
+  SAVE_VERSION,
+  parseSavedGame,
+  serialise,
+  type SavedGame,
+} from './sim/savegame'
 import { Spawner } from './sim/spawner'
 import type { Aircraft } from './sim/types'
 import type { Command } from './commands/types'
@@ -23,7 +29,7 @@ import { Guide } from './ui/guide'
 import guideSource from '../TUTORIAL.md?raw'
 import clickUrl from './assets/click.wav'
 import { Sfx, isClickable } from './audio/sfx'
-import { GameLoop } from './core/loop'
+import { formatClock, GameLoop } from './core/loop'
 import { drawScope } from './render/scope'
 import {
   DEFAULT_OVERLAYS,
@@ -375,6 +381,10 @@ function start(
       requestDraw()
     },
     onToggleSound: toggleSound,
+    // Wrapped rather than passed, because both are declared further down:
+    // the menu is built before there is a loop or a spawner to snapshot.
+    onSave: () => saveSession(),
+    onLoad: () => loadSession(),
   })
 
   // ---- the guide -------------------------------------------------------
@@ -587,6 +597,96 @@ function start(
     holdFixes: airport.navaids.filter((n) => n.hold !== null).map((n) => n.name),
     envelopeFor: applyContext.envelopeFor,
   })
+
+  // ---- saving and loading ----------------------------------------------
+
+  /**
+   * Where a session lives between visits.
+   *
+   * One slot, deliberately. A list of saves wants naming, listing, deleting
+   * and a dialog to do it in; one slot wants a button. If several are ever
+   * wanted, the format already carries a timestamp to tell them apart.
+   */
+  const SAVE_STORAGE = 'radar-contact:session'
+
+  const saveSession = (): void => {
+    const game: SavedGame = {
+      version: SAVE_VERSION,
+      airport: airport.icao,
+      savedAt: new Date().toISOString(),
+      clock: loop.clock,
+      score,
+      controller,
+      selected,
+      traffic: [...traffic],
+      spawner: spawner.snapshot(),
+    }
+
+    try {
+      window.localStorage.setItem(SAVE_STORAGE, serialise(game))
+    } catch {
+      // Storage full, or blocked. Saying so beats a button that silently
+      // does nothing.
+      commandConsole.write('could not save the session', 'reject')
+      return
+    }
+
+    commandConsole.write(
+      `session saved at ${formatClock(loop.clock.timeOfDaySeconds)} -- ` +
+        `${traffic.length} on frequency, ${score.landed} landed, ${score.points} points`,
+      'note',
+    )
+  }
+
+  const loadSession = (): void => {
+    let text: string | null = null
+    try {
+      text = window.localStorage.getItem(SAVE_STORAGE)
+    } catch {
+      text = null
+    }
+    if (text === null) {
+      commandConsole.write('there is no saved session', 'reject')
+      return
+    }
+
+    const read = parseSavedGame(text, { airport: airport.icao })
+    if (!read.ok) {
+      commandConsole.write(`could not load: ${read.reason}`, 'reject')
+      return
+    }
+
+    const game = read.game
+    traffic = game.traffic
+    score = game.score
+    selected = game.selected
+    controller = game.controller
+    spawner.restore(game.spawner)
+    loop.setTicks(game.clock.ticks)
+
+    // Loaded paused, always. Dropping a controller into moving traffic they
+    // have not looked at yet is how a saved session gets lost twice.
+    loop.setPaused(true)
+
+    if (controller === null) {
+      logon.show()
+      logon.focus()
+    } else {
+      logon.hide()
+    }
+
+    tagMenu.close()
+    menu.setOpen(false)
+    syncStrips()
+    paintMenu()
+    requestDraw()
+
+    commandConsole.write(
+      `session loaded from ${game.savedAt.slice(0, 16).replace('T', ' ')} -- ` +
+        `${traffic.length} on frequency, ${score.points} points. Paused.`,
+      'note',
+    )
+  }
 
   // ---- the session -----------------------------------------------------
   // Who is working the position. Null until someone logs on, which is also

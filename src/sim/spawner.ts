@@ -1,9 +1,9 @@
 import type { Clock } from '../core/loop'
 import { advance, bearingDeg, distanceNM, type Vec2NM } from '../core/geo'
 import { exitRangeNM } from './airspace'
-import { makeRng, type Rng } from '../core/rng'
+import { makeRng, makeRngAt, type Rng } from '../core/rng'
 import type { Airport, Navaid } from '../data/airport'
-import { FlightGenerator } from './flightgen'
+import { FlightGenerator, type FlightGeneratorState } from './flightgen'
 import type { Aircraft, HoldClearance } from './types'
 
 /**
@@ -39,6 +39,19 @@ const STACK_STEP_FT = 1000
 
 
 
+/** Everything the spawner remembers between releases. */
+export interface SpawnerState {
+  readonly seed: number
+  readonly draws: number
+  readonly sinceLastSpawn: number
+  readonly waitSeconds: number
+  readonly spawned: number
+  readonly deferred: number
+  /** When each fix was last used, as pairs so it survives JSON. */
+  readonly lastUsedAt: readonly (readonly [string, number])[]
+  readonly flights: FlightGeneratorState
+}
+
 /** A place to put an arrival: which fix, and which level of its stack. */
 interface Slot {
   readonly fix: Navaid
@@ -59,7 +72,7 @@ export interface SpawnerOptions {
 
 export class Spawner {
   private readonly airport: Airport
-  private readonly rng: Rng
+  private rng: Rng
   private readonly fixes: readonly Navaid[]
   private readonly flights: FlightGenerator
 
@@ -92,6 +105,42 @@ export class Spawner {
    */
   get seed(): number {
     return this.rng.seed
+  }
+
+  /**
+   * Everything the spawner remembers, for saving a session.
+   *
+   * The cadence matters as much as the counts: a save taken forty seconds
+   * into a fifty second gap should resume with ten seconds left, not with a
+   * fresh gap. The random stream is carried as a seed and a draw count,
+   * which resumes it exactly -- see core/rng.ts.
+   *
+   * What is NOT here: the fixes, the airport and the cached entry points.
+   * All three come from the config, so a save that carried them could
+   * disagree with it.
+   */
+  snapshot(): SpawnerState {
+    return {
+      seed: this.rng.seed,
+      draws: this.rng.draws,
+      sinceLastSpawn: this.sinceLastSpawn,
+      waitSeconds: this.waitSeconds,
+      spawned: this.spawnCount,
+      deferred: this.deferCount,
+      lastUsedAt: [...this.lastUsedAt],
+      flights: this.flights.snapshot(),
+    }
+  }
+
+  restore(state: SpawnerState): void {
+    this.rng = makeRngAt(state.seed, state.draws)
+    this.sinceLastSpawn = state.sinceLastSpawn
+    this.waitSeconds = state.waitSeconds
+    this.spawnCount = state.spawned
+    this.deferCount = state.deferred
+    this.lastUsedAt.clear()
+    for (const [fix, at] of state.lastUsedAt) this.lastUsedAt.set(fix, at)
+    this.flights.restore(state.flights)
   }
 
   get spawned(): number {
