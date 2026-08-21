@@ -4,6 +4,16 @@ import { loadAirport } from './data/airport'
 import egllConfig from './data/egll.json'
 import { drawScope } from './render/scope'
 import {
+  DEFAULT_OVERLAYS,
+  OVERLAY_ITEMS,
+  OVERLAY_PRESETS,
+  densityOf,
+  nextDensity,
+  type DensityName,
+  type OverlayKey,
+  type Overlays,
+} from './render/overlays'
+import {
   paletteName,
   setPalette,
   theme,
@@ -39,14 +49,20 @@ function start(
 ): void {
   // World space is anchored on the airport reference point, so centring the
   // camera on the origin centres it on the field.
-  const cam = new Camera({ x: 0, y: 0 }, airport.sector.defaultRangeNM)
+  // The zoom ceiling is twice the area of responsibility: far enough to see
+  // what is coming, close enough that the sector still fills the scope.
+  const cam = new Camera({ x: 0, y: 0 }, airport.sector.defaultRangeNM, {
+    maxNM: airport.sector.radiusNM * 2,
+  })
+
+  let overlays: Overlays = DEFAULT_OVERLAYS
 
   let frame = 0
   const requestDraw = (): void => {
     if (frame !== 0) return
     frame = requestAnimationFrame(() => {
       frame = 0
-      drawScope(ctx, cam, airport)
+      drawScope(ctx, cam, airport, overlays)
     })
   }
 
@@ -115,6 +131,93 @@ function start(
 
   resize()
 
+  // ---- overlay control -------------------------------------------------
+  // How much context to draw is a controller preference, not a constant.
+
+  const OVERLAY_STORAGE = 'radar-contact:overlays'
+
+  const readOverlays = (): Overlays | null => {
+    try {
+      const raw = window.localStorage.getItem(OVERLAY_STORAGE)
+      if (!raw) return null
+      const parsed: unknown = JSON.parse(raw)
+      if (typeof parsed !== 'object' || parsed === null) return null
+      const rec = parsed as Record<string, unknown>
+      // Read key by key rather than trusting the blob: a stale or
+      // hand-edited entry must not put a non-boolean into the render path.
+      const next: Record<string, boolean> = { ...DEFAULT_OVERLAYS }
+      for (const item of OVERLAY_ITEMS) {
+        const v = rec[item.key]
+        if (typeof v === 'boolean') next[item.key] = v
+      }
+      return next as unknown as Overlays
+    } catch {
+      return null
+    }
+  }
+
+  const rememberOverlays = (value: Overlays): void => {
+    try {
+      window.localStorage.setItem(OVERLAY_STORAGE, JSON.stringify(value))
+    } catch {
+      /* preference simply will not persist */
+    }
+  }
+
+  const panel = document.createElement('div')
+  panel.className = 'overlay-panel'
+  panel.hidden = true
+
+  const densityButton = document.createElement('button')
+  densityButton.type = 'button'
+  densityButton.className = 'overlay-density'
+  panel.appendChild(densityButton)
+
+  const boxes = new Map<OverlayKey, HTMLInputElement>()
+  for (const item of OVERLAY_ITEMS) {
+    const row = document.createElement('label')
+    row.className = 'overlay-row'
+    const box = document.createElement('input')
+    box.type = 'checkbox'
+    box.addEventListener('change', () => {
+      setOverlays({ ...overlays, [item.key]: box.checked })
+    })
+    row.appendChild(box)
+    row.appendChild(document.createTextNode(item.label))
+    panel.appendChild(row)
+    boxes.set(item.key, box)
+  }
+
+  const overlayButton = document.createElement('button')
+  overlayButton.type = 'button'
+  overlayButton.className = 'mode-toggle overlay-button'
+  overlayButton.textContent = 'OVERLAYS'
+
+  const setOverlays = (value: Overlays): void => {
+    overlays = value
+    rememberOverlays(value)
+    for (const [key, box] of boxes) box.checked = value[key]
+    densityButton.textContent = 'PRESET: ' + densityOf(value).toUpperCase()
+    requestDraw()
+  }
+
+  densityButton.addEventListener('click', () => {
+    const next: DensityName = nextDensity(densityOf(overlays))
+    setOverlays(OVERLAY_PRESETS[next])
+  })
+
+  // Tracked explicitly rather than read back off the element: the DOM
+  // hidden property is typed string | boolean because it also accepts
+  // "until-found", which is not a state this panel wants to reason about.
+  let panelOpen = false
+  const showPanel = (visible: boolean): void => {
+    panelOpen = visible
+    panel.hidden = !visible
+    overlayButton.setAttribute('aria-expanded', String(visible))
+  }
+
+  overlayButton.addEventListener('click', () => showPanel(!panelOpen))
+
   // ---- light / dark control -------------------------------------------
   // The palette is a live object shared by every render module, so
   // switching it and asking for a redraw is the whole implementation.
@@ -142,8 +245,14 @@ function start(
 
   const toggle = document.createElement('button')
   toggle.type = 'button'
-  toggle.className = 'mode-toggle'
-  document.body.appendChild(toggle)
+  toggle.className = 'mode-toggle theme-button'
+
+  const controls = document.createElement('div')
+  controls.className = 'controls'
+  controls.appendChild(overlayButton)
+  controls.appendChild(toggle)
+  controls.appendChild(panel)
+  document.body.appendChild(controls)
 
   const paintChrome = (): void => {
     const dark = paletteName() === 'dark'
@@ -152,9 +261,12 @@ function start(
     toggle.setAttribute('aria-pressed', String(dark))
     // Colours live in TypeScript, so the chrome is styled from the palette
     // rather than duplicating hex values in the stylesheet.
-    toggle.style.background = theme.bg
-    toggle.style.color = theme.accent
-    toggle.style.borderColor = theme.ringStrong
+    for (const el of [toggle, overlayButton, densityButton, panel]) {
+      el.style.background = theme.bg
+      el.style.color = theme.accent
+      el.style.borderColor = theme.ringStrong
+    }
+    panel.style.color = theme.text
     document.body.style.background = theme.bg
     document.body.style.color = theme.text
   }
@@ -174,8 +286,10 @@ function start(
     if (e.key === 'd' || e.key === 'D') {
       applyPalette(paletteName() === 'dark' ? 'beige' : 'dark')
     }
+    if (e.key === 'o' || e.key === 'O') showPanel(!panelOpen)
   })
 
+  setOverlays(readOverlays() ?? DEFAULT_OVERLAYS)
   applyPalette(storedPalette() ?? paletteName())
 
 

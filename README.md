@@ -19,7 +19,13 @@ npm run dev        # http://localhost:5173
 | `npm run typecheck` | Type-check only |
 
 On the scope: drag to pan, wheel to zoom, `R` to reset the view, `D` to switch between the
-beige and dark displays. The button in the top right does the same.
+beige and dark displays, `O` to open the overlay panel. The buttons in the top right do the
+same.
+
+The overlay panel controls how much context is drawn -- airspace, traffic zones, other
+aerodromes, other navaids, labels, range rings, centrelines -- with minimal / standard / full
+presets. The runways being worked, the holding fixes and the sector boundary are always
+drawn: they are the job rather than decoration.
 
 ## Where things are
 

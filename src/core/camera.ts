@@ -20,7 +20,7 @@ export interface Vec2Px {
 
 /** Zoom limits, expressed as the scope's radius in NM. */
 export const MIN_RANGE_NM = 2
-export const MAX_RANGE_NM = 160
+export const MAX_RANGE_NM = 80
 
 export class Camera {
   /** World-space point displayed at the centre of the viewport. */
@@ -37,9 +37,37 @@ export class Camera {
   private widthPx = 1
   private heightPx = 1
 
-  constructor(centreNM: Vec2NM = { x: 0, y: 0 }, rangeNM = 30) {
+  private readonly minRange: number
+  private readonly maxRange: number
+
+  /**
+   * The zoom ceiling is a constructor argument rather than a constant,
+   * because how far out is useful depends on the size of the sector being
+   * worked. Callers should derive it from the area of responsibility;
+   * MAX_RANGE_NM is only a fallback.
+   */
+  constructor(
+    centreNM: Vec2NM = { x: 0, y: 0 },
+    rangeNM = 30,
+    limits: { minNM?: number; maxNM?: number } = {},
+  ) {
+    this.minRange = Math.max(0.1, limits.minNM ?? MIN_RANGE_NM)
+    this.maxRange = Math.max(this.minRange, limits.maxNM ?? MAX_RANGE_NM)
     this.centreNM = centreNM
-    this.range = clampRange(rangeNM)
+    this.range = this.clamp(rangeNM)
+  }
+
+  get minRangeNM(): number {
+    return this.minRange
+  }
+
+  get maxRangeNM(): number {
+    return this.maxRange
+  }
+
+  private clamp(rangeNM: number): number {
+    if (!Number.isFinite(rangeNM)) return this.minRange
+    return Math.min(this.maxRange, Math.max(this.minRange, rangeNM))
   }
 
   get centre(): Vec2NM {
@@ -70,7 +98,7 @@ export class Camera {
   }
 
   setRangeNM(rangeNM: number): void {
-    this.range = clampRange(rangeNM)
+    this.range = this.clamp(rangeNM)
   }
 
   setCentre(centreNM: Vec2NM): void {
@@ -118,7 +146,7 @@ export class Camera {
    */
   zoomAt(anchor: Vec2Px, factor: number): void {
     const before = this.screenToWorld(anchor)
-    this.range = clampRange(this.range / factor)
+    this.range = this.clamp(this.range / factor)
     const s = this.pxPerNM
 
     // Solve worldToScreen(before) === anchor for the new centre.
@@ -160,11 +188,6 @@ export class Camera {
     const aspect = this.widthPx / this.heightPx
     const needed = aspect >= 1 ? Math.max(halfH, halfW / aspect) : Math.max(halfW, halfH * aspect)
 
-    this.setRangeNM(Math.max(needed * margin, MIN_RANGE_NM))
+    this.setRangeNM(Math.max(needed * margin, this.minRange))
   }
-}
-
-function clampRange(rangeNM: number): number {
-  if (!Number.isFinite(rangeNM)) return MIN_RANGE_NM
-  return Math.min(MAX_RANGE_NM, Math.max(MIN_RANGE_NM, rangeNM))
 }

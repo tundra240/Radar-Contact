@@ -113,3 +113,44 @@ describe('Camera', () => {
     expect(Number.isFinite(s.y)).toBe(true)
   })
 })
+
+describe('Camera zoom limits', () => {
+  it('defaults to a ceiling that is not absurdly far out', () => {
+    const c = new Camera({ x: 0, y: 0 }, 30)
+    c.setViewport(1000, 600)
+    c.setRangeNM(9999)
+    expect(c.rangeNM).toBe(MAX_RANGE_NM)
+    expect(MAX_RANGE_NM).toBeLessThanOrEqual(100)
+    // Still comfortably wider than a terminal area, so the ceiling is a
+    // limit rather than a straitjacket.
+    expect(MAX_RANGE_NM).toBeGreaterThanOrEqual(60)
+  })
+
+  it('takes a ceiling from the caller', () => {
+    // main.ts derives this from the sector radius, so the useful zoom range
+    // scales with the airspace being worked instead of being a constant.
+    const c = new Camera({ x: 0, y: 0 }, 30, { maxNM: 80, minNM: 3 })
+    c.setViewport(1000, 600)
+    expect(c.maxRangeNM).toBe(80)
+    expect(c.minRangeNM).toBe(3)
+
+    c.setRangeNM(500)
+    expect(c.rangeNM).toBe(80)
+    c.setRangeNM(0.5)
+    expect(c.rangeNM).toBe(3)
+  })
+
+  it('clamps zooming as well as setting', () => {
+    const c = new Camera({ x: 0, y: 0 }, 40, { maxNM: 50 })
+    c.setViewport(1000, 600)
+    for (let i = 0; i < 30; i += 1) c.zoomAt({ x: 500, y: 300 }, 0.8)
+    expect(c.rangeNM).toBe(50)
+  })
+
+  it('survives a ceiling below the floor', () => {
+    const c = new Camera({ x: 0, y: 0 }, 10, { minNM: 20, maxNM: 5 })
+    c.setViewport(1000, 600)
+    expect(c.maxRangeNM).toBeGreaterThanOrEqual(c.minRangeNM)
+    expect(Number.isFinite(c.rangeNM)).toBe(true)
+  })
+})

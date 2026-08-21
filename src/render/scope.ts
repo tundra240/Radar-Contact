@@ -9,6 +9,7 @@ import {
   type NeighbourAirport,
   type Runway,
 } from '../data/airport'
+import { countEnabled, densityOf, type Overlays } from './overlays'
 import { airspaceColour, fonts, formatLevel, theme } from './theme'
 
 /**
@@ -27,34 +28,48 @@ export function drawScope(
   g: CanvasRenderingContext2D,
   cam: Camera,
   airport: Airport,
+  overlays: Overlays,
 ): void {
   g.fillStyle = theme.bg
   g.fillRect(0, 0, cam.width, cam.height)
 
   // Bottom to top: airspace is the faintest wash, the field being worked
   // is the boldest thing on the display.
-  for (const volume of airport.airspace) {
+  const volumes = airport.airspace.filter((v) =>
+    v.airspaceClass === 'G' ? overlays.trafficZones : overlays.airspace,
+  )
+  for (const volume of volumes) {
     drawAirspaceBoundary(g, cam, volume)
   }
-  drawAirspaceLabels(g, cam, airport.airspace)
+  if (overlays.airspaceLabels) drawAirspaceLabels(g, cam, volumes)
 
-  drawRangeRings(g, cam, airport)
+  if (overlays.rangeRings) drawRangeRings(g, cam, airport)
+  // The edge of the area of responsibility is not optional: it is the
+  // boundary of the job, not decoration.
+  drawSectorBoundary(g, cam, airport)
   drawCardinals(g, cam, airport)
 
-  for (const neighbour of airport.airports) {
-    drawNeighbour(g, cam, airport, neighbour)
+  if (overlays.aerodromes) {
+    for (const neighbour of airport.airports) {
+      drawNeighbour(g, cam, airport, neighbour)
+    }
   }
   for (const navaid of airport.navaids) {
-    drawNavaid(g, cam, navaid)
+    // Holds are operational rather than contextual, so they stay whatever
+    // the overlay settings say.
+    if (navaid.hold === null && !overlays.navaids) continue
+    drawNavaid(g, cam, navaid, overlays.navaidFreqs)
   }
-  for (const rwy of airport.arrivalRunways) {
-    drawExtendedCentreline(g, cam, rwy)
+  if (overlays.centrelines) {
+    for (const rwy of airport.arrivalRunways) {
+      drawExtendedCentreline(g, cam, rwy)
+    }
   }
   for (const rwy of airport.runways) {
     drawRunway(g, cam, airport, rwy)
   }
 
-  drawHud(g, cam, airport)
+  drawHud(g, cam, airport, overlays)
 }
 
 /* ------------------------------------------------------------- airspace */
@@ -217,8 +232,15 @@ function drawRangeRings(
     g.textBaseline = 'middle'
     g.fillText(`${nm}`, c.x + r + 4, c.y)
   }
+}
 
-  // The edge of the area of responsibility.
+function drawSectorBoundary(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  airport: Airport,
+): void {
+  const c = cam.worldToScreen(ORIGIN)
+  g.lineWidth = 1
   g.strokeStyle = theme.ringStrong
   g.beginPath()
   g.arc(c.x, c.y, cam.nmToPx(airport.sector.radiusNM), 0, Math.PI * 2)
@@ -300,7 +322,12 @@ function drawNeighbour(
 
 /* -------------------------------------------------------------- navaids */
 
-function drawNavaid(g: CanvasRenderingContext2D, cam: Camera, n: Navaid): void {
+function drawNavaid(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  n: Navaid,
+  showFreq: boolean,
+): void {
   const p = cam.worldToScreen(n.posNM)
   const r = 6
 
@@ -343,7 +370,7 @@ function drawNavaid(g: CanvasRenderingContext2D, cam: Camera, n: Navaid): void {
   g.fillText(n.name, p.x + r + 4, p.y - 1)
 
   // Frequency only once there is room for it.
-  if (n.station && cam.pxPerNM > 12) {
+  if (showFreq && n.station && cam.pxPerNM > 12) {
     g.fillStyle = theme.navaidFreq
     g.font = fonts.label(9)
     g.textBaseline = 'top'
@@ -440,6 +467,7 @@ function drawHud(
   g: CanvasRenderingContext2D,
   cam: Camera,
   airport: Airport,
+  overlays: Overlays,
 ): void {
   g.font = fonts.bold(11)
   g.textAlign = 'left'
@@ -458,15 +486,19 @@ function drawHud(
     12,
     30,
   )
-  g.fillText('drag pan / wheel zoom / R reset / D theme', 12, 44)
+  g.fillText('drag pan / wheel zoom / R reset / D theme / O overlays', 12, 44)
 
   // Airspace provenance, on the display rather than buried in a config
   // file: solid boundaries are published, dotted are rule-derived.
-  const published = airport.airspace.filter((v) => v.derivation === "aip").length
-  const ruled = airport.airspace.filter((v) => v.derivation === "rule").length
+  const shown = airport.airspace.filter((v) =>
+    v.airspaceClass === 'G' ? overlays.trafficZones : overlays.airspace,
+  )
+  const published = shown.filter((v) => v.derivation === 'aip').length
+  const ruled = shown.filter((v) => v.derivation === 'rule').length
   g.fillStyle = theme.airspaceLabel
   g.fillText(
-    `airspace ${published} published (solid) / ${ruled} rule-derived (dotted)`,
+    `overlays ${densityOf(overlays)} (${countEnabled(overlays)}/8)   ` +
+      `airspace ${published} published / ${ruled} rule-derived`,
     12,
     58,
   )

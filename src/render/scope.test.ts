@@ -3,6 +3,7 @@ import { Camera } from '../core/camera'
 import { loadAirport, runwayScaleAt } from '../data/airport'
 import raw from '../data/egll.json'
 import { drawScope } from './scope'
+import { OVERLAY_PRESETS, type Overlays } from './overlays'
 import { palettes, setPalette } from './theme'
 
 /**
@@ -70,11 +71,18 @@ function recorder(): {
 
 const airport = loadAirport(raw)
 
-function render(w = 1000, h = 600, rangeNM = 30) {
-  const cam = new Camera({ x: 0, y: 0 }, rangeNM)
+// Most tests assert that a feature draws, so they render everything; the
+// overlay tests pass a narrower set explicitly.
+function render(
+  w = 1000,
+  h = 600,
+  rangeNM = 30,
+  overlays: Overlays = OVERLAY_PRESETS.full,
+) {
+  const cam = new Camera({ x: 0, y: 0 }, rangeNM, { maxNM: 200 })
   cam.setViewport(w, h)
   const rec = recorder()
-  drawScope(rec.ctx, cam, airport)
+  drawScope(rec.ctx, cam, airport, overlays)
   return { ...rec, cam, labels: rec.texts.map((t) => t.s) }
 }
 
@@ -188,10 +196,11 @@ describe('airspace overlay', () => {
     expect(dashes.some((d) => d.length === 0)).toBe(true)
   })
 
-  it('states airspace provenance on the display', () => {
+  it('states airspace provenance and overlay density on the display', () => {
     const { labels } = render()
-    expect(labels.some((s) => s.includes('published (solid)'))).toBe(true)
-    expect(labels.some((s) => s.includes('rule-derived (dotted)'))).toBe(true)
+    expect(labels.some((s) => s.includes('published'))).toBe(true)
+    expect(labels.some((s) => s.includes('rule-derived'))).toBe(true)
+    expect(labels.some((s) => s.includes('overlays full'))).toBe(true)
   })
 
   it('shows the rule-derived traffic zones when zoomed in', () => {
@@ -266,5 +275,92 @@ describe('palette switching', () => {
     expect(labels).toContain('EGLL APPROACH')
     expect(labels).toContain('LAM')
     expect(labels).toContain('LONDON TMA')
+  })
+})
+
+describe('overlay control', () => {
+  const only = (over: Partial<Overlays>): Overlays => ({
+    ...OVERLAY_PRESETS.minimal,
+    ...over,
+  })
+
+  it('draws the operational picture even at minimum density', () => {
+    // What must survive every setting: the runways being worked, their
+    // centrelines, the holds, and the sector boundary.
+    const { labels, arcs } = render(1000, 600, 30, OVERLAY_PRESETS.minimal)
+    expect(labels).toContain('27R')
+    expect(labels).toContain('27L')
+    for (const hold of ['LAM', 'BIG', 'BNN', 'OCK']) {
+      expect(labels, hold).toContain(hold)
+    }
+    // 40 NM sector boundary at 10 px per NM.
+    expect(arcs.some((a) => Math.round(a.r) === 400)).toBe(true)
+  })
+
+  it('drops the context layers at minimum density', () => {
+    const { labels } = render(1000, 600, 30, OVERLAY_PRESETS.minimal)
+    expect(labels).not.toContain('LONDON TMA')
+    expect(labels).not.toContain('EGKK')
+    expect(labels).not.toContain('CPT')
+  })
+
+  it('keeps holds while hiding the other navaids', () => {
+    const { labels } = render(1000, 600, 15, only({ navaids: false }))
+    expect(labels).toContain('LAM')
+    expect(labels).not.toContain('CPT')
+    expect(labels).not.toContain('MAY')
+  })
+
+  it('separates traffic zones from controlled airspace', () => {
+    const zonesOff = render(1000, 600, 8, only({ airspace: true, airspaceLabels: true }))
+    expect(zonesOff.labels).not.toContain('EGWU ATZ')
+
+    const zonesOn = render(
+      1000,
+      600,
+      8,
+      only({ airspace: true, airspaceLabels: true, trafficZones: true }),
+    )
+    expect(zonesOn.labels).toContain('EGWU ATZ')
+  })
+
+  it('can draw boundaries without their labels', () => {
+    const { labels, dashes } = render(1000, 600, 30, only({ airspace: true }))
+    expect(labels).not.toContain('LONDON TMA')
+    // The line work is still stroked, just unlabelled.
+    expect(dashes.length).toBeGreaterThan(0)
+  })
+
+  it('turns range rings off without losing the sector boundary', () => {
+    const { arcs } = render(1000, 600, 30, only({ rangeRings: false }))
+    expect(arcs.some((a) => Math.round(a.r) === 400)).toBe(true)
+    expect(arcs.some((a) => Math.round(a.r) === 100)).toBe(false)
+  })
+
+  it('turns extended centrelines off', () => {
+    const { labels } = render(1000, 600, 12, only({ centrelines: false }))
+    expect(labels).not.toContain('FAF 27R')
+    expect(labels).toContain('27R')
+  })
+
+  it('gates navaid frequencies separately from navaids', () => {
+    const withFreq = render(1000, 600, 15, only({ navaids: true, navaidFreqs: true }))
+    expect(withFreq.labels).toContain('113.60')
+    const without = render(1000, 600, 15, only({ navaids: true, navaidFreqs: false }))
+    expect(without.labels).toContain('LON')
+    expect(without.labels).not.toContain('113.60')
+  })
+
+  it('reports the active density on the display', () => {
+    expect(
+      render(1000, 600, 30, OVERLAY_PRESETS.minimal).labels.some((s) =>
+        s.includes('overlays minimal'),
+      ),
+    ).toBe(true)
+    expect(
+      render(1000, 600, 30, only({ navaids: true })).labels.some((s) =>
+        s.includes('overlays custom'),
+      ),
+    ).toBe(true)
   })
 })

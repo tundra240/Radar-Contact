@@ -57,3 +57,60 @@ canvas {
   outline: 2px solid currentColor;
   outline-offset: 2px;
 }
+
+/* Control cluster: overlay and theme buttons with the overlay panel below. */
+.controls {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.controls .mode-toggle {
+  position: static;
+  top: auto;
+  right: auto;
+}
+
+.overlay-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid;
+  border-radius: 2px;
+  font-size: 11px;
+  min-width: 190px;
+}
+
+.overlay-panel[hidden] {
+  display: none;
+}
+
+.overlay-density {
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding: 4px 6px;
+  margin-bottom: 4px;
+  border: 1px solid;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.overlay-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.overlay-row input {
+  margin: 0;
+  cursor: pointer;
+}

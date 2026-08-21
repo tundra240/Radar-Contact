@@ -300,6 +300,28 @@ Using the published data earned its keep immediately: **Biggin Hill's ATZ is not
 2.5 NM**, where the runway-length rule gives 2 NM. The rule was wrong, and the source
 corrected it.
 
+### Overlay density
+
+`render/overlays.ts` defines which layers are optional and three presets over them
+(minimal, standard, full), with the panel built from the same list so a key cannot exist in
+the render path without being switchable. The split is deliberate: the runways being worked,
+the holding fixes, the sector boundary and the readouts are **always drawn**, because they
+are the job. Everything else -- controlled airspace, class G traffic zones, airspace labels,
+other aerodromes, non-hold navaids, navaid frequencies, range rings, extended centrelines --
+is context that helps or clutters depending on what you are doing.
+
+Class G traffic zones are switched separately from controlled airspace, because there are
+ten of them and they are small enough to be noise at range. The preference persists in local
+storage, read key by key rather than trusting the stored blob, so a stale entry cannot put a
+non-boolean into the render path.
+
+### Zoom limits
+
+The camera's zoom ceiling is a constructor argument, not a constant: how far out is useful
+depends on the size of the sector. `main.ts` passes twice the area of responsibility, so
+EGLL's 40 NM sector gives an 80 NM maximum -- far enough to see what is coming, close enough
+that the sector still fills the scope. `MAX_RANGE_NM` remains as a fallback only.
+
 ### Display scale
 
 Runways are about two miles long inside a forty mile sector, so at the default range they
