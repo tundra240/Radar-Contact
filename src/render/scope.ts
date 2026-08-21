@@ -463,43 +463,140 @@ function drawExtendedCentreline(
 
 /* ------------------------------------------------------------------- hud */
 
+/**
+ * Monospace advance width. Measured arithmetically rather than through
+ * measureText so layout is deterministic and testable without a real
+ * canvas -- the font is fixed-pitch, so this is exact enough to lay out
+ * panels against.
+ */
+const charW = (px: number): number => px * 0.6
+
+/**
+ * A raised or sunken panel face, the way interfaces of this era drew
+ * every control: a one-pixel light edge along the top and left, a shadow
+ * edge along the bottom and right, and the two swapped to read as sunken.
+ */
+function bevel(
+  g: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  sunken = false,
+): void {
+  g.fillStyle = sunken ? theme.chromeWell : theme.chromeFace
+  g.fillRect(x, y, w, h)
+
+  const topLeft = sunken ? theme.chromeShadow : theme.chromeLight
+  const bottomRight = sunken ? theme.chromeLight : theme.chromeShadow
+
+  g.fillStyle = topLeft
+  g.fillRect(x, y, w, 1)
+  g.fillRect(x, y, 1, h)
+  g.fillStyle = bottomRight
+  g.fillRect(x, y + h - 1, w, 1)
+  g.fillRect(x + w - 1, y, 1, h)
+}
+
+interface Cell {
+  readonly label: string
+  readonly value: string
+}
+
 function drawHud(
   g: CanvasRenderingContext2D,
   cam: Camera,
   airport: Airport,
   overlays: Overlays,
 ): void {
-  g.font = fonts.bold(11)
+  drawTitleBlock(g, airport)
+  drawStatusBar(g, cam, airport, overlays)
+}
+
+function drawTitleBlock(g: CanvasRenderingContext2D, airport: Airport): void {
+  const size = 11
+  const title = `${airport.icao} APPROACH`
+  const sub = airport.name.toUpperCase()
+  const w = Math.ceil(charW(size) * Math.max(title.length, sub.length)) + 18
+  const h = 40
+
+  bevel(g, 10, 10, w, h)
+
   g.textAlign = 'left'
   g.textBaseline = 'top'
-
+  g.font = fonts.bold(size)
   g.fillStyle = theme.accent
-  g.fillText(`${airport.icao} APPROACH`, 12, 12)
+  g.fillText(title, 19, 17)
+  g.font = fonts.label(9)
+  g.fillStyle = theme.chromeDim
+  g.fillText(sub, 19, 31)
+}
 
-  g.font = fonts.label(10)
-  g.fillStyle = theme.textDim
-  const scale = runwayScaleAt(airport.render, cam.pxPerNM)
-  g.fillText(
-    `RANGE ${cam.rangeNM.toFixed(0)} NM   ARR ${airport.arrivalRunways
-      .map((r) => r.id)
-      .join(' / ')}   RWY x${scale.toFixed(1)}`,
-    12,
-    30,
-  )
-  g.fillText('drag pan / wheel zoom / R reset / D theme / O overlays', 12, 44)
-
-  // Airspace provenance, on the display rather than buried in a config
-  // file: solid boundaries are published, dotted are rule-derived.
+function drawStatusBar(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  airport: Airport,
+  overlays: Overlays,
+): void {
   const shown = airport.airspace.filter((v) =>
     v.airspaceClass === 'G' ? overlays.trafficZones : overlays.airspace,
   )
   const published = shown.filter((v) => v.derivation === 'aip').length
   const ruled = shown.filter((v) => v.derivation === 'rule').length
-  g.fillStyle = theme.airspaceLabel
-  g.fillText(
-    `overlays ${densityOf(overlays)} (${countEnabled(overlays)}/8)   ` +
-      `airspace ${published} published / ${ruled} rule-derived`,
-    12,
-    58,
-  )
+  const scale = runwayScaleAt(airport.render, cam.pxPerNM)
+
+  const cells: Cell[] = [
+    { label: 'RANGE', value: `${cam.rangeNM.toFixed(0)} NM` },
+    { label: 'ARR', value: airport.arrivalRunways.map((r) => r.id).join('/') },
+    { label: 'RWY', value: `x${scale.toFixed(1)}` },
+    {
+      label: 'OVERLAYS',
+      value: `${densityOf(overlays).toUpperCase()} ${countEnabled(overlays)}/8`,
+    },
+    { label: 'AIRSPACE', value: `${published} PUBLISHED / ${ruled} RULE-DERIVED` },
+  ]
+
+  const barH = 24
+  const top = cam.height - barH - 8
+  const left = 10
+  const right = cam.width - 10
+  bevel(g, left, top, Math.max(40, right - left), barH)
+
+  const size = 9
+  const cw = charW(size)
+  let x = left + 5
+  const cellY = top + 4
+  const cellH = barH - 8
+
+  g.textAlign = 'left'
+  g.textBaseline = 'middle'
+
+  for (const cell of cells) {
+    const text = `${cell.label} ${cell.value}`
+    const cellW = Math.ceil(cw * text.length) + 12
+    // Stop rather than spill past the end of the bar on a narrow window.
+    if (x + cellW > right - 5) break
+
+    bevel(g, x, cellY, cellW, cellH, true)
+    const mid = cellY + cellH / 2
+
+    g.font = fonts.label(size)
+    g.fillStyle = theme.chromeDim
+    g.fillText(cell.label, x + 6, mid)
+    g.fillStyle = theme.accent
+    g.fillText(cell.value, x + 6 + Math.ceil(cw * (cell.label.length + 1)), mid)
+
+    x += cellW + 4
+  }
+
+  // Key hints sit at the right end, and are the first thing to go when the
+  // window is too narrow to hold them.
+  const hint = 'DRAG PAN  WHEEL ZOOM  R RESET  D THEME  O OVERLAYS'
+  const hintW = Math.ceil(cw * hint.length)
+  if (right - 8 - hintW > x) {
+    g.font = fonts.label(size)
+    g.fillStyle = theme.chromeDim
+    g.textAlign = 'right'
+    g.fillText(hint, right - 8, cellY + cellH / 2)
+  }
 }

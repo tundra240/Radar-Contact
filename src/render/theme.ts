@@ -45,6 +45,19 @@ export interface Palette {
   readonly textDim: string
   readonly accent: string
   readonly warn: string
+
+  /**
+   * Chrome: the raised and sunken panel faces that give the interface its
+   * period look. Bevels are drawn as a light edge on the top and left and a
+   * shadow edge on the bottom and right, so both need to exist per palette
+   * rather than being derived with a filter.
+   */
+  readonly chromeFace: string
+  readonly chromeLight: string
+  readonly chromeShadow: string
+  readonly chromeText: string
+  readonly chromeDim: string
+  readonly chromeWell: string
 }
 
 export const palettes: Record<'beige' | 'dark', Palette> = {
@@ -80,6 +93,13 @@ export const palettes: Record<'beige' | 'dark', Palette> = {
     textDim: '#5f5636',
     accent: '#0a6b74',
     warn: '#a32000',
+
+    chromeFace: '#bfb59a',
+    chromeLight: '#e4dcc6',
+    chromeShadow: '#736a51',
+    chromeText: '#241f14',
+    chromeDim: '#6b6248',
+    chromeWell: '#ada291',
   },
 
   dark: {
@@ -114,6 +134,13 @@ export const palettes: Record<'beige' | 'dark', Palette> = {
     textDim: '#5a6b7c',
     accent: '#00e5ff',
     warn: '#ff5252',
+
+    chromeFace: '#1b232c',
+    chromeLight: '#33424f',
+    chromeShadow: '#05080b',
+    chromeText: '#c8d4e0',
+    chromeDim: '#6b7d8c',
+    chromeWell: '#101720',
   },
 }
 

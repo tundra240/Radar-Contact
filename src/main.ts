@@ -168,6 +168,11 @@ function start(
   panel.className = 'overlay-panel'
   panel.hidden = true
 
+  const panelTitle = document.createElement('div')
+  panelTitle.className = 'overlay-title'
+  panelTitle.textContent = 'Display overlays'
+  panel.appendChild(panelTitle)
+
   const densityButton = document.createElement('button')
   densityButton.type = 'button'
   densityButton.className = 'overlay-density'
@@ -256,17 +261,24 @@ function start(
 
   const paintChrome = (): void => {
     const dark = paletteName() === 'dark'
-    toggle.textContent = dark ? 'LIGHT' : 'DARK'
+    // Shows the current display rather than the destination, which is what
+    // aria-pressed reports and what a state indicator of the era would do.
+    toggle.textContent = dark ? 'Mode dark' : 'Mode beige'
     toggle.title = dark ? 'Switch to the beige display' : 'Switch to the dark display'
     toggle.setAttribute('aria-pressed', String(dark))
     // Colours live in TypeScript, so the chrome is styled from the palette
     // rather than duplicating hex values in the stylesheet.
-    for (const el of [toggle, overlayButton, densityButton, panel]) {
-      el.style.background = theme.bg
-      el.style.color = theme.accent
-      el.style.borderColor = theme.ringStrong
-    }
-    panel.style.color = theme.text
+    // Chrome colours travel as CSS custom properties, so the stylesheet
+    // owns the bevel geometry and theme.ts stays the only place a hex
+    // value is written down.
+    const root = document.documentElement.style
+    root.setProperty('--face', theme.chromeFace)
+    root.setProperty('--well', theme.chromeWell)
+    root.setProperty('--bevel-light', theme.chromeLight)
+    root.setProperty('--bevel-shadow', theme.chromeShadow)
+    root.setProperty('--chrome-text', theme.chromeText)
+    root.setProperty('--chrome-dim', theme.chromeDim)
+    root.setProperty('--accent', theme.accent)
     document.body.style.background = theme.bg
     document.body.style.color = theme.text
   }

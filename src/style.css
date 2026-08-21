@@ -32,33 +32,26 @@ canvas {
   display: block;
 }
 
-/* Light / dark control. Colours are applied from the active palette in
-   main.ts, so hex values are not duplicated between here and theme.ts. */
-.mode-toggle {
-  position: fixed;
-  top: 12px;
-  right: 12px;
-  z-index: 10;
-  padding: 6px 12px;
-  font-family: inherit;
-  font-size: 10px;
-  line-height: 1;
-  letter-spacing: 0.08em;
-  border: 1px solid;
-  border-radius: 2px;
-  cursor: pointer;
+/* ---------------------------------------------------------------- chrome
+
+   Interface furniture in the idiom of early-2000s terminal software:
+   square corners, two-pixel bevels, uppercase letter-spaced labels. The
+   bevel is a light edge top-left and a shadow edge bottom-right, drawn
+   with inset box-shadows so it survives any face colour.
+
+   Colours arrive as custom properties set from the active palette in
+   main.ts, so no hex value is duplicated between here and theme.ts.       */
+
+:root {
+  --face: #bfb59a;
+  --well: #ada291;
+  --bevel-light: #e4dcc6;
+  --bevel-shadow: #736a51;
+  --chrome-text: #241f14;
+  --chrome-dim: #6b6248;
+  --accent: #0a6b74;
 }
 
-.mode-toggle:hover {
-  filter: brightness(1.1);
-}
-
-.mode-toggle:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
-}
-
-/* Control cluster: overlay and theme buttons with the overlay panel below. */
 .controls {
   position: fixed;
   top: 12px;
@@ -70,47 +63,130 @@ canvas {
   gap: 6px;
 }
 
-.controls .mode-toggle {
-  position: static;
-  top: auto;
-  right: auto;
+.mode-toggle {
+  min-width: 96px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+  cursor: pointer;
+}
+
+.mode-toggle:active {
+  /* Bevel inverts, so the control reads as pressed in. */
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+  padding: 7px 11px 5px 13px;
+}
+
+.mode-toggle:focus-visible {
+  outline: 1px dotted var(--chrome-text);
+  outline-offset: -4px;
 }
 
 .overlay-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 10px;
-  border: 1px solid;
-  border-radius: 2px;
+  width: 208px;
+  padding: 0 0 6px;
+  border: 0;
+  border-radius: 0;
   font-size: 11px;
-  min-width: 190px;
+  color: var(--chrome-text);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
 }
 
 .overlay-panel[hidden] {
   display: none;
 }
 
+.overlay-title {
+  margin: 2px 2px 6px;
+  padding: 4px 7px;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--chrome-dim);
+  background: var(--well);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
 .overlay-density {
+  display: block;
+  width: calc(100% - 14px);
+  margin: 0 7px 7px;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 0;
   font-family: inherit;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  padding: 4px 6px;
-  margin-bottom: 4px;
-  border: 1px solid;
-  border-radius: 2px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
   cursor: pointer;
+}
+
+.overlay-density:active {
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
 }
 
 .overlay-row {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
+  margin: 0 7px;
+  padding: 2px 0;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   cursor: pointer;
   user-select: none;
 }
 
+/* Square sunken indicator with a solid block when set, rather than the
+   platform checkbox, which would break the period entirely. */
 .overlay-row input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
   margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--well);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
   cursor: pointer;
+}
+
+.overlay-row input:checked {
+  background:
+    linear-gradient(var(--accent), var(--accent)) center / 6px 6px no-repeat,
+    var(--well);
+}
+
+.overlay-row input:focus-visible {
+  outline: 1px dotted var(--chrome-text);
+  outline-offset: 1px;
 }

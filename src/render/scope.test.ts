@@ -196,11 +196,15 @@ describe('airspace overlay', () => {
     expect(dashes.some((d) => d.length === 0)).toBe(true)
   })
 
-  it('states airspace provenance and overlay density on the display', () => {
+  it('states airspace provenance and overlay density in the status bar', () => {
     const { labels } = render()
-    expect(labels.some((s) => s.includes('published'))).toBe(true)
-    expect(labels.some((s) => s.includes('rule-derived'))).toBe(true)
-    expect(labels.some((s) => s.includes('overlays full'))).toBe(true)
+    // Readouts are label/value pairs in bevelled cells, so the label and
+    // its value are separate draws.
+    expect(labels).toContain('AIRSPACE')
+    expect(labels).toContain('OVERLAYS')
+    expect(labels.some((s) => s.includes('PUBLISHED'))).toBe(true)
+    expect(labels.some((s) => s.includes('RULE-DERIVED'))).toBe(true)
+    expect(labels.some((s) => s.includes('FULL'))).toBe(true)
   })
 
   it('shows the rule-derived traffic zones when zoomed in', () => {
@@ -224,8 +228,10 @@ describe('runway display scale', () => {
     expect(mid).toBeLessThan(airport.render.runwayExaggeration)
   })
 
-  it('reports the current magnification on the display', () => {
-    expect(render().labels.some((s) => s.includes('RWY x'))).toBe(true)
+  it('reports the current magnification in the status bar', () => {
+    const { labels } = render()
+    expect(labels).toContain('RWY')
+    expect(labels.some((s) => s.startsWith('x') && s.length <= 5)).toBe(true)
   })
 })
 
@@ -351,16 +357,57 @@ describe('overlay control', () => {
     expect(without.labels).not.toContain('113.60')
   })
 
-  it('reports the active density on the display', () => {
+  it('names the active density in the status bar', () => {
     expect(
       render(1000, 600, 30, OVERLAY_PRESETS.minimal).labels.some((s) =>
-        s.includes('overlays minimal'),
+        s.includes('MINIMAL'),
       ),
     ).toBe(true)
     expect(
       render(1000, 600, 30, only({ navaids: true })).labels.some((s) =>
-        s.includes('overlays custom'),
+        s.includes('CUSTOM'),
       ),
     ).toBe(true)
+  })
+})
+
+describe('period chrome', () => {
+  it('draws the readouts as bevelled panels', () => {
+    // Raised faces for the title block and status bar, sunken wells for
+    // each readout cell: the look is built from those two, so both must
+    // actually be painted.
+    const { fills } = render()
+    expect(fills).toContain(palettes.beige.chromeFace)
+    expect(fills).toContain(palettes.beige.chromeWell)
+    expect(fills).toContain(palettes.beige.chromeLight)
+    expect(fills).toContain(palettes.beige.chromeShadow)
+  })
+
+  it('names the field and the airport in the title block', () => {
+    const { labels } = render()
+    expect(labels).toContain('EGLL APPROACH')
+    expect(labels).toContain('LONDON HEATHROW')
+  })
+
+  it('keeps the status bar inside a narrow window', () => {
+    // Cells are dropped rather than allowed to spill past the bar, so a
+    // small viewport loses readouts instead of drawing over the edge.
+    const narrow = render(320, 400)
+    const wide = render(1400, 800)
+    expect(narrow.labels.length).toBeLessThan(wide.labels.length)
+    expect(narrow.labels).toContain('RANGE')
+  })
+
+  it('drops the key hints before it drops a readout', () => {
+    expect(render(1400, 800).labels.some((s) => s.includes('DRAG PAN'))).toBe(true)
+    expect(render(420, 400).labels.some((s) => s.includes('DRAG PAN'))).toBe(false)
+  })
+
+  it('follows the palette into dark mode', () => {
+    setPalette('dark')
+    const { fills } = render()
+    expect(fills).toContain(palettes.dark.chromeFace)
+    expect(fills).not.toContain(palettes.beige.chromeFace)
+    setPalette('beige')
   })
 })

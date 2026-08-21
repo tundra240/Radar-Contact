@@ -300,6 +300,30 @@ Using the published data earned its keep immediately: **Biggin Hill's ATZ is not
 2.5 NM**, where the runway-length rule gives 2 NM. The rule was wrong, and the source
 corrected it.
 
+### Chrome and readouts
+
+The interface furniture is deliberately in the idiom of early-2000s terminal software:
+square corners, two-pixel bevels, uppercase letter-spaced labels. A bevel is a light edge
+along the top and left with a shadow edge along the bottom and right, and the two swapped to
+read as sunken -- so each palette carries `chromeFace`, `chromeLight`, `chromeShadow`,
+`chromeWell`, `chromeText` and `chromeDim` rather than deriving them with a filter, which
+would fall apart between a light and a dark ground.
+
+Two separate mechanisms, one source of truth:
+
+- **On the scope**, `render/scope.ts` draws the title block and the status bar itself with a
+  `bevel()` helper. Readouts sit in sunken cells as label/value pairs. Layout uses monospace
+  advance-width arithmetic rather than `measureText`, so it is deterministic and testable
+  without a real canvas. Cells are dropped when the window is too narrow rather than allowed
+  to spill, and the key hints go first.
+- **The DOM controls** get their colours as CSS custom properties set from the active palette
+  in `main.ts`, so the stylesheet owns the bevel geometry and `theme.ts` stays the only
+  place a hex value is written down. Checkboxes are restyled to square sunken indicators,
+  because a platform checkbox would break the period immediately.
+
+Drawing the readouts on the scope rather than in an HTML status bar is also the more faithful
+choice: displays of this era put their data on the tube.
+
 ### Overlay density
 
 `render/overlays.ts` defines which layers are optional and three presets over them
