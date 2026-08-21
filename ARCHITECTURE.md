@@ -246,6 +246,56 @@ older VOR calibration epochs and is deliberately unused. Hold inbound legs are n
 in the open dataset, so the loader derives each one as the bearing from the fix to the field
 and flags it with `inboundIsDerived`; real STAR data overrides it per fix.
 
+### Surrounding traffic picture
+
+The config carries three further sections, all projected by the same loader:
+
+- **`navaids`** -- thirteen VOR/VOR-DME within about 45 NM, with real frequencies. The four
+  approach holds (LAM, BIG, BNN, OCK) are entries in this list that additionally carry a
+  `hold` object, so there is one source of navaid truth rather than two overlapping ones.
+  `airport.holdingFixes` is the derived subset.
+- **`airports`** -- fifteen aerodromes within roughly 40 NM: Northolt, London City, Biggin
+  Hill, Gatwick, Luton, Stansted, Farnborough, Blackbushe, Fairoaks, Denham, Elstree, Wycombe,
+  Redhill, Odiham and Oxford. Each carries its longest runway so the strip can be drawn on its
+  real bearing rather than as a generic dot.
+- **`airspace`** -- the London TMA, six control zones and ten aerodrome traffic zones.
+
+Note that the **BIG VOR sits on Biggin Hill aerodrome**, about 160 m from its reference point.
+That is real, not a data error, and it means a holding fix symbol and an aerodrome symbol
+land on top of each other; the renderer has to tolerate collisions rather than assume they
+cannot happen. There is a test pinning it.
+
+### Airspace: what is exact and what is not
+
+Airspace is the one part of this data that is not authoritative, and the code says so rather
+than implying otherwise.
+
+| Volume type | Geometry | Flagged |
+|---|---|---|
+| Aerodrome traffic zones | Computed from the UK rule: 2 NM radius where the longest runway is 1850 m or less, 2.5 NM otherwise, to 2000 ft above aerodrome level | `derivation: "rule"`, `approximate: false` -- drawn solid |
+| Control zones and the TMA | Circles standing in for the real irregular boundaries | `derivation: "approx"`, `approximate: true` -- drawn dashed, and the display says how many are approximate |
+
+The schema accepts a `polygon` vertex list as well as a `circle`, so authoritative AIP
+boundaries can replace the stand-ins with no code change at all -- there is a test that
+loads a polygon volume to prove that path works.
+
+On sourcing real boundaries: the VATSIM UK sector file is an open, community-maintained
+transcription of UK airspace and would be an excellent source, but it is **GPL-3.0**
+licensed, so nothing was copied from it here. Using it would be a licensing decision about
+this project, not a technical one. The alternative is openAIP, which needs an API key, or
+transcribing the UK AIP ENR charts directly.
+
+### Display scale
+
+Runways are about two miles long inside a forty mile sector, so at the default range they
+collapse to a couple of dozen pixels. `render.runwayExaggeration` (3) magnifies the painted
+strip, fading linearly to true scale by `exaggerationCutoffPxPerNM` (45), and the current
+factor is shown on the display. It is applied **from the threshold**, so the threshold, the
+extended centreline, the FAF and every future approach calculation stay exactly where they
+really are -- the exaggeration is paint, never geometry. Neighbouring aerodromes get
+`neighbourRunwayMinPx` instead, a floor on drawn length, because a 900 m grass strip is a
+third of a pixel at 40 NM.
+
 ---
 
 ## 5. Revised Roadmap
@@ -319,15 +369,15 @@ Rendering and interaction get checked by eye, which is what HMR is for.
 
 ## 8. Open Questions
 
-1. **Radar background shade.** Section 2 of the design doc describes the background as
-   "charcoal slate beige" without a hex value, which reads as a conflict between a
-   near-black and a warm light tone. `theme.ts` holds this as a single `bg` token plus a
-   derived set of line and text colours, so it is one edit either way -- but the direction
-   changes every other colour in the palette, since the existing neon teal, green and
-   crimson accents assume a dark ground and would need desaturating and darkening
-   substantially to stay legible on a light one. Day 0 shipped a dark palette in
-   `render/theme.ts`; switching now means repainting the accents, not flipping a token, so
-   this is worth settling before Day 1 adds targets and data blocks.
+1. **Radar background shade -- DECIDED: beige.** The display now runs a warm chart-paper
+   ground with dim, saturated accents, after the early-2000s terminals that drew dark
+   symbology on a light surface. As predicted, this was a repaint rather than a token swap:
+   the accents were retuned whole, because a colour that glows on black turns to mud on
+   beige. Both palettes live in `render/theme.ts` as `palettes.beige` and `palettes.dark`,
+   and the active one is a single named export, so reverting or adding a third scheme is one
+   line. Remaining sub-question: whether aircraft symbology in Day 1 wants a fourth accent
+   for "established on ILS" that reads against beige without competing with the amber used
+   for holds.
 2. **Runway mode.** The MVP lands both 27R and 27L. Real Heathrow segregates arrivals and
    departures and alternates at 15:00. Mixed-mode is simpler and is what is planned; the
    config can carry a `mode` field later.

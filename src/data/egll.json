@@ -1,10 +1,12 @@
 {
   "icao": "EGLL",
   "name": "London Heathrow",
-  "arp": { "lat": 51.470748, "lon": -0.459909 },
+  "arp": {
+    "lat": 51.470748,
+    "lon": -0.459909
+  },
   "elevationFt": 83,
   "magVarDeg": 0,
-
   "sector": {
     "radiusNM": 40,
     "ceilingFt": 15000,
@@ -12,94 +14,703 @@
     "speedLimitKts": 250,
     "speedLimitBelowFt": 10000,
     "interceptAltMaxFt": 3000,
-    "rangeRingsNM": [5, 10, 15, 20],
+    "rangeRingsNM": [
+      5,
+      10,
+      15,
+      20
+    ],
     "defaultRangeNM": 30,
-    "activeArrivalRunways": ["27R", "27L"]
+    "activeArrivalRunways": [
+      "27R",
+      "27L"
+    ]
   },
-
+  "render": {
+    "runwayExaggeration": 3,
+    "exaggerationCutoffPxPerNM": 45,
+    "neighbourRunwayMinPx": 9
+  },
   "runways": [
     {
       "id": "27R",
-      "threshold": { "lat": 51.477681, "lon": -0.433227 },
+      "threshold": {
+        "lat": 51.477681,
+        "lon": -0.433227
+      },
       "bearingTrue": 270,
       "lengthFt": 12799,
       "thresholdElevationFt": 78,
-      "ils": { "available": true, "glideslopeDeg": 3.0, "fafDistNM": 10, "minInterceptDeg": 30 }
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
     },
     {
       "id": "27L",
-      "threshold": { "lat": 51.464957, "lon": -0.434048 },
+      "threshold": {
+        "lat": 51.464957,
+        "lon": -0.434048
+      },
       "bearingTrue": 270,
       "lengthFt": 12001,
       "thresholdElevationFt": 77,
-      "ils": { "available": true, "glideslopeDeg": 3.0, "fafDistNM": 10, "minInterceptDeg": 30 }
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
     },
     {
       "id": "09L",
-      "threshold": { "lat": 51.47749, "lon": -0.489439 },
+      "threshold": {
+        "lat": 51.47749,
+        "lon": -0.489439
+      },
       "bearingTrue": 90,
       "lengthFt": 12799,
       "thresholdElevationFt": 79,
       "displacedThresholdFt": 1007,
-      "ils": { "available": true, "glideslopeDeg": 3.0, "fafDistNM": 10, "minInterceptDeg": 30 }
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
     },
     {
       "id": "09R",
-      "threshold": { "lat": 51.46478, "lon": -0.486808 },
+      "threshold": {
+        "lat": 51.46478,
+        "lon": -0.486808
+      },
       "bearingTrue": 90,
       "lengthFt": 12001,
       "thresholdElevationFt": 75,
       "displacedThresholdFt": 1013,
-      "ils": { "available": true, "glideslopeDeg": 3.0, "fafDistNM": 10, "minInterceptDeg": 30 }
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
     }
   ],
-
-  "fixes": [
+  "navaids": [
     {
       "name": "LAM",
       "fullName": "Lambourne",
       "lat": 51.646099,
       "lon": 0.151667,
-      "navaid": { "type": "VOR-DME", "freqMHz": 115.6 },
-      "hold": { "turns": "right", "legMins": 1 }
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 115.6
+      },
+      "hold": {
+        "turns": "right",
+        "legMins": 1
+      }
     },
     {
       "name": "BIG",
       "fullName": "Biggin",
       "lat": 51.330898,
       "lon": 0.034811,
-      "navaid": { "type": "VOR-DME", "freqMHz": 115.1 },
-      "hold": { "turns": "right", "legMins": 1 }
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 115.1
+      },
+      "hold": {
+        "turns": "right",
+        "legMins": 1
+      }
     },
     {
       "name": "BNN",
       "fullName": "Bovingdon",
       "lat": 51.726101,
       "lon": -0.549722,
-      "navaid": { "type": "VOR-DME", "freqMHz": 113.75 },
-      "hold": { "turns": "right", "legMins": 1 }
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 113.75
+      },
+      "hold": {
+        "turns": "right",
+        "legMins": 1
+      }
     },
     {
       "name": "OCK",
       "fullName": "Ockham",
       "lat": 51.305,
       "lon": -0.447222,
-      "navaid": { "type": "VOR-DME", "freqMHz": 115.3 },
-      "hold": { "turns": "right", "legMins": 1 }
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 115.3
+      },
+      "hold": {
+        "turns": "right",
+        "legMins": 1
+      }
+    },
+    {
+      "name": "LON",
+      "fullName": "London",
+      "lat": 51.487202,
+      "lon": -0.466667,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 113.6
+      }
+    },
+    {
+      "name": "BPK",
+      "fullName": "Brookmans Park",
+      "lat": 51.749699,
+      "lon": -0.106667,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 117.5
+      }
+    },
+    {
+      "name": "MID",
+      "fullName": "Midhurst",
+      "lat": 51.053902,
+      "lon": -0.625,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 114
+      }
+    },
+    {
+      "name": "CPT",
+      "fullName": "Compton",
+      "lat": 51.491699,
+      "lon": -1.21972,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 114.35
+      }
+    },
+    {
+      "name": "MAY",
+      "fullName": "Mayfield",
+      "lat": 51.0172,
+      "lon": 0.116111,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 117.9
+      }
+    },
+    {
+      "name": "BKY",
+      "fullName": "Barkway",
+      "lat": 51.9897,
+      "lon": 0.061944,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 116.25
+      }
+    },
+    {
+      "name": "GWC",
+      "fullName": "Goodwood",
+      "lat": 50.855301,
+      "lon": -0.756667,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 114.75
+      }
+    },
+    {
+      "name": "DET",
+      "fullName": "Detling",
+      "lat": 51.303902,
+      "lon": 0.597222,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 117.3
+      }
+    },
+    {
+      "name": "CFD",
+      "fullName": "Cranfield",
+      "lat": 52.0742,
+      "lon": -0.610792,
+      "navaid": {
+        "type": "VOR",
+        "freqMHz": 116.5
+      }
     }
   ],
-
-  "aircraftTypes": [
-    { "type": "A319", "wake": "M", "cruiseKts": 250, "approachKts": 135 },
-    { "type": "A320", "wake": "M", "cruiseKts": 250, "approachKts": 140 },
-    { "type": "A321", "wake": "M", "cruiseKts": 250, "approachKts": 142 },
-    { "type": "B738", "wake": "M", "cruiseKts": 250, "approachKts": 142 },
-    { "type": "A350", "wake": "H", "cruiseKts": 280, "approachKts": 148 },
-    { "type": "B789", "wake": "H", "cruiseKts": 280, "approachKts": 150 },
-    { "type": "B77W", "wake": "H", "cruiseKts": 280, "approachKts": 152 },
-    { "type": "A388", "wake": "J", "cruiseKts": 280, "approachKts": 145 }
+  "airports": [
+    {
+      "icao": "EGWU",
+      "name": "RAF Northolt",
+      "iata": "NHT",
+      "kind": "medium",
+      "lat": 51.553001,
+      "lon": -0.418167,
+      "elevationFt": 124,
+      "primaryRunway": {
+        "ident": "07/25",
+        "bearingTrue": 69.7,
+        "lengthFt": 5545
+      }
+    },
+    {
+      "icao": "EGLD",
+      "name": "Denham",
+      "iata": null,
+      "kind": "small",
+      "lat": 51.588299,
+      "lon": -0.513056,
+      "elevationFt": 249,
+      "primaryRunway": {
+        "ident": "06/24",
+        "bearingTrue": 59,
+        "lengthFt": 2543
+      }
+    },
+    {
+      "icao": "EGTF",
+      "name": "Fairoaks",
+      "iata": null,
+      "kind": "small",
+      "lat": 51.348099,
+      "lon": -0.558889,
+      "elevationFt": 80,
+      "primaryRunway": {
+        "ident": "06/24",
+        "bearingTrue": 59,
+        "lengthFt": 2667
+      }
+    },
+    {
+      "icao": "EGTR",
+      "name": "Elstree",
+      "iata": null,
+      "kind": "small",
+      "lat": 51.6558,
+      "lon": -0.325833,
+      "elevationFt": 332,
+      "primaryRunway": {
+        "ident": "08/26",
+        "bearingTrue": 80,
+        "lengthFt": 2135
+      }
+    },
+    {
+      "icao": "EGTB",
+      "name": "Wycombe Air Park",
+      "iata": "HYC",
+      "kind": "small",
+      "lat": 51.61177,
+      "lon": -0.808316,
+      "elevationFt": 515,
+      "primaryRunway": {
+        "ident": "06/24",
+        "bearingTrue": 62,
+        "lengthFt": 2411
+      }
+    },
+    {
+      "icao": "EGLF",
+      "name": "Farnborough",
+      "iata": "FAB",
+      "kind": "medium",
+      "lat": 51.275799,
+      "lon": -0.776333,
+      "elevationFt": 238,
+      "primaryRunway": {
+        "ident": "06/24",
+        "bearingTrue": 62,
+        "lengthFt": 8005
+      }
+    },
+    {
+      "icao": "EGLK",
+      "name": "Blackbushe",
+      "iata": "BBS",
+      "kind": "medium",
+      "lat": 51.323898,
+      "lon": -0.8475,
+      "elevationFt": 325,
+      "primaryRunway": {
+        "ident": "07/25",
+        "bearingTrue": 72,
+        "lengthFt": 4380
+      }
+    },
+    {
+      "icao": "EGLC",
+      "name": "London City",
+      "iata": "LCY",
+      "kind": "medium",
+      "lat": 51.505299,
+      "lon": 0.055278,
+      "elevationFt": 19,
+      "primaryRunway": {
+        "ident": "09/27",
+        "bearingTrue": 93,
+        "lengthFt": 4948
+      }
+    },
+    {
+      "icao": "EGKR",
+      "name": "Redhill",
+      "iata": null,
+      "kind": "small",
+      "lat": 51.2136,
+      "lon": -0.138611,
+      "elevationFt": 222,
+      "primaryRunway": {
+        "ident": "07R/25L",
+        "bearingTrue": 0,
+        "lengthFt": 2943
+      }
+    },
+    {
+      "icao": "EGKB",
+      "name": "London Biggin Hill",
+      "iata": "BQH",
+      "kind": "medium",
+      "lat": 51.330799,
+      "lon": 0.0325,
+      "elevationFt": 598,
+      "primaryRunway": {
+        "ident": "03/21",
+        "bearingTrue": 25,
+        "lengthFt": 5925
+      }
+    },
+    {
+      "icao": "EGKK",
+      "name": "London Gatwick",
+      "iata": "LGW",
+      "kind": "large",
+      "lat": 51.148744,
+      "lon": -0.185739,
+      "elevationFt": 202,
+      "primaryRunway": {
+        "ident": "08R/26L",
+        "bearingTrue": 78,
+        "lengthFt": 10883
+      }
+    },
+    {
+      "icao": "EGVO",
+      "name": "RAF Odiham",
+      "iata": "ODH",
+      "kind": "medium",
+      "lat": 51.2341,
+      "lon": -0.942825,
+      "elevationFt": 405,
+      "primaryRunway": {
+        "ident": "09/27",
+        "bearingTrue": 93,
+        "lengthFt": 6030
+      }
+    },
+    {
+      "icao": "EGGW",
+      "name": "London Luton",
+      "iata": "LTN",
+      "kind": "large",
+      "lat": 51.874699,
+      "lon": -0.368333,
+      "elevationFt": 526,
+      "primaryRunway": {
+        "ident": "07/25",
+        "bearingTrue": 74,
+        "lengthFt": 7093
+      }
+    },
+    {
+      "icao": "EGSS",
+      "name": "London Stansted",
+      "iata": "STN",
+      "kind": "large",
+      "lat": 51.884998,
+      "lon": 0.235,
+      "elevationFt": 348,
+      "primaryRunway": {
+        "ident": "04/22",
+        "bearingTrue": 44,
+        "lengthFt": 10003
+      }
+    },
+    {
+      "icao": "EGTK",
+      "name": "London Oxford",
+      "iata": "OXF",
+      "kind": "medium",
+      "lat": 51.836899,
+      "lon": -1.32,
+      "elevationFt": 270,
+      "primaryRunway": {
+        "ident": "01/19",
+        "bearingTrue": 11,
+        "lengthFt": 5006
+      }
+    }
   ],
-
+  "airspace": [
+    {
+      "id": "LONDON TMA",
+      "label": "LONDON TMA",
+      "class": "A",
+      "kind": "circle",
+      "centre": {
+        "lat": 51.4861,
+        "lon": -0.4686
+      },
+      "radiusNM": 40,
+      "floorFt": 2500,
+      "ceilingFt": 19500,
+      "approximate": true
+    },
+    {
+      "id": "LONDON CTR",
+      "label": "LONDON CTR",
+      "class": "D",
+      "kind": "circle",
+      "centreAirport": "EGLL",
+      "radiusNM": 10,
+      "floorFt": 0,
+      "ceilingFt": 2500,
+      "approximate": true
+    },
+    {
+      "id": "LONDON CITY CTR",
+      "label": "CITY CTR",
+      "class": "D",
+      "kind": "circle",
+      "centreAirport": "EGLC",
+      "radiusNM": 5,
+      "floorFt": 0,
+      "ceilingFt": 2500,
+      "approximate": true
+    },
+    {
+      "id": "GATWICK CTR",
+      "label": "GATWICK CTR",
+      "class": "D",
+      "kind": "circle",
+      "centreAirport": "EGKK",
+      "radiusNM": 8,
+      "floorFt": 0,
+      "ceilingFt": 2500,
+      "approximate": true
+    },
+    {
+      "id": "LUTON CTR",
+      "label": "LUTON CTR",
+      "class": "D",
+      "kind": "circle",
+      "centreAirport": "EGGW",
+      "radiusNM": 6,
+      "floorFt": 0,
+      "ceilingFt": 3500,
+      "approximate": true
+    },
+    {
+      "id": "STANSTED CTR",
+      "label": "STANSTED CTR",
+      "class": "D",
+      "kind": "circle",
+      "centreAirport": "EGSS",
+      "radiusNM": 7,
+      "floorFt": 0,
+      "ceilingFt": 3500,
+      "approximate": true
+    },
+    {
+      "id": "FARNBOROUGH CTR",
+      "label": "FARNBRO CTR",
+      "class": "D",
+      "kind": "circle",
+      "centreAirport": "EGLF",
+      "radiusNM": 5,
+      "floorFt": 0,
+      "ceilingFt": 2000,
+      "approximate": true
+    },
+    {
+      "id": "EGWU ATZ",
+      "label": "EGWU ATZ",
+      "class": "G",
+      "kind": "circle",
+      "centreAirport": "EGWU",
+      "radiusNM": 2,
+      "floorFt": 0,
+      "ceilingFt": 2124,
+      "derivation": "rule",
+      "approximate": false
+    },
+    {
+      "id": "EGLD ATZ",
+      "label": "EGLD ATZ",
+      "class": "G",
+      "kind": "circle",
+      "centreAirport": "EGLD",
+      "radiusNM": 2,
+      "floorFt": 0,
+      "ceilingFt": 2249,
+      "derivation": "rule",
+      "approximate": false
+    },
+    {
+      "id": "EGTF ATZ",
+      "label": "EGTF ATZ",
+      "class": "G",
+      "kind": "circle",
+      "centreAirport": "EGTF",
+      "radiusNM": 2,
+      "floorFt": 0,
+      "ceilingFt": 2080,
+      "derivation": "rule",
+      "approximate": false
+    },
+    {
+      "id": "EGTR ATZ",
+      "label": "EGTR ATZ",
+      "class": "G",
+      "kind": "circle",
+      "centreAirport": "EGTR",
+      "radiusNM": 2,
+      "floorFt": 0,
+      "ceilingFt": 2332,
+      "derivation": "rule",
+      "approximate": false
+    },
+    {
+      "id": "EGTB ATZ",
+      "label": "EGTB ATZ",
+      "class": "G",
+      "kind": "circle",
+      "centreAirport": "EGTB",
+      "radiusNM": 2,
+      "floorFt": 0,
+      "ceilingFt": 2515,
+      "derivation": "rule",
+      "approximate": false
+    },
+    {
+      "id": "EGLK ATZ",
+      "label": "EGLK ATZ",
+      "class": "G",
+      "kind": "circle",
+      "centreAirport": "EGLK",
+      "radiusNM": 2,
+      "floorFt": 0,
+      "ceilingFt": 2325,
+      "derivation": "rule",
+      "approximate": false
+    },
+    {
+      "id": "EGKB ATZ",
+      "label": "EGKB ATZ",
+      "class": "G",
+      "kind": "circle",
+      "centreAirport": "EGKB",
+      "radiusNM": 2,
+      "floorFt": 0,
+      "ceilingFt": 2598,
+      "derivation": "rule",
+      "approximate": false
+    },
+    {
+      "id": "EGKR ATZ",
+      "label": "EGKR ATZ",
+      "class": "G",
+      "kind": "circle",
+      "centreAirport": "EGKR",
+      "radiusNM": 2,
+      "floorFt": 0,
+      "ceilingFt": 2222,
+      "derivation": "rule",
+      "approximate": false
+    },
+    {
+      "id": "EGVO ATZ",
+      "label": "EGVO ATZ",
+      "class": "G",
+      "kind": "circle",
+      "centreAirport": "EGVO",
+      "radiusNM": 2,
+      "floorFt": 0,
+      "ceilingFt": 2405,
+      "derivation": "rule",
+      "approximate": false
+    },
+    {
+      "id": "EGTK ATZ",
+      "label": "EGTK ATZ",
+      "class": "G",
+      "kind": "circle",
+      "centreAirport": "EGTK",
+      "radiusNM": 2,
+      "floorFt": 0,
+      "ceilingFt": 2270,
+      "derivation": "rule",
+      "approximate": false
+    }
+  ],
+  "aircraftTypes": [
+    {
+      "type": "A319",
+      "wake": "M",
+      "cruiseKts": 250,
+      "approachKts": 135
+    },
+    {
+      "type": "A320",
+      "wake": "M",
+      "cruiseKts": 250,
+      "approachKts": 140
+    },
+    {
+      "type": "A321",
+      "wake": "M",
+      "cruiseKts": 250,
+      "approachKts": 142
+    },
+    {
+      "type": "B738",
+      "wake": "M",
+      "cruiseKts": 250,
+      "approachKts": 142
+    },
+    {
+      "type": "A350",
+      "wake": "H",
+      "cruiseKts": 280,
+      "approachKts": 148
+    },
+    {
+      "type": "B789",
+      "wake": "H",
+      "cruiseKts": 280,
+      "approachKts": 150
+    },
+    {
+      "type": "B77W",
+      "wake": "H",
+      "cruiseKts": 280,
+      "approachKts": 152
+    },
+    {
+      "type": "A388",
+      "wake": "J",
+      "cruiseKts": 280,
+      "approachKts": 145
+    }
+  ],
   "provenance": {
     "positions": "Airport reference point, runway threshold coordinates, elevations and displaced thresholds from the OurAirports open dataset (airports.csv, runways.csv). Navaid positions and frequencies from OurAirports navaids.csv.",
     "retrieved": "2026-08-21",
@@ -108,7 +719,11 @@
       "bearingTrue is the published rounded value. The bearing computed geometrically between the 09L and 27R thresholds is about 269.7 degrees; airport.test.ts asserts the two agree within half a degree, so a genuinely wrong threshold or bearing in any future airport file fails the test.",
       "Hold inbound tracks are not published in the source dataset. The loader derives each hold's inbound leg as the bearing from the fix to the airport reference point, which is a sensible default rather than a charted procedure. Override per fix with hold.inboundTrue when real STAR data is added.",
       "Transition altitude is deliberately not encoded: the UK value has been under review and the simulation does not use it yet.",
-      "Runway threshold separation between 27R and 27L computes to 0.764 NM (1415 m), matching Heathrow's published parallel centreline spacing."
+      "Runway threshold separation between 27R and 27L computes to 0.764 NM (1415 m), matching Heathrow's published parallel centreline spacing.",
+      "Surrounding airports and VOR positions are from the same OurAirports datasets. Fifteen aerodromes within about 40 NM and thirteen VOR/VOR-DME within 45 NM are included.",
+      "Aerodrome Traffic Zones are computed from the UK rule rather than guessed: radius 2 NM where the longest runway is 1850 m or less and 2.5 NM otherwise, extending to 2000 ft above aerodrome level. They carry derivation \"rule\" and approximate false.",
+      "Control zones and the London TMA are drawn as CIRCLES and flagged approximate true. Real CTR and TMA boundaries are irregular polygons published in the UK AIP; the schema accepts a polygon vertex list so authoritative boundaries can replace these without any code change. The VATSIM UK sector file is one open source of such coordinates but is GPL-3.0 licensed, so it was deliberately not copied here.",
+      "render.runwayExaggeration is a display-only magnification of the painted runway strip, applied from the threshold so approach geometry stays exact, and faded out as the scope zooms in."
     ]
   }
 }

@@ -112,9 +112,14 @@ function start(
   // Sanity line in the console: if the projection were wrong, these
   // distances and bearings would be visibly nonsense.
   console.info(
-    `${airport.icao} loaded: ${airport.runways.length} runways, ` +
-      `${airport.fixes.length} fixes -- ` +
-      airport.fixes
+    `${airport.icao}: ${airport.runways.length} runways, ` +
+      `${airport.navaids.length} navaids (${airport.holdingFixes.length} holds), ` +
+      `${airport.airports.length} nearby aerodromes, ` +
+      `${airport.airspace.length} airspace volumes`,
+  )
+  console.info(
+    'holds: ' +
+      airport.holdingFixes
         .map(
           (f) =>
             `${f.name} ${f.distanceFromArpNM.toFixed(1)}NM/${f.bearingFromArpTrue.toFixed(0)}deg`,

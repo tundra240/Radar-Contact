@@ -5,7 +5,7 @@ import {
   glideslopeAltFt,
   loadAirport,
   type Airport,
-  type Fix,
+  type Navaid,
   type Runway,
 } from './airport'
 import { angleDelta, bearingDeg, distanceNM } from '../core/geo'
@@ -18,8 +18,8 @@ function runway(id: string): Runway {
   return r
 }
 
-function fix(name: string): Fix {
-  const f = egll.fixes.find((x) => x.name === name)
+function fix(name: string): Navaid {
+  const f = egll.navaids.find((x) => x.name === name)
   if (!f) throw new Error(`no fix ${name} in config`)
   return f
 }
@@ -119,13 +119,13 @@ describe('approach geometry', () => {
 
 describe('feeder fixes', () => {
   it('loads all four Heathrow holds with their navaids', () => {
-    expect(egll.fixes.map((f) => f.name)).toEqual(['LAM', 'BIG', 'BNN', 'OCK'])
+    expect(egll.holdingFixes.map((f) => f.name)).toEqual(['LAM', 'BIG', 'BNN', 'OCK'])
     expect(fix('LAM').fullName).toBe('Lambourne')
-    expect(fix('BNN').navaid?.freqMHz).toBe(113.75)
+    expect(fix('BNN').station?.freqMHz).toBe(113.75)
   })
 
   it('places every fix inside the sector', () => {
-    for (const f of egll.fixes) {
+    for (const f of egll.holdingFixes) {
       expect(f.distanceFromArpNM, f.name).toBeLessThan(egll.sector.radiusNM)
       expect(f.distanceFromArpNM, f.name).toBeGreaterThan(5)
     }
@@ -152,7 +152,7 @@ describe('feeder fixes', () => {
   })
 
   it('derives hold inbound legs pointing at the airport', () => {
-    for (const f of egll.fixes) {
+    for (const f of egll.holdingFixes) {
       expect(f.hold, f.name).not.toBeNull()
       if (!f.hold) continue
       expect(f.hold.inboundIsDerived, f.name).toBe(true)
@@ -166,13 +166,13 @@ describe('feeder fixes', () => {
 
   it('honours an explicit inbound track when one is supplied', () => {
     const cfg = structuredClone(raw) as Record<string, unknown>
-    const fixes = cfg['fixes'] as Array<Record<string, unknown>>
+    const fixes = cfg['navaids'] as Array<Record<string, unknown>>
     const first = fixes[0]
     if (!first) throw new Error('fixture has no fixes')
     first['hold'] = { turns: 'left', legMins: 1, inboundTrue: 233 }
 
     const loaded = loadAirport(cfg)
-    const lam = loaded.fixes[0]
+    const lam = loaded.navaids[0]
     expect(lam?.hold?.inboundTrue).toBe(233)
     expect(lam?.hold?.inboundIsDerived).toBe(false)
     expect(lam?.hold?.turns).toBe('left')
@@ -259,5 +259,233 @@ describe('config validation', () => {
         if (r) delete r['bearingTrue']
       }),
     ).toThrow(/runways\[2\].bearingTrue must be a finite number/)
+  })
+})
+
+describe('surrounding aerodromes', () => {
+  function neighbour(icao: string) {
+    const a = egll.airports.find((x) => x.icao === icao)
+    if (!a) throw new Error(`no aerodrome ${icao}`)
+    return a
+  }
+
+  it('loads the aerodromes in the vicinity', () => {
+    expect(egll.airports.length).toBeGreaterThanOrEqual(12)
+    for (const icao of ['EGWU', 'EGLC', 'EGKB', 'EGKK', 'EGGW', 'EGSS', 'EGLF']) {
+      expect(egll.airports.map((a) => a.icao), icao).toContain(icao)
+    }
+  })
+
+  it('places them at their real range and bearing', () => {
+    // Cross-checked against the source dataset.
+    const expected: Record<string, { d: number; b: number }> = {
+      EGWU: { d: 5.2, b: 18 },
+      EGLC: { d: 19.4, b: 84 },
+      EGKB: { d: 20.3, b: 114 },
+      EGKK: { d: 21.9, b: 152 },
+      EGGW: { d: 24.5, b: 8 },
+    }
+    for (const [icao, e] of Object.entries(expected)) {
+      const a = neighbour(icao)
+      expect(a.distanceFromArpNM, `${icao} distance`).toBeCloseTo(e.d, 0)
+      expect(Math.abs(angleDelta(e.b, a.bearingFromArpTrue)), `${icao} bearing`).toBeLessThan(1)
+    }
+  })
+
+  it('carries a primary runway for drawing', () => {
+    const kk = neighbour('EGKK')
+    expect(kk.primaryRunway).not.toBeNull()
+    // Gatwick's main runway is a little over 1.7 NM.
+    expect(kk.primaryRunway?.lengthNM).toBeGreaterThan(1.4)
+    expect(kk.iata).toBe('LGW')
+  })
+
+  it('has the BIG navaid co-located with Biggin Hill aerodrome', () => {
+    // Not a coincidence and not a data error: the Biggin VOR-DME sits on
+    // Biggin Hill itself, about 160 m from the aerodrome reference point.
+    // Worth pinning, because it means the BIG hold symbol and the EGKB
+    // aerodrome symbol land on top of each other and the renderer has to
+    // cope rather than assume navaids and aerodromes never collide.
+    const kb = neighbour('EGKB')
+    const big = fix('BIG')
+    const sep = distanceNM(kb.posNM, big.posNM)
+    expect(sep).toBeLessThan(0.2)
+    expect(sep * 1852).toBeGreaterThan(100)
+  })
+})
+
+describe('navaids', () => {
+  it('loads the surrounding VORs as well as the holds', () => {
+    expect(egll.navaids.length).toBeGreaterThanOrEqual(12)
+    expect(egll.holdingFixes.length).toBe(4)
+    for (const n of ['LON', 'BPK', 'MID', 'CPT', 'MAY']) {
+      expect(egll.navaids.map((x) => x.name), n).toContain(n)
+    }
+  })
+
+  it('puts the London VOR essentially on the field', () => {
+    expect(fix('LON').distanceFromArpNM).toBeLessThan(2)
+    expect(fix('LON').station?.freqMHz).toBe(113.6)
+  })
+
+  it('gives holds a pattern and plain navaids none', () => {
+    expect(fix('LAM').hold).not.toBeNull()
+    expect(fix('CPT').hold).toBeNull()
+  })
+})
+
+describe('airspace', () => {
+  function volume(id: string) {
+    const v = egll.airspace.find((x) => x.id === id)
+    if (!v) throw new Error(`no airspace ${id}`)
+    return v
+  }
+
+  it('loads the TMA, the control zones and the traffic zones', () => {
+    expect(egll.airspace.length).toBeGreaterThanOrEqual(15)
+    for (const id of ['LONDON TMA', 'LONDON CTR', 'GATWICK CTR', 'EGWU ATZ']) {
+      expect(egll.airspace.map((v) => v.id), id).toContain(id)
+    }
+  })
+
+  it('describes the TMA as a class A volume above the zones', () => {
+    const tma = volume('LONDON TMA')
+    expect(tma.airspaceClass).toBe('A')
+    expect(tma.floorFt).toBe(2500)
+    expect(tma.ceilingFt).toBe(19500)
+    expect(tma.shape.kind).toBe('circle')
+  })
+
+  it('anchors a zone on the aerodrome it names', () => {
+    const ctr = volume('GATWICK CTR')
+    const kk = egll.airports.find((a) => a.icao === 'EGKK')
+    expect(kk).toBeDefined()
+    if (!kk || ctr.shape.kind !== 'circle') return
+    expect(distanceNM(ctr.shape.centreNM, kk.posNM)).toBeCloseTo(0, 9)
+  })
+
+  it('derives traffic zones from the UK rule rather than guessing', () => {
+    // Radius 2 NM where the longest runway is 1850 m or less, otherwise
+    // 2.5 NM, up to 2000 ft above aerodrome level. Because that is a rule
+    // and not an estimate, these are NOT flagged approximate.
+    const atzs = egll.airspace.filter((v) => v.id.endsWith(' ATZ'))
+    expect(atzs.length).toBeGreaterThanOrEqual(8)
+
+    for (const atz of atzs) {
+      expect(atz.derivation, atz.id).toBe('rule')
+      expect(atz.approximate, atz.id).toBe(false)
+      expect(atz.airspaceClass, atz.id).toBe('G')
+      if (atz.shape.kind !== 'circle') throw new Error('ATZ must be a circle')
+      expect([2, 2.5], atz.id).toContain(atz.shape.radiusNM)
+
+      const icao = atz.id.slice(0, 4)
+      const field = egll.airports.find((a) => a.icao === icao)
+      expect(field, icao).toBeDefined()
+      if (!field) continue
+      expect(atz.ceilingFt, atz.id).toBe(field.elevationFt + 2000)
+      // And the radius must match the rule for that field's runway.
+      const m = (field.primaryRunway?.lengthNM ?? 0) * 1852
+      expect(atz.shape.radiusNM, `${atz.id} radius for ${Math.round(m)} m`).toBe(
+        m <= 1850 ? 2 : 2.5,
+      )
+    }
+  })
+
+  it('flags the control zones as approximations', () => {
+    // They are irregular polygons in the AIP; circles are stand-ins and the
+    // display dashes them so that is visible rather than implied.
+    for (const id of ['LONDON CTR', 'GATWICK CTR', 'LONDON TMA']) {
+      expect(volume(id).approximate, id).toBe(true)
+      expect(volume(id).derivation, id).toBe('approx')
+    }
+  })
+})
+
+describe('airspace validation', () => {
+  function mutateAirspace(fn: (v: Record<string, unknown>[]) => void): () => Airport {
+    return () => {
+      const cfg = structuredClone(raw) as Record<string, unknown>
+      fn(cfg['airspace'] as Record<string, unknown>[])
+      return loadAirport(cfg)
+    }
+  }
+
+  it('rejects a zone anchored on an unknown aerodrome', () => {
+    expect(
+      mutateAirspace((v) => {
+        const first = v[0]
+        if (first) {
+          delete first['centre']
+          first['centreAirport'] = 'ZZZZ'
+        }
+      }),
+    ).toThrow(/unknown aerodrome "ZZZZ"/)
+  })
+
+  it('rejects an airspace class outside A-G', () => {
+    expect(
+      mutateAirspace((v) => {
+        const first = v[0]
+        if (first) first['class'] = 'Q'
+      }),
+    ).toThrow(/single letter A-G/)
+  })
+
+  it('rejects a ceiling at or below the floor', () => {
+    expect(
+      mutateAirspace((v) => {
+        const first = v[0]
+        if (first) first['ceilingFt'] = 0
+      }),
+    ).toThrow(/ceilingFt must be above floorFt/)
+  })
+
+  it('rejects an unknown shape kind', () => {
+    expect(
+      mutateAirspace((v) => {
+        const first = v[0]
+        if (first) first['kind'] = 'blob'
+      }),
+    ).toThrow(/must be "circle" or "polygon"/)
+  })
+
+  it('rejects a degenerate polygon', () => {
+    expect(
+      mutateAirspace((v) => {
+        const first = v[0]
+        if (first) {
+          first['kind'] = 'polygon'
+          first['vertices'] = [{ lat: 51.5, lon: -0.4 }, { lat: 51.6, lon: -0.3 }]
+        }
+      }),
+    ).toThrow(/at least 3 points/)
+  })
+
+  it('accepts a real polygon boundary', () => {
+    // The path an authoritative AIP boundary takes when it replaces one of
+    // the circular stand-ins: no code change, just different config.
+    const loaded = mutateAirspace((v) => {
+      const first = v[0]
+      if (first) {
+        first['kind'] = 'polygon'
+        first['approximate'] = false
+        first['derivation'] = 'aip'
+        first['vertices'] = [
+          { lat: 51.7, lon: -0.7 },
+          { lat: 51.7, lon: -0.2 },
+          { lat: 51.3, lon: -0.2 },
+          { lat: 51.3, lon: -0.7 },
+        ]
+      }
+    })()
+
+    const v = loaded.airspace[0]
+    expect(v?.shape.kind).toBe('polygon')
+    expect(v?.approximate).toBe(false)
+    expect(v?.derivation).toBe('aip')
+    if (v?.shape.kind !== 'polygon') return
+    expect(v.shape.verticesNM.length).toBe(4)
+    // Projected, so the northern edge really is north of the southern one.
+    expect(v.shape.verticesNM[0]?.y).toBeGreaterThan(v.shape.verticesNM[2]?.y ?? 0)
   })
 })
