@@ -19,7 +19,13 @@ npm run dev        # http://localhost:5173
 | `npm run typecheck` | Type-check only |
 
 On the scope: drag to pan, wheel to zoom, `R` to reset the view, `D` to switch between the
-display schemes, `O` to open the overlay panel. The buttons in the top right do the same.
+display schemes, `O` to open the overlay panel, and space to pause. The buttons in the top
+right do the same.
+
+The simulation runs in fixed 50 ms steps at 20 Hz and the rate buttons run it at 0.5x, 1x, 2x
+or 4x. Changing the rate changes how many steps happen per real second, never the size of a
+step, so fast-forward is the same simulation sooner rather than a different one. The status
+bar clock keeps simulated time and stops when paused.
 
 Three display schemes cycle in order: **beige** (a Windows-2000-era desktop with a tan tube),
 **dark** (a colour CRT), and **amber** (a monochrome phosphor tube). The choice persists.

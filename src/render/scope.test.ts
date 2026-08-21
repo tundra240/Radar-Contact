@@ -4,6 +4,7 @@ import { loadAirport, runwayScaleAt } from '../data/airport'
 import raw from '../data/egll.json'
 import { drawScope } from './scope'
 import { OVERLAY_PRESETS, type Overlays } from './overlays'
+import type { ScopeStatus } from './scope'
 import { PALETTE_ORDER, palettes, setPalette } from './theme'
 
 /**
@@ -71,6 +72,14 @@ function recorder(): {
 
 const airport = loadAirport(raw)
 
+// A settled clock, so the status bar has something to show without the
+// tests needing a running loop.
+const STATUS: ScopeStatus = {
+  clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 12 * 3600 },
+  speed: 1,
+  paused: false,
+}
+
 // Most tests assert that a feature draws, so they render everything; the
 // overlay tests pass a narrower set explicitly.
 function render(
@@ -82,7 +91,7 @@ function render(
   const cam = new Camera({ x: 0, y: 0 }, rangeNM, { maxNM: 200 })
   cam.setViewport(w, h)
   const rec = recorder()
-  drawScope(rec.ctx, cam, airport, overlays)
+  drawScope(rec.ctx, cam, airport, overlays, STATUS)
   return { ...rec, cam, labels: rec.texts.map((t) => t.s) }
 }
 
@@ -535,7 +544,7 @@ describe('labels stay with their airspace when panning', () => {
     const cam = new Camera(centre, rangeNM, { maxNM: 200 })
     cam.setViewport(1000, 600)
     const rec = recorder()
-    drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.full)
+    drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.full, STATUS)
     return { ...rec, cam }
   }
 
@@ -697,5 +706,53 @@ describe('labels hold still while zooming', () => {
       expect(Math.hypot(pa.x - pb.x, pa.y - pb.y), band).toBeLessThan(4)
     }
     expect(compared, 'bands compared across zooms').toBeGreaterThan(2)
+  })
+})
+
+describe('the clock and rate readouts', () => {
+  function withStatus(status: ScopeStatus) {
+    const cam = new Camera({ x: 0, y: 0 }, 30, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.full, status)
+    return rec.texts.map((t) => t.s)
+  }
+
+  it('shows simulated time of day, not the wall clock', () => {
+    const labels = withStatus({
+      clock: { ticks: 1200, elapsedSeconds: 60, timeOfDaySeconds: 13 * 3600 + 61 },
+      speed: 1,
+      paused: false,
+    })
+    expect(labels).toContain('TIME')
+    expect(labels).toContain('13:01:01')
+  })
+
+  it('shows the active rate', () => {
+    for (const [speed, shown] of [
+      [0.5, 'x0.5'],
+      [1, 'x1'],
+      [2, 'x2'],
+      [4, 'x4'],
+    ] as const) {
+      const labels = withStatus({
+        clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
+        speed,
+        paused: false,
+      })
+      expect(labels, `x${speed}`).toContain('RATE')
+      expect(labels, `x${speed}`).toContain(shown)
+    }
+  })
+
+  it('says PAUSED rather than a rate when stopped', () => {
+    // Otherwise a paused scope showing x4 invites the obvious mistake.
+    const labels = withStatus({
+      clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
+      speed: 4,
+      paused: true,
+    })
+    expect(labels).toContain('PAUSED')
+    expect(labels).not.toContain('x4')
   })
 })

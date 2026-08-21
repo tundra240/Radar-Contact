@@ -434,3 +434,60 @@ canvas {
     inset 1px 1px 0 0 var(--bevel-shadow),
     inset -1px -1px 0 0 var(--bevel-light);
 }
+
+/* --------------------------------------------------------- time control
+
+   Pause and the four simulation rates. The active rate is shown pressed in
+   and picks up the caption colours, so the current state reads without
+   having to compare four buttons.                                       */
+
+.time-control {
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+}
+
+.time-button {
+  min-width: 32px;
+  padding: 4px 4px;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+  cursor: pointer;
+}
+
+.time-button:active {
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.time-button.is-active {
+  color: var(--title-text);
+  background: var(--title-bar);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.time-button:focus-visible {
+  outline: 1px dotted var(--chrome-text);
+  outline-offset: -3px;
+}
+
+.time-pause {
+  min-width: 26px;
+  font-weight: bold;
+}

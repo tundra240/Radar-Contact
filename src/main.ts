@@ -5,6 +5,7 @@ import egllConfig from './data/egll.json'
 import { DEMO_ROSTER } from './sim/demoRoster'
 import { describeCommand, type Command } from './commands/types'
 import { StripBay } from './ui/stripbay'
+import { GameLoop, SPEEDS, formatSpeed, type Speed } from './core/loop'
 import { drawScope } from './render/scope'
 import {
   DEFAULT_OVERLAYS,
@@ -69,13 +70,14 @@ function start(
 
   let overlays: Overlays = DEFAULT_OVERLAYS
 
-  let frame = 0
+  // The loop owns the frame now. requestDraw only marks the picture as
+  // needing a repaint, which matters when the simulation is paused: an idle
+  // scope then draws nothing at all rather than sixty identical frames a
+  // second.
+  let dirty = true
+  let simAdvanced = false
   const requestDraw = (): void => {
-    if (frame !== 0) return
-    frame = requestAnimationFrame(() => {
-      frame = 0
-      drawScope(ctx, cam, airport, overlays)
-    })
+    dirty = true
   }
 
   const resize = (): void => {
@@ -141,6 +143,53 @@ function start(
     if (e.key === 'r' || e.key === 'R') reset()
   })
 
+  // ---- time control ----------------------------------------------------
+  // The loop keeps simulated time; these only ask it to go faster, slower
+  // or stop. Nothing else in the codebase knows the rate has changed.
+
+  const timePanel = document.createElement('div')
+  timePanel.className = 'time-control'
+
+  const pauseButton = document.createElement('button')
+  pauseButton.type = 'button'
+  pauseButton.className = 'time-button time-pause'
+  timePanel.appendChild(pauseButton)
+
+  const speedButtons = new Map<Speed, HTMLButtonElement>()
+  for (const speed of SPEEDS) {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'time-button'
+    b.textContent = formatSpeed(speed)
+    b.addEventListener('click', () => {
+      loop.setSpeed(speed)
+      // Choosing a rate implies wanting it to run.
+      loop.setPaused(false)
+      paintTime()
+      requestDraw()
+    })
+    timePanel.appendChild(b)
+    speedButtons.set(speed, b)
+  }
+
+  const paintTime = (): void => {
+    const paused = loop.paused
+    pauseButton.textContent = paused ? '>' : '||'
+    pauseButton.title = paused ? 'Resume' : 'Pause'
+    pauseButton.setAttribute('aria-pressed', String(paused))
+    for (const [speed, button] of speedButtons) {
+      const active = !paused && loop.speed === speed
+      button.classList.toggle('is-active', active)
+      button.setAttribute('aria-pressed', String(active))
+    }
+  }
+
+  pauseButton.addEventListener('click', () => {
+    loop.togglePaused()
+    paintTime()
+    requestDraw()
+  })
+
   // ---- flight progress strips -----------------------------------------
   // The bay is a view over the world, so it holds no aircraft state of its
   // own. Today the snapshot is a frozen roster; Day 1 swaps DEMO_ROSTER for
@@ -173,13 +222,45 @@ function start(
     bay.update(DEMO_ROSTER, selected)
   }
 
-  // Five times a second: past what anyone can read, and far short of the
-  // twenty ticks a second the simulation will run at.
-  const SYNC_INTERVAL_MS = 200
-  syncStrips()
-  window.setInterval(syncStrips, SYNC_INTERVAL_MS)
+  // ---- the loop --------------------------------------------------------
 
+  // Every fourth step, so five times a simulated second: past what anyone
+  // can read, and far short of the twenty steps a second the simulation
+  // runs at. Tying it to ticks rather than to the wall clock means it
+  // follows the rate control and stops dead when paused.
+  const SYNC_EVERY_TICKS = 4
+
+  const loop = new GameLoop({
+    tick: (_dt, clock) => {
+      simAdvanced = true
+      // Day 1: this is where world.tick goes.
+      if (clock.ticks % SYNC_EVERY_TICKS === 0) syncStrips()
+    },
+    render: () => {
+      if (!dirty && !simAdvanced) return
+      dirty = false
+      simAdvanced = false
+      drawScope(ctx, cam, airport, overlays, {
+        clock: loop.clock,
+        speed: loop.speed,
+        paused: loop.paused,
+      })
+    },
+  })
+
+  window.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key !== ' ') return
+    // Otherwise space scrolls the page or re-triggers a focused button.
+    e.preventDefault()
+    loop.togglePaused()
+    paintTime()
+    requestDraw()
+  })
+
+  syncStrips()
+  paintTime()
   resize()
+  loop.start()
 
   // ---- overlay control -------------------------------------------------
   // How much context to draw is a controller preference, not a constant.
@@ -306,6 +387,7 @@ function start(
   controls.className = 'controls'
   controls.appendChild(overlayButton)
   controls.appendChild(toggle)
+  controls.appendChild(timePanel)
   controls.appendChild(panel)
   // Mounted in the scope rather than on the body: the strip bay owns the
   // right-hand edge of the window, and fixed positioning put these
@@ -319,8 +401,6 @@ function start(
     toggle.textContent = `Mode ${name}`
     toggle.title = `Display scheme: ${name}. Click for ${nextPaletteName()}.`
     toggle.setAttribute('aria-label', `Display scheme ${name}, click for ${nextPaletteName()}`)
-    // Colours live in TypeScript, so the chrome is styled from the palette
-    // rather than duplicating hex values in the stylesheet.
     // Chrome colours travel as CSS custom properties, so the stylesheet
     // owns the bevel geometry and theme.ts stays the only place a hex
     // value is written down.

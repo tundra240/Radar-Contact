@@ -390,6 +390,39 @@ third of a pixel at 40 NM.
 
 ---
 
+### The clock and the loop
+
+`core/loop.ts` runs the simulation in fixed 50 ms steps at 20 Hz and draws on
+`requestAnimationFrame`, which is decision 1 made concrete.
+
+**Changing speed changes how many ticks happen per real second, never the size of a tick.**
+A step is always 50 ms of simulated time, so 0.5x, 1x, 2x and 4x are the same simulation run
+slower or sooner rather than four different ones. Scaling `dt` instead is the obvious
+shortcut and it quietly breaks determinism, so there is a test asserting the step size is
+identical at every rate.
+
+Simulated time is counted in **ticks**, not wall clock: `elapsedSeconds` is exactly
+`ticks x 0.05`. That is what makes a replay possible -- the same tick count with the same
+seed gives the same world -- and it is why the status bar clock keeps sim time and stops when
+paused.
+
+Three robustness details, each with a test:
+
+- **A frame's real elapsed time is clamped** (250 ms). A backgrounded tab returns with minutes
+  of elapsed time; simulating all of it in one frame stalls, and the next frame is further
+  behind still. That is the classic spiral, and the clamp is what prevents it.
+- **A backlog that cannot be cleared is abandoned** rather than carried forward, and counted
+  in `droppedTicks` so it is visible rather than silent.
+- **Pausing discards banked time**, or resuming would be followed by a burst of catch-up.
+
+`now` and the scheduler are constructor arguments, so the tests drive time by hand instead of
+waiting on it: twenty-four of them cover the rate maths, the clock, pausing and the spiral
+guard without a single real timer.
+
+Rendering is skipped when nothing has changed. `requestDraw()` marks the picture dirty and a
+tick marks it advanced; a paused, untouched scope draws nothing at all rather than sixty
+identical frames a second.
+
 ### The flight strip bay and the sync seam
 
 The bay is built ahead of the simulation, which is only possible because the seam between

@@ -1,4 +1,5 @@
 import type { Camera } from '../core/camera'
+import { formatClock, formatSpeed, type Clock, type Speed } from '../core/loop'
 import { advance, type Vec2NM } from '../core/geo'
 import {
   centrelinePoint,
@@ -24,11 +25,19 @@ import { airspaceColour, fonts, formatLevel, theme } from './theme'
 
 const ORIGIN: Vec2NM = { x: 0, y: 0 }
 
+/** What the status bar needs from the loop, and nothing more. */
+export interface ScopeStatus {
+  readonly clock: Clock
+  readonly speed: Speed
+  readonly paused: boolean
+}
+
 export function drawScope(
   g: CanvasRenderingContext2D,
   cam: Camera,
   airport: Airport,
   overlays: Overlays,
+  status: ScopeStatus,
 ): void {
   g.fillStyle = theme.bg
   g.fillRect(0, 0, cam.width, cam.height)
@@ -69,7 +78,7 @@ export function drawScope(
     drawRunway(g, cam, airport, rwy)
   }
 
-  drawHud(g, cam, airport, overlays)
+  drawHud(g, cam, airport, overlays, status)
   drawScreenFrame(g, cam)
 }
 
@@ -684,9 +693,10 @@ function drawHud(
   cam: Camera,
   airport: Airport,
   overlays: Overlays,
+  status: ScopeStatus,
 ): void {
   drawTitleBlock(g, airport)
-  drawStatusBar(g, cam, airport, overlays)
+  drawStatusBar(g, cam, airport, overlays, status)
 }
 
 function drawTitleBlock(g: CanvasRenderingContext2D, airport: Airport): void {
@@ -713,6 +723,7 @@ function drawStatusBar(
   cam: Camera,
   airport: Airport,
   overlays: Overlays,
+  status: ScopeStatus,
 ): void {
   const shown = airport.airspace.filter((v) =>
     v.airspaceClass === 'G' ? overlays.trafficZones : overlays.airspace,
@@ -722,6 +733,13 @@ function drawStatusBar(
   const scale = runwayScaleAt(airport.render, cam.pxPerNM)
 
   const cells: Cell[] = [
+    // Simulated time, not wall clock: it runs at whatever rate the loop is
+    // set to, and stops when the loop is paused.
+    { label: 'TIME', value: formatClock(status.clock.timeOfDaySeconds) },
+    {
+      label: 'RATE',
+      value: status.paused ? 'PAUSED' : formatSpeed(status.speed),
+    },
     { label: 'RANGE', value: `${cam.rangeNM.toFixed(0)} NM` },
     { label: 'ARR', value: airport.arrivalRunways.map((r) => r.id).join('/') },
     { label: 'RWY', value: `x${scale.toFixed(1)}` },
