@@ -155,8 +155,12 @@ interface AirspaceLabel {
   limits: string
   colour: string
   assumed: boolean
-  /** On-screen extent, used to break ties within a tier. */
-  priority: number
+  /**
+   * Width of the volume in nautical miles. Deliberately not in pixels:
+   * every input to a label's position has to be independent of the camera,
+   * or the position moves when the scope is zoomed.
+   */
+  widthNM: number
   /**
    * Claim on the space, lowest first. Ranked by usefulness rather than
    * size, or the enormous upper-area bands would squeeze out every control
@@ -168,34 +172,44 @@ interface AirspaceLabel {
 }
 
 /**
- * One label per name and altitude band, placed at the northernmost point
- * of the volume.
+ * One label per name and altitude band, placed at the centre of the
+ * volume's boundary.
+ *
+ * The centre rather than the northernmost point, for two reasons. It is
+ * where a chart puts a name, inside the thing being named; and a northern
+ * extremity is frequently off the top of the screen while the airspace
+ * itself is in plain view -- Luton's CTR sat seven pixels above the edge at
+ * the default range, so its label vanished for want of an anchor rather
+ * than for want of room.
  */
-function airspaceLabel(cam: Camera, volume: AirspaceVolume): AirspaceLabel | null {
+function airspaceLabel(volume: AirspaceVolume): AirspaceLabel | null {
   const shape = volume.shape
   let at: Vec2NM | null = null
-  let size = 0
+  let widthNM = 0
 
   if (shape.kind === 'circle') {
-    at = { x: shape.centreNM.x, y: shape.centreNM.y + shape.radiusNM }
-    size = cam.nmToPx(shape.radiusNM) * 2
+    at = shape.centreNM
+    widthNM = shape.radiusNM * 2
   } else {
     const all: readonly Vec2NM[] =
       shape.kind === 'polygon' ? shape.verticesNM : shape.pathsNM.flat()
     if (all.length === 0) return null
-    let top = all[0] as Vec2NM
-    let minX = top.x
-    let maxX = top.x
+
+    let sumX = 0
+    let sumY = 0
+    let minX = Infinity
+    let maxX = -Infinity
     for (const v of all) {
-      if (v.y > top.y) top = v
+      sumX += v.x
+      sumY += v.y
       if (v.x < minX) minX = v.x
       if (v.x > maxX) maxX = v.x
     }
-    at = top
-    size = cam.nmToPx(maxX - minX)
+    at = { x: sumX / all.length, y: sumY / all.length }
+    widthNM = maxX - minX
   }
 
-  if (!at || size < 40) return null
+  if (!at) return null
 
   const limits = `${formatLevel(volume.floorFt)}-${formatLevel(volume.ceilingFt)}`
 
@@ -211,7 +225,7 @@ function airspaceLabel(cam: Camera, volume: AirspaceVolume): AirspaceLabel | nul
     limits,
     colour: airspaceColour(volume.airspaceClass),
     assumed: volume.verticalSource === 'assumed',
-    priority: size,
+    widthNM,
     tier,
     floorFt: volume.floorFt,
   }
@@ -253,83 +267,111 @@ function drawAirspaceLabels(
   cam: Camera,
   volumes: readonly AirspaceVolume[],
 ): void {
+  // Built from every volume, with no reference to the camera. An earlier
+  // version discarded volumes too small to label BEFORE assigning them
+  // positions, which made a name's group -- and so the slot each band sat
+  // in -- depend on the zoom level. Labels then moved as the scope was
+  // zoomed, which is the fault this ordering exists to prevent. Size is now
+  // considered only when deciding whether to draw, further down.
   const unique = new Map<string, AirspaceLabel>()
   for (const v of volumes) {
-    const l = airspaceLabel(cam, v)
+    const l = airspaceLabel(v)
     if (!l) continue
     const existing = unique.get(l.key)
     // Keep the largest instance of a repeated band, so the label lands on
     // the most prominent piece of that airspace.
-    if (!existing || l.priority > existing.priority) unique.set(l.key, l)
+    if (!existing || l.widthNM > existing.widthNM) unique.set(l.key, l)
   }
 
   const size = 9
   const lineH = 11
+  const h = lineH * 2 + 6
+  const all = [...unique.values()]
+
+  /**
+   * Each label gets ONE possible screen position, fixed relative to its own
+   * anchor: the offset comes from where its band sits in its airspace, not
+   * from what it happens to collide with.
+   *
+   * That distinction is the whole point. Choosing an offset by trying
+   * alternatives until one is free makes the choice depend on the zoom
+   * level, so a label jumps between positions as the scope is zoomed --
+   * which is what Farnborough's CTA was doing across its nine bands.
+   * Deriving the offset from the data instead means the position is a pure
+   * function of the airspace and the camera, so a label can appear or
+   * disappear but can never move.
+   */
+  const slotOf = new Map<string, number>()
+  const byName = new Map<string, AirspaceLabel[]>()
+  for (const l of all) {
+    const group = byName.get(l.text) ?? []
+    group.push(l)
+    byName.set(l.text, group)
+  }
+  for (const group of byName.values()) {
+    group.sort((a, b) => a.floorFt - b.floorFt || a.limits.localeCompare(b.limits))
+    group.forEach((l, i) => slotOf.set(l.key, i))
+  }
+
+  /**
+   * Which bands of an airspace are eligible is decided here, from the data,
+   * and not by which ones happen to survive collision testing.
+   *
+   * That matters for stability. If the limit were a count of labels
+   * actually drawn, a band dropped for want of room would let a completely
+   * different band take its place -- and since what collides changes with
+   * the zoom level, the label would appear somewhere else as the scope was
+   * zoomed. Farnborough has nine bands and was doing exactly that. Fixing
+   * the eligible set means a band can appear or disappear, but nothing ever
+   * moves.
+   *
+   * The TMA alone has nine bands too. Naming the same airspace more than
+   * twice tells you nothing further and crowds out zones not yet named.
+   */
+  const MAX_PER_NAME = 2
+  const eligible = all.filter((l) => (slotOf.get(l.key) ?? 0) < MAX_PER_NAME)
+
+  /**
+   * The lowest band sits on the centre point and further bands stack
+   * downwards from it. A constant per volume, so the offset never varies
+   * with the camera.
+   */
+  const slotOffset = (slot: number): number => slot * h
+
   // Within a tier the lowest base wins: of the TMA's nine bands the one
   // with the lowest floor is the one that matters, since it is the first
   // thing an aircraft would climb into.
-  const candidates = [...unique.values()].sort(
-    (a, b) => a.tier - b.tier || a.floorFt - b.floorFt || b.priority - a.priority,
+  const candidates = eligible.sort(
+    (a, b) => a.tier - b.tier || a.floorFt - b.floorFt || b.widthNM - a.widthNM,
   )
   const placed: LabelBox[] = []
-  // The TMA alone has nine bands and Farnborough nine. Naming the same
-  // airspace more than twice tells you nothing further and crowds out the
-  // zones that have not been named at all.
-  const MAX_PER_NAME = 2
-  const drawnPerName = new Map<string, number>()
 
   g.font = fonts.label(size)
   g.textAlign = 'center'
 
-  const h = lineH * 2 + 6
-
   for (const l of candidates) {
-    if ((drawnPerName.get(l.text) ?? 0) >= MAX_PER_NAME) continue
+    // Too small on screen to carry text. This is the one camera-dependent
+    // decision, and it only ever hides a label -- it cannot move one.
+    if (cam.nmToPx(l.widthNM) < 40) continue
 
     const anchor = cam.worldToScreen(l.at)
     const limits = l.assumed ? `(${l.limits})` : l.limits
     const w = charW(size) * Math.max(l.text.length, limits.length) + 8
 
-    // Try the anchor first, then a few nudges. Different airspaces are
-    // built from shared boundary lines and genuinely land on the same
-    // vertex, so shifting keeps the information rather than throwing a
-    // whole label away for want of a few pixels.
-    const offsets: readonly (readonly [number, number])[] = [
-      [0, 0],
-      [0, h],
-      [0, -h],
-      [-w * 0.62, 0],
-      [w * 0.62, 0],
-      [0, h * 2],
-    ]
+    const dy = slotOffset(slotOf.get(l.key) ?? 0)
+    const at = { x: anchor.x, y: anchor.y + dy }
+    const box: LabelBox = { x: at.x - w / 2, y: at.y - lineH - 4, w, h }
 
-    let at: { x: number; y: number } | null = null
-    let box: LabelBox | null = null
-    for (const [dx, dy] of offsets) {
-      const candidate: LabelBox = {
-        x: anchor.x + dx - w / 2,
-        y: anchor.y + dy - lineH - 4,
-        w,
-        h,
-      }
-
-      // Must fit entirely on screen, and is never nudged in to make it fit.
-      // Clamping a label into the viewport makes it slide along the edge as
-      // the scope is panned, so it appears to follow the view rather than
-      // stay with its airspace. Dropping it is the honest behaviour: the
-      // label belongs to a place, and that place is off screen.
-      if (candidate.x < 0 || candidate.x + w > cam.width) continue
-      if (candidate.y < 0 || candidate.y + h > cam.height) continue
-      if (placed.some((q) => overlaps(candidate, q))) continue
-
-      at = { x: anchor.x + dx, y: anchor.y + dy }
-      box = candidate
-      break
-    }
-    if (!at || !box) continue
+    // Must fit entirely on screen, and is never moved to make it fit.
+    // Clamping a label into the viewport makes it slide along the edge as
+    // the scope is panned, so it appears to follow the view rather than
+    // stay with its airspace. Dropping it is the honest behaviour: the
+    // label belongs to a place, and that place is off screen.
+    if (box.x < 0 || box.x + w > cam.width) continue
+    if (box.y < 0 || box.y + h > cam.height) continue
+    if (placed.some((q) => overlaps(box, q))) continue
 
     placed.push(box)
-    drawnPerName.set(l.text, (drawnPerName.get(l.text) ?? 0) + 1)
 
     g.fillStyle = theme.airspaceLabel
     g.textBaseline = 'bottom'

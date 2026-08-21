@@ -587,3 +587,115 @@ describe('labels stay with their airspace when panning', () => {
     expect(count(far)).toBeLessThan(count(near))
   })
 })
+
+describe('labels hold still while zooming', () => {
+  const NAMES = [
+    'LONDON TMA',
+    'LONDON CTR',
+    'STANSTED CTA',
+    'LUTON CTR',
+    'LUTON CTA',
+    'GATWICK CTR',
+    'GATWICK CTA',
+    'CITY CTA',
+    'FARNBOROUGH CTR',
+    'FARNBOROUGH CTA',
+  ]
+  const ZOOMS = [10, 14, 20, 26, 32, 40, 55]
+
+  /** Pairs each name label with the limits drawn directly beneath it. */
+  function bandsByName(texts: { s: string; x: number; y: number }[]) {
+    const out = new Map<string, Set<string>>()
+    for (const t of texts) {
+      if (!NAMES.includes(t.s)) continue
+      const limits = texts.find(
+        (o) => o !== t && Math.abs(o.x - t.x) < 0.01 && o.y > t.y && o.y - t.y < 12,
+      )
+      if (!limits) continue
+      const set = out.get(t.s) ?? new Set<string>()
+      set.add(limits.s)
+      out.set(t.s, set)
+    }
+    return out
+  }
+
+  it('never shows a different band of the same airspace at a different zoom', () => {
+    // The reported fault. Farnborough has nine bands; when the count of
+    // labels actually drawn was the limit, a band dropped for want of room
+    // let another take its place, and since what collides changes with zoom
+    // the label appeared somewhere else as the scope was zoomed.
+    const perZoom = ZOOMS.map((z) => bandsByName(render(1000, 600, z).texts))
+
+    for (const name of NAMES) {
+      const seen = new Set<string>()
+      for (const bands of perZoom) {
+        for (const b of bands.get(name) ?? []) seen.add(b)
+      }
+      // At most the two eligible bands, and always the same two.
+      expect(seen.size, `${name} showed bands ${[...seen].join(', ')}`).toBeLessThanOrEqual(2)
+    }
+  })
+
+  it('anchors every label on its own airspace, not on the viewport', () => {
+    // Independently recompute the centroids the renderer should be using,
+    // and require every drawn label to sit on one of them, offset only
+    // vertically by a whole number of label heights.
+    const centroids = airport.airspace.flatMap((v) => {
+      if (v.shape.kind === 'circle') return [v.shape.centreNM]
+      const all =
+        v.shape.kind === 'polygon' ? v.shape.verticesNM : v.shape.pathsNM.flat()
+      if (all.length === 0) return []
+      let sx = 0
+      let sy = 0
+      for (const p of all) {
+        sx += p.x
+        sy += p.y
+      }
+      return [{ x: sx / all.length, y: sy / all.length }]
+    })
+
+    for (const z of ZOOMS) {
+      const { texts, cam } = render(1000, 600, z)
+      const screens = centroids.map((c) => cam.worldToScreen(c))
+      for (const t of texts.filter((x) => NAMES.includes(x.s))) {
+        const match = screens.some(
+          (s) => Math.abs(s.x - t.x) < 0.01 && t.y - s.y >= -4 && t.y - s.y < 70,
+        )
+        expect(match, `${t.s} at zoom ${z} is not on any airspace centre`).toBe(true)
+      }
+    }
+  })
+
+  it('keeps each band on the same airspace centre across zoom levels', () => {
+    // Keyed by band, not by name: different bands of one airspace have
+    // different centres, so comparing "the Stansted label" across zooms
+    // compares two different volumes. The invariant is that a given band
+    // never moves.
+    const worldOf = (range: number): Map<string, { x: number; y: number }> => {
+      const { texts, cam } = render(1000, 600, range)
+      const m2 = new Map<string, { x: number; y: number }>()
+      for (const t2 of texts.filter((x) => NAMES.includes(x.s))) {
+        const limits = texts.find(
+          (o) => o !== t2 && Math.abs(o.x - t2.x) < 0.01 && o.y > t2.y && o.y - t2.y < 12,
+        )
+        if (!limits) continue
+        m2.set(`${t2.s}|${limits.s}`, cam.screenToWorld({ x: t2.x, y: t2.y }))
+      }
+      return m2
+    }
+
+    const a = worldOf(20)
+    const b = worldOf(40)
+    let compared = 0
+    for (const [band, pa] of a) {
+      const pb = b.get(band)
+      if (!pb) continue
+      compared += 1
+      // The vertical slot offset is in pixels, so it covers slightly
+      // different ground at different scales; the anchor itself must not
+      // have moved.
+      expect(Math.hypot(pa.x - pb.x, pa.y - pb.y), band).toBeLessThan(4)
+    }
+    expect(compared, 'bands compared across zooms').toBeGreaterThan(2)
+  })
+})
