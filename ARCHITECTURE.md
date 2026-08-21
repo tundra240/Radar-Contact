@@ -423,6 +423,83 @@ picking the one you want beats pressing until it comes round. The active rate an
 drawn pressed in, in the caption colours, so the current setting reads at a glance instead of
 by comparing four buttons with each other.
 
+### The command system
+
+Three modules, and the split between them is the point.
+
+**`commands/parse.ts`** turns a typed line into `Command` objects and knows nothing about
+aircraft state. It is forgiving in the ways that cost nothing -- verb glued to its value or
+apart from it, abbreviated or spelled out, callsign shortened to anything unique or omitted in
+favour of the selected strip -- and strict in one place: an altitude has to be unambiguous.
+`A30` is 3,000 ft and `A3000` is 3,000 ft, told apart by **length rather than magnitude**,
+because a magnitude threshold is a rule nobody could guess and a mistyped altitude is the most
+expensive kind of typo in this game.
+
+**`commands/apply.ts`** is the gate. It validates against the sector and the type's envelope
+and returns a new aircraft plus a readback, or a refusal with a reason. Pure, and given
+everything it needs through `ApplyContext`, so it is tested without a DOM, a clock or a config
+file.
+
+Two decisions in it worth defending:
+
+- **It refuses rather than clamps.** Silently turning "descend 200" into the sector floor
+  teaches the controller that the number they typed was accepted. The refusals say why: an
+  A320 asked for 90 kt is told it will not fly below 140, not just "no".
+- **A line is all or nothing.** `applyAll` threads the aircraft through each command and
+  abandons the lot on the first refusal, so `H270 A30 S400` does not leave the aircraft turned
+  and descending before complaining about the speed. It also means each instruction is judged
+  against the ones before it in the same line -- the descent below 10,000 ft is what makes
+  280 kt illegal, and both can be in one line.
+
+**`ui/console.ts`** is a dumb terminal: a prompt, a log, and a history. It does not know what a
+command is. The history keeps refused lines deliberately, because a refused line is usually one
+character away from a good one.
+
+The seam that matters is that `main.ts` routes the **tag menu through the same `issue()`
+path** as the typed line. That is decision 5 in section 3 finally paying off: one validation
+path, one readback format, and the mouse rubber-band will join it without a third
+implementation of "is this clearance legal".
+
+A clearance sets the CLEARED fields and never the actual ones -- `autopilot.ts` closes the gap
+at 3 deg/sec, 1500 fpm and 1.5 kt/sec. An integration test runs the whole chain, from a typed
+line through the parser and the gate into the autopilot, and asserts the aircraft is actually
+turning ten seconds later.
+
+Approach, hold and handoff commands **parse but are refused**, with a reason saying they are
+not flyable yet. The alternative -- accepting a clearance and doing nothing with it -- would be
+worse than the refusal, and the parser supporting them now means the console and the tag menu
+already speak the same language for when `ils.ts` arrives.
+
+### The tag menu
+
+Instructions are issued by **right-clicking the aircraft** -- the target on the scope, or its
+strip in the bay. `ui/tagmenu.ts` opens at the cursor, one page deep: the categories at the top
+level, the values one click in, and the panel closes as soon as it has issued something.
+
+This replaced three fixed quick-buttons per strip. Those could only ever offer three of the
+clearances a controller needs, at values somebody had to choose in advance -- a menu that opens
+on the aircraft can offer all of them, at the value actually wanted, and it is closer to how
+the job is really done.
+
+Two rules hold it together:
+
+- **It only offers what will be accepted.** Levels come from the sector floor and ceiling,
+  speeds from the aircraft type's envelope and the terminal area limit -- the same numbers
+  `commands/apply.ts` validates against, including the detail that the speed limit bites on the
+  *lower* of actual and cleared level. A test walks every value the menu can offer through
+  `applyCommand` and asserts none of them is refused, because a menu that teaches limits the
+  simulation does not have is worse than no menu.
+- **It does not decide what is flyable.** Every kind in the `Command` union appears, including
+  the three that are still refused. `applyCommand` is the one authority on that and it answers
+  in the console; greying items out here would put the same knowledge in two places, and the
+  second copy would go stale the day approaches start working.
+
+Hit testing lives in `render/layers/targets.ts` next to the drawing, and both the symbol and
+the **data block** are clickable -- the block is the bigger thing and the part a controller is
+already reading. `blockBox()` is shared by the draw and the pick so the hit area cannot drift
+away from the text, and the block stops being clickable at the zoom where it stops being drawn,
+because an invisible hit box is a trap.
+
 ### The in-game guide
 
 A book button beside the menu opens `TUTORIAL.md` in a window. The text is **not restated in
@@ -668,9 +745,9 @@ Three consequences worth stating:
 - **The bay holds no aircraft state.** A strip is a view over an `Aircraft` record, so there
   is nothing to keep in step and no chance of the panel and the scope disagreeing. Day 1
   swaps the frozen `sim/demoRoster.ts` for the live world and the bay does not change.
-- **Every button produces a `Command`.** Nothing applies them yet -- the sink currently logs
-  a readback -- but the strip path is already the same path the mouse and the console will
-  take, which is decision 5 honoured rather than promised.
+- **A strip issues nothing itself.** It has no buttons at all. Right-clicking one opens the
+  same tag menu as right-clicking the target, so there is one place a clearance comes from
+  however you reached it -- and nothing on a strip that can catch a stray click.
 - **Refreshing is diffed, not rebuilt.** The bay updates at 5 Hz forever. Rows are keyed by
   callsign, every field is compared before it is written, and rows are moved rather than
   recreated when the running order changes. A test observes the DOM through a
@@ -681,13 +758,6 @@ Three consequences worth stating:
 
 Strips are ordered by what needs attention soonest -- go-around, established, on the
 localizer, being vectored, holding, finished -- rather than alphabetically or by arrival time.
-The approach quick-button offers the runway an aircraft is already assigned to rather than the
-active one, because quietly re-clearing an aircraft onto the other runway is a genuinely
-dangerous thing for a button to do, and it disables itself once there is nothing left to
-clear.
-
-Placeholder traffic is badged `DEMO` in the caption, so a frozen picture is never mistaken
-for running traffic. The badge goes when the roster does.
 
 ## 5. Revised Roadmap
 

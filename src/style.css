@@ -23,18 +23,32 @@ body {
 }
 
 #app {
+  /* The positioning context for the tag menu, which has to be able to open
+     over the strip bay as well as over the radar picture. */
+  position: relative;
   display: flex;
   width: 100vw;
   height: 100vh;
 }
 
-/* The drawing area. min-width lets it shrink rather than forcing the bay
-   off the side of the window. */
+/* The left-hand column: the radar picture with the command console under
+   it. min-width lets it shrink rather than forcing the bay off the side of
+   the window. */
 .scope {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
   min-width: 0;
   height: 100%;
+}
+
+/* The drawing area proper. The canvas is measured against THIS, not the
+   column, so the status bar it draws along its bottom edge is never hidden
+   behind the console. */
+.scope-view {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 canvas {
@@ -504,41 +518,6 @@ canvas {
   font-weight: bold;
 }
 
-.strip-actions {
-  display: flex;
-  gap: 3px;
-  margin-top: 5px;
-}
-
-.strip-action {
-  flex: 1 1 auto;
-  padding: 3px 2px;
-  border: 0;
-  border-radius: 0;
-  font-family: inherit;
-  font-size: 8px;
-  letter-spacing: 0.04em;
-  color: var(--accent);
-  background: var(--face);
-  box-shadow:
-    inset 1px 1px 0 0 var(--bevel-light),
-    inset -1px -1px 0 0 var(--bevel-shadow);
-  cursor: pointer;
-}
-
-.strip-action:active {
-  box-shadow:
-    inset 1px 1px 0 0 var(--bevel-shadow),
-    inset -1px -1px 0 0 var(--bevel-light);
-}
-
-.strip-action:disabled {
-  color: var(--chrome-dim);
-  cursor: default;
-  box-shadow:
-    inset 1px 1px 0 0 var(--bevel-shadow),
-    inset -1px -1px 0 0 var(--bevel-light);
-}
 
 /* --------------------------------------------------------------- logon
 
@@ -968,4 +947,244 @@ canvas {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--chrome-dim);
+}
+
+/* ------------------------------------------------------------- console
+
+   The command line, under the radar picture: a sunken log with a prompt
+   below it. Same furniture as everything else, and the log is deliberately
+   monospace-plain -- a readback is text a controller reads, not a widget. */
+
+.console {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: 128px;
+  padding: 6px 8px 8px;
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+}
+
+.console-log {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 6px;
+  font-size: 10px;
+  line-height: 1.5;
+  background: var(--well);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.console-line {
+  margin: 0;
+  white-space: pre-wrap;
+  letter-spacing: 0.04em;
+}
+
+/* What was typed, kept dim: it is a record, not the answer. */
+.console-line.is-command {
+  color: var(--chrome-dim);
+}
+
+/* The clearance as it was understood. */
+.console-line.is-readback {
+  color: var(--accent);
+}
+
+/* A refusal has to be impossible to mistake for a readback. */
+.console-line.is-reject {
+  color: var(--warn);
+}
+
+.console-line.is-note {
+  color: var(--chrome-text);
+}
+
+.console-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.console-prompt {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.console-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--chrome-text);
+  background: var(--well);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.console-input::placeholder {
+  color: var(--chrome-dim);
+  text-transform: none;
+  letter-spacing: 0.04em;
+  opacity: 1;
+}
+
+.console-input:focus {
+  outline: 1px dotted var(--chrome-text);
+  outline-offset: -4px;
+}
+
+/* ------------------------------------------------------------- tag menu
+
+   Right-click an aircraft -- on the scope or on its strip -- and its
+   clearances open at the cursor. Same face, bevels and caption strip as
+   the options menu, because it is the same interface; what differs is
+   that this one is about one aircraft and closes as soon as it has issued
+   something.
+
+   Positioned against #app rather than the scope so the menu can open over
+   the strip bay as well as over the radar picture.                       */
+
+.tagmenu {
+  position: absolute;
+  z-index: 60;
+  width: 182px;
+  padding: 0 0 4px;
+  font-size: 11px;
+  color: var(--chrome-text);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow),
+    2px 2px 6px rgb(0 0 0 / 35%);
+}
+
+.tagmenu[hidden] {
+  display: none;
+}
+
+.tagmenu-title {
+  margin: 2px 2px 0;
+  padding: 4px 7px;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  color: var(--title-text);
+  background: var(--title-bar);
+}
+
+/* What the aircraft is doing right now, sunk into the panel so it reads as
+   a readout rather than as something you can press. */
+.tagmenu-readout {
+  margin: 3px 3px 4px;
+  padding: 4px 6px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  white-space: pre;
+  color: var(--chrome-dim);
+  background: var(--well);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.tagmenu-body {
+  padding: 0 3px;
+}
+
+.tagmenu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-align: left;
+  color: var(--chrome-text);
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Highlighted the way a menu item of the era was: the caption colours,
+   full width, no rounding. */
+.tagmenu-row:hover,
+.tagmenu-row:focus-visible {
+  color: var(--title-text);
+  background: var(--title-bar);
+  outline: 0;
+}
+
+.tagmenu-more {
+  font-size: 9px;
+  opacity: 0.75;
+}
+
+.tagmenu-back {
+  margin-bottom: 3px;
+  color: var(--chrome-dim);
+}
+
+.tagmenu-rule {
+  margin: 4px 2px;
+  border-top: 1px solid var(--bevel-shadow);
+  box-shadow: 0 1px 0 0 var(--bevel-light);
+}
+
+/* Value keys: the smallest thing in the interface that is still a button,
+   because a heading grid is thirty-six of them. */
+.tagmenu-grid {
+  display: grid;
+  gap: 2px;
+  margin: 0 2px 3px;
+}
+
+.tagmenu-key {
+  padding: 4px 1px;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+  cursor: pointer;
+}
+
+.tagmenu-key:hover {
+  color: var(--title-text);
+  background: var(--title-bar);
+}
+
+.tagmenu-key:active {
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.tagmenu-key:focus-visible {
+  outline: 1px dotted var(--chrome-text);
+  outline-offset: -3px;
 }

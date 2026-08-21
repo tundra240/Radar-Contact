@@ -3,12 +3,14 @@ import { formatClock, formatSpeed, type Clock, type Speed } from '../core/loop'
 import { advance, type Vec2NM } from '../core/geo'
 import {
   centrelinePoint,
+  holdRacetrack,
   runwayScaleAt,
   type Airport,
   type AirspaceVolume,
   type GeoPath,
   type GeographyFeature,
   type GeographyKind,
+  type HoldPattern,
   type Navaid,
   type NeighbourAirport,
   type Runway,
@@ -91,11 +93,23 @@ export function drawScope(
       drawNeighbour(g, cam, airport, neighbour)
     }
   }
+  // Racetracks first, so the fix symbols sit on top of their own pattern.
+  for (const fix of airport.holdingFixes) {
+    if (holdShown(cam, airport, fix, overlays)) drawHoldPattern(g, cam, airport, fix)
+  }
   for (const navaid of airport.navaids) {
     // Holds are operational rather than contextual, so they stay whatever
     // the overlay settings say.
     if (navaid.hold === null && !overlays.navaids) continue
-    drawNavaid(g, cam, navaid, overlays.navaidFreqs)
+    // The stub stands in for the racetrack when the racetrack is not drawn,
+    // so the inbound direction is always readable somehow.
+    drawNavaid(
+      g,
+      cam,
+      navaid,
+      overlays.navaidFreqs,
+      !holdShown(cam, airport, navaid, overlays),
+    )
   }
   if (overlays.centrelines) {
     for (const rwy of airport.arrivalRunways) {
@@ -669,18 +683,92 @@ function drawNeighbour(
 
 /* -------------------------------------------------------------- navaids */
 
+/**
+ * Whether the full racetrack is worth drawing at this zoom.
+ *
+ * A one-minute leg at 220 kt is 3.7 NM, which is sixteen pixels at the
+ * default range and a smudge well before the zoom ceiling. Below the
+ * threshold the stub reads better than a squashed oval.
+ */
+const HOLD_MIN_LEG_PX = 16
+
+function holdShown(
+  cam: Camera,
+  airport: Airport,
+  n: Navaid,
+  overlays: Overlays,
+): boolean {
+  if (!overlays.holdPatterns || n.hold === null) return false
+  return cam.nmToPx(holdLegNM(airport, n.hold)) >= HOLD_MIN_LEG_PX
+}
+
+const holdLegNM = (airport: Airport, hold: HoldPattern): number =>
+  (airport.render.holdSpeedKts * hold.legMins) / 60
+
+/**
+ * The racetrack at a holding fix.
+ *
+ * The ring is closed here rather than in the geometry, and the inbound leg
+ * is then re-stroked heavier: with two parallel legs a mile apart, which one
+ * is flown towards the fix is the only thing that says which way round the
+ * pattern goes, and the fix symbol alone does not say it.
+ */
+function drawHoldPattern(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  airport: Airport,
+  n: Navaid,
+): void {
+  const hold = n.hold
+  if (hold === null) return
+
+  const ring = holdRacetrack(n.posNM, hold, {
+    speedKts: airport.render.holdSpeedKts,
+  })
+
+  g.save()
+  g.strokeStyle = theme.hold
+  g.setLineDash([])
+  g.lineJoin = 'round'
+  g.lineWidth = 1.1
+
+  g.beginPath()
+  ring.forEach((v, i) => {
+    const p = cam.worldToScreen(v)
+    if (i === 0) g.moveTo(p.x, p.y)
+    else g.lineTo(p.x, p.y)
+  })
+  g.closePath()
+  g.stroke()
+
+  const from = cam.worldToScreen(
+    advance(n.posNM, hold.inboundTrue + 180, holdLegNM(airport, hold)),
+  )
+  const at = cam.worldToScreen(n.posNM)
+  g.lineWidth = 2.4
+  g.lineCap = 'round'
+  g.beginPath()
+  g.moveTo(from.x, from.y)
+  g.lineTo(at.x, at.y)
+  g.stroke()
+
+  g.restore()
+}
+
 function drawNavaid(
   g: CanvasRenderingContext2D,
   cam: Camera,
   n: Navaid,
   showFreq: boolean,
+  showStub: boolean,
 ): void {
   const p = cam.worldToScreen(n.posNM)
   const r = 6
 
-  // Holding fixes get a stub along the inbound leg so the pattern reads at
-  // a glance without drawing a full racetrack.
-  if (n.hold) {
+  // Holding fixes get a stub along the inbound leg, which is the low-clutter
+  // stand-in for the full racetrack: enough to read the inbound direction
+  // from, and a couple of miles of line work cheaper.
+  if (n.hold && showStub) {
     const tail = cam.worldToScreen(advance(n.posNM, n.hold.inboundTrue + 180, 2.5))
     g.strokeStyle = theme.hold
     g.lineWidth = 3

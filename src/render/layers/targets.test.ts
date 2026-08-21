@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Camera } from '../../core/camera'
 import type { Aircraft } from '../../sim/types'
 import { palettes, setPalette, theme } from '../theme'
-import { blockLines, drawTargets } from './targets'
+import { PICK_RADIUS_PX, blockBox, blockLines, drawTargets, pickTarget } from './targets'
 
 /**
  * The target symbology, checked against a recording canvas: where the
@@ -288,5 +288,70 @@ describe('blockLines', () => {
   it('rounds speed to five knots so the digits can be read', () => {
     expect(blockLines(plane({ gsKts: 238 }))[2]).toBe('240 A320')
     expect(blockLines(plane({ gsKts: 232 }))[2]).toBe('230 A320')
+  })
+})
+
+describe('pickTarget', () => {
+  const cam = (rangeNM = 20): Camera => {
+    const c = new Camera({ x: 0, y: 0 }, rangeNM, { maxNM: 200 })
+    c.setViewport(1000, 600)
+    return c
+  }
+
+  it('finds nothing on an empty scope', () => {
+    expect(pickTarget(cam(), [], { x: 500, y: 300 })).toBe(null)
+  })
+
+  it('picks the aircraft the cursor is on', () => {
+    const c = cam()
+    const a = plane({ pos: { x: 4, y: -2 } })
+    const p = c.worldToScreen(a.pos)
+    expect(pickTarget(c, [a], p)?.callsign).toBe('BAW123')
+  })
+
+  it('forgives a few pixels, because a target moves while you aim', () => {
+    const c = cam()
+    const a = plane()
+    const p = c.worldToScreen(a.pos)
+    expect(pickTarget(c, [a], { x: p.x + PICK_RADIUS_PX - 1, y: p.y })).not.toBe(null)
+  })
+
+  it('gives up beyond the radius rather than picking the nearest thing', () => {
+    const c = cam()
+    const a = plane()
+    const p = c.worldToScreen(a.pos)
+    // Well clear of both the symbol and its block, which is up and right.
+    expect(pickTarget(c, [a], { x: p.x - 60, y: p.y + 60 })).toBe(null)
+  })
+
+  it('counts the data block as part of the target', () => {
+    // The block is the biggest part of a target and the part a controller
+    // actually points at.
+    const c = cam()
+    const a = plane()
+    const p = c.worldToScreen(a.pos)
+    const box = blockBox(c, a, p)
+    const middle = { x: box.x + box.w / 2, y: box.y + box.h / 2 }
+    expect(Math.hypot(middle.x - p.x, middle.y - p.y)).toBeGreaterThan(PICK_RADIUS_PX)
+    expect(pickTarget(c, [a], middle)?.callsign).toBe('BAW123')
+  })
+
+  it('does not pick a block that is not being drawn', () => {
+    // Zoomed out past the decluttering threshold there is no block on the
+    // screen, and an invisible hit box is a trap.
+    const wide = cam(200)
+    const a = plane()
+    const p = wide.worldToScreen(a.pos)
+    const box = blockBox(wide, a, p)
+    expect(pickTarget(wide, [a], { x: box.x + box.w / 2, y: box.y + box.h / 2 })).toBe(null)
+  })
+
+  it('resolves an overlap to whichever symbol is nearest', () => {
+    const c = cam()
+    const near = plane({ callsign: 'NEAR', pos: { x: 4, y: 0 } })
+    const far = plane({ callsign: 'FAR', pos: { x: 4.3, y: 0 } })
+    const at = c.worldToScreen(near.pos)
+    // Order reversed, so a result of NEAR cannot just be the first match.
+    expect(pickTarget(c, [far, near], at)?.callsign).toBe('NEAR')
   })
 })

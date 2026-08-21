@@ -15,6 +15,12 @@ export interface Overlays {
   readonly airspaceLabels: boolean
   /** Navaids that are not approach holds; holds are always drawn. */
   readonly navaids: boolean
+  /**
+   * The racetrack at each holding fix. The fix itself is always drawn --
+   * it is the job -- but the pattern around it is a couple of miles of line
+   * work per hold, which is context rather than the job.
+   */
+  readonly holdPatterns: boolean
   readonly navaidFreqs: boolean
   readonly aerodromes: boolean
   readonly rangeRings: boolean
@@ -37,6 +43,7 @@ export const OVERLAY_ITEMS: readonly { readonly key: OverlayKey; readonly label:
   { key: 'trafficZones', label: 'Traffic zones (ATZ)' },
   { key: 'airspaceLabels', label: 'Airspace labels' },
   { key: 'aerodromes', label: 'Other aerodromes' },
+  { key: 'holdPatterns', label: 'Hold patterns' },
   { key: 'navaids', label: 'Other navaids' },
   { key: 'navaidFreqs', label: 'Navaid frequencies' },
   { key: 'coastline', label: 'Coastline' },
@@ -54,6 +61,7 @@ export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
     airspaceLabels: false,
     navaids: false,
     navaidFreqs: false,
+    holdPatterns: false,
     aerodromes: false,
     rangeRings: true,
     centrelines: true,
@@ -68,6 +76,7 @@ export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
     airspaceLabels: true,
     navaids: true,
     navaidFreqs: false,
+    holdPatterns: true,
     aerodromes: true,
     rangeRings: true,
     centrelines: true,
@@ -82,6 +91,7 @@ export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
     airspaceLabels: true,
     navaids: true,
     navaidFreqs: true,
+    holdPatterns: true,
     aerodromes: true,
     rangeRings: true,
     centrelines: true,

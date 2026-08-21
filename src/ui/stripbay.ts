@@ -1,4 +1,3 @@
-import type { Command, CommandSink } from '../commands/types'
 import {
   isHeavy,
   modeC,
@@ -12,28 +11,25 @@ import {
  * The flight progress strip bay.
  *
  * One strip per aircraft under control, kept in step with the simulation by
- * `update()`. The simulation does not exist yet, which is the point: the
- * bay reads a snapshot of `Aircraft` records and emits `Command` objects,
- * so Day 1 supplies real aircraft and Day 2 points the sink at
- * commands/apply.ts without this file changing.
+ * `update()`. A strip is a view and nothing more: it holds no state of its
+ * own, because the world is the single source of truth, and it issues no
+ * clearances of its own either. Right-clicking a strip opens the same tag
+ * menu as right-clicking the target on the scope, which is where every
+ * instruction now comes from -- three fixed quick-buttons per strip could
+ * only ever offer three of the clearances a controller needs, at values
+ * somebody had to guess in advance.
  *
- * Two things it deliberately does not do: hold state of its own (the world
- * is the single source of truth, so a strip is a view), and rebuild itself
- * on every tick. Rows are keyed by callsign and each field is compared
+ * The other thing it deliberately does not do is rebuild itself on every
+ * tick. Rows are keyed by callsign and each field is compared
  * before it is written, because at a 5 Hz refresh a naive rebuild would
  * throw away focus, selection and scroll position several times a second.
  */
 
 export interface StripBayOptions {
   readonly mount: HTMLElement
-  readonly onCommand: CommandSink
   readonly onSelect: (callsign: string | null) => void
-  /** Quick-button target altitude, from the sector's intercept altitude. */
-  readonly quickDescendFt: number
-  /** Quick-button target speed, for the closing stages of an approach. */
-  readonly quickSpeedKts: number
-  /** Runway offered by CLEARED ILS when the aircraft has none assigned. */
-  readonly defaultRunway: string
+  /** Right-click: opens the tag menu for this strip's aircraft. */
+  readonly onContextMenu: (callsign: string, at: { readonly x: number; readonly y: number }) => void
   /** Called after the bay changes width, so the scope can be re-measured. */
   readonly onLayoutChange?: () => void
   /**
@@ -66,7 +62,6 @@ interface Row {
   readonly spd: HTMLElement
   readonly hdg: HTMLElement
   readonly status: HTMLElement
-  readonly approachBtn: HTMLButtonElement
   rendered: Rendered
   selected: boolean
 }
@@ -80,8 +75,6 @@ export class StripBay {
   private readonly collapseButton: HTMLButtonElement
 
   private readonly rows = new Map<string, Row>()
-  /** Last known approach clearance per callsign, for the quick button. */
-  private readonly approachByCallsign = new Map<string, string>()
   private isCollapsed = false
   private selectedCallsign: string | null = null
 
@@ -185,7 +178,6 @@ export class StripBay {
       if (!present.has(callsign)) {
         row.el.remove()
         this.rows.delete(callsign)
-        this.approachByCallsign.delete(callsign)
       }
     }
 
@@ -239,26 +231,7 @@ export class StripBay {
     const status = document.createElement('div')
     status.className = 'strip-status'
 
-    const actions = document.createElement('div')
-    actions.className = 'strip-actions'
-    const descend = this.quickButton(`DES ${this.opts.quickDescendFt}`, () => ({
-      kind: 'altitude',
-      callsign,
-      ft: this.opts.quickDescendFt,
-    }))
-    const slow = this.quickButton(`SPD ${this.opts.quickSpeedKts}`, () => ({
-      kind: 'speed',
-      callsign,
-      kts: this.opts.quickSpeedKts,
-    }))
-    const approachBtn = this.quickButton('CLEARED ILS', () => ({
-      kind: 'approach',
-      callsign,
-      runway: this.runwayFor(callsign),
-    }))
-    actions.append(descend, slow, approachBtn)
-
-    el.append(head, body, status, actions)
+    el.append(head, body, status)
 
     // Selecting a strip is how the corresponding radar target gets picked
     // up, so the handler is on the row rather than a dedicated control.
@@ -267,7 +240,22 @@ export class StripBay {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()
         this.opts.onSelect(callsign)
+        return
       }
+      // The platform's own keyboard route to a context menu, so the strips
+      // stay usable without a mouse.
+      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+        e.preventDefault()
+        const box = el.getBoundingClientRect()
+        this.opts.onContextMenu(callsign, { x: box.left + 12, y: box.top + 12 })
+      }
+    })
+
+    // Right-click: the clearances for this aircraft, at the cursor. The
+    // browser's own menu would otherwise open on top of them.
+    el.addEventListener('contextmenu', (e: MouseEvent) => {
+      e.preventDefault()
+      this.opts.onContextMenu(callsign, { x: e.clientX, y: e.clientY })
     })
 
     const row: Row = {
@@ -277,7 +265,6 @@ export class StripBay {
       spd,
       hdg,
       status,
-      approachBtn,
       rendered: { head: '', alt: '', spd: '', hdg: '', status: '', mode: '' },
       selected: false,
     }
@@ -286,27 +273,7 @@ export class StripBay {
     return row
   }
 
-  private quickButton(label: string, build: () => Command): HTMLButtonElement {
-    const b = document.createElement('button')
-    b.type = 'button'
-    b.className = 'strip-action'
-    b.textContent = label
-    b.addEventListener('click', (e: MouseEvent) => {
-      // Otherwise issuing a clearance would also re-select the strip.
-      e.stopPropagation()
-      this.opts.onCommand(build())
-    })
-    return b
-  }
-
-  /** An assigned approach wins; otherwise offer the active runway. */
-  private runwayFor(callsign: string): string {
-    return this.approachByCallsign.get(callsign) ?? this.opts.defaultRunway
-  }
-
   private renderRow(row: Row, a: Aircraft): void {
-    this.approachByCallsign.set(a.callsign, a.clearedApproach ?? this.opts.defaultRunway)
-
     const heavy = isHeavy(a.wake) ? ` ${a.wake}` : ''
     const trend = TREND_MARK[trendOf(a.vsFpm)] ?? '='
     const hdgNow = String(Math.round(a.hdg)).padStart(3, '0')
@@ -331,13 +298,6 @@ export class StripBay {
     if (next.status !== row.rendered.status) row.status.textContent = next.status
     if (next.mode !== row.rendered.mode) {
       row.el.dataset['mode'] = next.mode
-      // Once an approach clearance is out there is nothing left to clear.
-      row.approachBtn.disabled =
-        a.navMode === 'LOC_ARMED' ||
-        a.navMode === 'LOC_CAPTURED' ||
-        a.navMode === 'GS_TRACKING' ||
-        a.navMode === 'LANDED' ||
-        a.navMode === 'HANDOFF'
     }
     row.rendered = next
 

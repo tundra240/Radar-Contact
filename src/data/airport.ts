@@ -1,6 +1,7 @@
 import {
   advance,
   bearingDeg,
+  degToRad,
   distanceNM,
   makeProjection,
   normalizeHeading,
@@ -229,6 +230,12 @@ export interface RenderSettings {
   /** Zoom past which exaggeration has faded to true scale. */
   readonly exaggerationCutoffPxPerNM: number
   readonly neighbourRunwayMinPx: number
+  /**
+   * Speed the drawn holding patterns are sized for. A display choice, not a
+   * rule: it sets how long the legs are and how wide the turns come out,
+   * and nothing in the simulation reads it.
+   */
+  readonly holdSpeedKts: number
 }
 
 export interface Sector {
@@ -614,6 +621,9 @@ function parseRender(raw: unknown): RenderSettings {
   const o = obj(raw, 'render')
   const ex = num(o['runwayExaggeration'], 'render.runwayExaggeration')
   if (ex < 1) throw new ConfigError('render.runwayExaggeration', 'must be at least 1')
+  const holdSpeed = num(o['holdSpeedKts'], 'render.holdSpeedKts')
+  if (holdSpeed <= 0) throw new ConfigError('render.holdSpeedKts', 'must be positive')
+
   return {
     runwayExaggeration: ex,
     exaggerationCutoffPxPerNM: num(
@@ -621,6 +631,7 @@ function parseRender(raw: unknown): RenderSettings {
       'render.exaggerationCutoffPxPerNM',
     ),
     neighbourRunwayMinPx: num(o['neighbourRunwayMinPx'], 'render.neighbourRunwayMinPx'),
+    holdSpeedKts: holdSpeed,
   }
 }
 
@@ -950,6 +961,99 @@ function parseAircraftType(raw: unknown, path: string): AircraftType {
 }
 
 /* -------------------------------------------------------------- geometry */
+
+/**
+ * A rate-one turn: 3 degrees a second, which is 180 degrees in a minute.
+ *
+ * The same figure `sim/autopilot.ts` flies at. It is stated here rather than
+ * imported from there because the drawn pattern is display geometry and must
+ * not make the data layer depend on the simulation.
+ */
+export const STANDARD_TURN_DEG_PER_SEC = 3
+
+export interface HoldGeometry {
+  /** Speed the pattern is drawn for. Leg length and radius both scale. */
+  readonly speedKts: number
+  readonly turnDegPerSec?: number
+  /** Points used for each 180 degree turn. */
+  readonly arcSteps?: number
+}
+
+/**
+ * The racetrack for a holding pattern, as a closed ring of world-space
+ * points.
+ *
+ * A hold is two straight legs joined by two half-circles. The fix is at the
+ * **downstream end of the inbound leg** -- that is the point the aircraft
+ * crosses before turning outbound, which is why the fix symbol sits at one
+ * end of the pattern rather than in the middle of it.
+ *
+ * Both dimensions come out of the speed: the legs are `legMins` of flying,
+ * and the turn radius is what a rate-one turn gives at that speed. At 220 kt
+ * and a one-minute leg that is a 3.7 NM leg and a 1.2 NM radius, so the
+ * whole pattern is about 3.7 by 2.3 NM -- which is why it is a thin sliver
+ * on a 40 NM scope and not the fat oval charts draw.
+ *
+ * The turns are generated as short chords rather than canvas arcs so that
+ * the whole pattern is one polyline in world space: it can then be measured
+ * in a test, and the renderer needs no knowledge of canvas angle
+ * conventions or of which way the y axis points.
+ */
+export function holdRacetrack(
+  fixNM: Vec2NM,
+  hold: HoldPattern,
+  geometry: HoldGeometry,
+): readonly Vec2NM[] {
+  const turnRate = geometry.turnDegPerSec ?? STANDARD_TURN_DEG_PER_SEC
+  const steps = Math.max(2, geometry.arcSteps ?? 12)
+
+  const legNM = (geometry.speedKts * hold.legMins) / 60
+  // Distance per second over radians per second.
+  const radiusNM = geometry.speedKts / 3600 / degToRad(turnRate)
+
+  const inbound = hold.inboundTrue
+  // Which side the pattern lies on, and which way the arcs sweep.
+  const side = hold.turns === 'right' ? 90 : -90
+
+  // The inbound leg, ending at the fix.
+  const legStart = advance(fixNM, inbound + 180, legNM)
+  // First turn: at the fix, through 180 degrees onto the outbound leg.
+  const firstCentre = advance(fixNM, inbound + side, radiusNM)
+  const outboundStart = advance(fixNM, inbound + side, radiusNM * 2)
+  const outboundEnd = advance(outboundStart, inbound + 180, legNM)
+  // Second turn: at the far end, back onto the inbound leg.
+  const secondCentre = advance(outboundEnd, inbound + 180 + side, radiusNM)
+
+  return [
+    legStart,
+    fixNM,
+    ...arcPoints(firstCentre, fixNM, side * 2, steps),
+    outboundEnd,
+    // The last point of this arc is legStart again, so it is dropped: the
+    // ring is closed by the renderer rather than by a duplicate point.
+    ...arcPoints(secondCentre, outboundEnd, side * 2, steps).slice(0, -1),
+  ]
+}
+
+/**
+ * Points along a turn, excluding where it started and including where it
+ * ends. A positive sweep is clockwise, which for a compass bearing from the
+ * centre of the turn is the direction a right turn goes.
+ */
+function arcPoints(
+  centre: Vec2NM,
+  from: Vec2NM,
+  sweepDeg: number,
+  steps: number,
+): readonly Vec2NM[] {
+  const radius = distanceNM(centre, from)
+  const start = bearingDeg(centre, from)
+  const out: Vec2NM[] = []
+  for (let k = 1; k <= steps; k += 1) {
+    out.push(advance(centre, start + (sweepDeg * k) / steps, radius))
+  }
+  return out
+}
 
 /**
  * A point on the extended centreline, `distNM` before the threshold on the

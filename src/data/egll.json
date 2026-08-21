@@ -29,7 +29,8 @@
   "render": {
     "runwayExaggeration": 3,
     "exaggerationCutoffPxPerNM": 45,
-    "neighbourRunwayMinPx": 9
+    "neighbourRunwayMinPx": 9,
+    "holdSpeedKts": 220
   },
   "runways": [
     {

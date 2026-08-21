@@ -31,6 +31,25 @@ const TRAIL_FADE_FLOOR = 0.18
 
 const TRAIL_DOT_PX = 1.6
 
+/* The data block's metrics, shared by the draw and the hit test. */
+const BLOCK_FONT_PX = 10
+const BLOCK_LINE_PX = 11
+/** Gap between the target symbol and the first character of the block. */
+const BLOCK_LEAD_PX = 11
+/** How close to the right edge a target has to be before its block flips. */
+const BLOCK_FLIP_MARGIN_PX = 90
+/** Monospace advance as a fraction of the font size, as scope.ts assumes. */
+const CHAR_ADVANCE = 0.6
+
+/**
+ * How close a click has to be to count. Pointing at a moving target is
+ * not a precision task, so the symbol picks up well outside its own eight
+ * pixels.
+ */
+export const PICK_RADIUS_PX = 12
+/** The same forgiveness around the edges of a data block. */
+const PICK_SLOP_PX = 2
+
 export function drawTargets(
   g: CanvasRenderingContext2D,
   cam: Camera,
@@ -121,6 +140,31 @@ export function blockLines(a: Aircraft): readonly string[] {
   return [`${a.callsign}${isHeavy(a.wake) ? ' H' : ''}`, level, `${speed} ${a.type}`]
 }
 
+/**
+ * The data block's screen rectangle.
+ *
+ * Shared by the draw and the hit test on purpose. The block is the biggest
+ * part of a target and the part a controller actually points at, so it has
+ * to be clickable -- and a hit test that computed its own idea of where
+ * the text sits would drift away from the text the moment either changed.
+ */
+export function blockBox(
+  cam: Camera,
+  a: Aircraft,
+  p: Vec2Px,
+): { readonly x: number; readonly y: number; readonly w: number; readonly h: number; readonly flip: boolean } {
+  const lines = blockLines(a)
+  const cols = Math.max(...lines.map((l) => l.length))
+  const w = cols * BLOCK_FONT_PX * CHAR_ADVANCE
+  const h = lines.length * BLOCK_LINE_PX
+
+  // Up and to the right, the way a strip is written. Flipped to the left
+  // near the right-hand edge so a block never runs off the display.
+  const flip = p.x > cam.width - BLOCK_FLIP_MARGIN_PX
+  const x = flip ? p.x - BLOCK_LEAD_PX - w : p.x + BLOCK_LEAD_PX
+  return { x, y: p.y - BLOCK_LINE_PX * 1.5, w, h, flip }
+}
+
 function drawBlock(
   g: CanvasRenderingContext2D,
   cam: Camera,
@@ -129,29 +173,65 @@ function drawBlock(
   ink: string,
 ): void {
   const lines = blockLines(a)
-  const size = 10
-  const lead = 11
-  const gap = size + 1
-
-  // Up and to the right, the way a strip is written. Flipped to the left
-  // near the right-hand edge so a block never runs off the display.
-  const flip = p.x > cam.width - 90
-  const dir = flip ? -1 : 1
-  const x = p.x + dir * lead
-  const top = p.y - gap
+  const box = blockBox(cam, a, p)
+  const dir = box.flip ? -1 : 1
+  // The text hangs off whichever edge of the box faces the target.
+  const anchorX = box.flip ? box.x + box.w : box.x
 
   g.strokeStyle = theme.trail
   g.lineWidth = 1
   g.beginPath()
   g.moveTo(p.x + dir * (TARGET_PX + 1), p.y - 1)
-  g.lineTo(x - dir * 2, top + gap * 0.4)
+  g.lineTo(anchorX - dir * 2, box.y + BLOCK_LINE_PX * 0.4)
   g.stroke()
 
   g.fillStyle = ink
-  g.font = fonts.label(size)
-  g.textAlign = flip ? 'right' : 'left'
+  g.font = fonts.label(BLOCK_FONT_PX)
+  g.textAlign = box.flip ? 'right' : 'left'
   g.textBaseline = 'middle'
   for (let i = 0; i < lines.length; i += 1) {
-    g.fillText(lines[i] as string, x, top + i * gap)
+    g.fillText(lines[i] as string, anchorX, box.y + BLOCK_LINE_PX * (i + 0.5))
   }
+}
+
+/**
+ * Which aircraft is under a screen point, or null for empty scope.
+ *
+ * The symbol gets a radius rather than its exact eight pixels, because
+ * pointing at a moving target with a mouse is not a precision task, and
+ * the block counts as part of the target for the same reason. Ties go to
+ * whichever symbol is nearest, so two overlapping blocks resolve to the
+ * aircraft the cursor is actually closest to.
+ */
+export function pickTarget(
+  cam: Camera,
+  traffic: readonly Aircraft[],
+  at: Vec2Px,
+  radiusPx = PICK_RADIUS_PX,
+): Aircraft | null {
+  let best: Aircraft | null = null
+  let nearest = Infinity
+
+  for (const a of traffic) {
+    const p = cam.worldToScreen(a.pos)
+    const away = Math.hypot(at.x - p.x, at.y - p.y)
+
+    let hit = away <= radiusPx
+    // Only when the block is actually drawn: an invisible block that can
+    // still be clicked is a trap.
+    if (!hit && cam.pxPerNM >= BLOCK_MIN_PX_PER_NM) {
+      const box = blockBox(cam, a, p)
+      hit =
+        at.x >= box.x - PICK_SLOP_PX &&
+        at.x <= box.x + box.w + PICK_SLOP_PX &&
+        at.y >= box.y - PICK_SLOP_PX &&
+        at.y <= box.y + box.h + PICK_SLOP_PX
+    }
+
+    if (hit && away < nearest) {
+      best = a
+      nearest = away
+    }
+  }
+  return best
 }

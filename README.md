@@ -100,12 +100,14 @@ runways and their centrelines -- along with the logon screen, the strip bay, the
 clock and its rate control. Arrivals are generated onto the holds with real callsigns and
 types, and appear on their strips.
 
-**Nothing moves yet.** There is no physics step, so an arrival stays where it was released and
-the flow stalls once every fix is occupied. Aircraft motion, clearances and ILS capture are
-Day 1 and Day 2 of the roadmap in [ARCHITECTURE.md](ARCHITECTURE.md). So the sections above
-describe the game being built rather than one you can play through -- but every figure in them
-is live in the config, and the geometry they depend on is already drawn correctly. See
-**Status** below for the detail.
+Arrivals fly, and they take headings, altitudes and speeds -- typed, or picked off the
+right-click menu on the target.
+
+**Nothing lands yet.** Approach clearances and the ILS are the piece still missing, so an
+aircraft vectored onto the centreline flies straight through it and out of the sector. Conflict
+detection and scoring are Day 3. So the sections above describe the game being built rather than
+one you can play through to a landing -- but every figure in them is live in the config, the
+geometry is drawn correctly, and the vectoring works. See **Status** below for the detail.
 
 ## Logging on
 
@@ -137,10 +139,30 @@ npm run dev        # http://localhost:5173
 On the scope: drag to pan, wheel to zoom, `R` to reset the view, space to pause, `D` to cycle
 the display schemes, and `M` to open the menu (`O` does too).
 
-Arrivals are released onto the four holds by `sim/spawner.ts`, on a timer that tightens as
-the session goes on. They do not move yet -- there is no physics step -- so the flow stalls at
-four, one per hold, and the `TRAFFIC n HELD n` readout shows the spacing rule refusing to
-stack more on top.
+Arrivals are released onto the four holds by `sim/spawner.ts`, on a timer that tightens as the
+session goes on, and fly from there. The `TRAFFIC n HELD n` readout on the status bar shows how
+many are airborne and how many the spawner is holding back because no fix is clear.
+
+### Issuing clearances
+
+The command line under the scope takes one aircraft's whole clearance in a line:
+
+```
+BAW178 H270 A30 S180
+```
+
+Turn onto 270, descend to 3,000 ft, reduce to 180 kt. Headings are `H`/`HDG`/`HEADING`,
+altitudes `A`/`ALT` (or `C`/`CLIMB` and `D`/`DES`, same field), speeds `S`/`SPD`. Altitudes
+work in hundreds of feet or in feet -- `A30` and `A3000` both mean 3,000 ft. The callsign can
+be shortened to anything unique (`178`, `BAW1`) or left out entirely if a strip is selected,
+and the up arrow walks back through what you typed.
+
+A clearance the aircraft or the sector cannot accept is **refused with a reason** rather than
+quietly adjusted, and a line with several instructions is all or nothing. The right-click tag
+menu produces the same commands and goes through the same gate, so there is one place a
+clearance can be refused however it was issued -- and the menu only offers values that gate
+will accept, derived from the same sector limits it checks against. [TUTORIAL.md](TUTORIAL.md) has the detail --
+and so does the in-game guide, which is that file.
 
 ### The guide
 
@@ -189,7 +211,7 @@ boundary are always drawn: they are the job rather than decoration.
 | `src/sim/` | The aircraft model, and a placeholder roster until Day 1 |
 | `src/ui/` | The strip bay, the options menu, the logon screen and the guide |
 | `tools/` | Scripts that regenerate the map and aerodrome data from their sources |
-| `src/commands/` | The one instruction type every input path produces |
+| `src/commands/` | The one instruction type, its parser and the gate that validates it |
 | `src/audio/` | Interface sounds |
 
 ## Status
@@ -197,10 +219,10 @@ boundary are always drawn: they are the job rather than decoration.
 Day 0 of the roadmap is complete: real EGLL data, the coordinate converter, the canvas
 scaler, the surrounding traffic picture and published airspace boundaries, all rendered.
 
-The flight progress strip bay is built and wired to its sync seam, but **there is no aircraft
-simulation yet** -- that is Day 1. The bay is currently fed a frozen placeholder roster and
-says so with a DEMO badge; its quick-action buttons produce real `Command` objects and log a
-readback, because Day 2 points that sink at `commands/apply.ts`.
+The flight progress strip bay is fed by the running simulation, and every instruction is
+issued by right-clicking an aircraft -- on the scope or on its strip. The three fixed
+quick-buttons that used to sit on every strip are gone: they could only ever offer three
+clearances at values somebody had to guess in advance, and a strip is a view.
 
 ## Licensing
 

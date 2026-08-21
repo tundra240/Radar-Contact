@@ -4,14 +4,96 @@ A tutorial on the one skill the whole game is about: turning four separate strea
 arrivals into a single landing sequence per runway, spaced as tightly as the rules allow,
 without anyone losing separation on the way there.
 
-This document covers **sequencing only**. Controls, display schemes and overlays are in
-[README.md](README.md); the code layout is in [ARCHITECTURE.md](ARCHITECTURE.md).
+This document covers **how to talk to aircraft and how to sequence them**. Display schemes,
+overlays and the rest of the interface are in [README.md](README.md); the code layout is in
+[ARCHITECTURE.md](ARCHITECTURE.md).
 
-> **What is live today.** The scope, the four holds and their geometry are drawn from real
-> data and are on screen now. The traffic itself is not built yet -- aircraft, clearances and
-> ILS capture are Day 1 and Day 2 of the roadmap. Every figure below marked *(config)* is read
-> live from `src/data/egll.json`, so it is what the game will actually enforce. Everything
-> else is the procedure the spawner and the approach logic are being built towards.
+> **What is live today.** The scope, the map, the four holds and their geometry are drawn from
+> real data. Arrivals appear over the holds and fly, and they take headings, altitudes and
+> speeds. Approach clearances and the ILS are not built yet, so nothing lands: an aircraft
+> vectored to the centreline will fly through it. Every figure below marked *(config)* is read
+> live from `src/data/egll.json`, so it is what the game actually enforces.
+
+---
+
+## Talking to aircraft
+
+There are two ways in, and they do exactly the same thing.
+
+### Point at it
+
+**Right-click an aircraft -- the target on the scope, or its strip in the bay -- and its
+clearances open at the cursor.** Pick HEADING, ALTITUDE, SPEED, APPROACH or HOLD, then pick the
+value. HANDOFF goes straight out with nothing to choose. The menu closes the moment it has
+issued something, so a clearance is two clicks.
+
+Right-clicking the data block works as well as the square, and is easier: the block is the
+bigger thing and it is what you are already reading. Escape closes the menu, and so does
+clicking anywhere else. Left-click picks a target up without instructing it, and left-clicking
+empty scope lets it go.
+
+Everything on offer is something the sector and the aeroplane will accept. The levels come from
+the sector floor and ceiling, and the speed list from that type's approach speed and the
+terminal area limit -- so an A319 is offered 140 kt where an A320 is offered 150, and an
+aircraft already cleared below FL100 is not offered 280 kt just because it is still up there.
+Nothing in the menu is a number that gets refused when you pick it.
+
+The heading page has the nudges first -- L30 to R30, worked out from the heading the aircraft is
+actually flying -- and then every ten degrees, because a specific heading is a specific heading.
+
+### Or type it
+
+One line does everything you want to say to one aircraft:
+
+```
+  BAW178 H270 A30 S180
+```
+
+That is: turn BAW178 onto heading 270, descend to 3,000 ft, reduce to 180 kt. Order does not
+matter and you can give one instruction or all three.
+
+| Instruction | Written | Means |
+|---|---|---|
+| Heading | `H270`, `HDG 270`, `HEADING 270` | Turn onto 270 degrees |
+| Altitude | `A30`, `A3000`, `ALT 30` | Cleared 3,000 ft |
+| Climb | `C90`, `CLIMB 9000` | Same field, said the other way |
+| Descend | `D30`, `DES 3000` | Same again |
+| Speed | `S180`, `SPD 180` | Reduce or increase to 180 kt |
+
+Four things worth knowing:
+
+- **Altitudes can be written either way.** Three digits or fewer is hundreds of feet, so `A30`
+  is 3,000 ft and `A150` is FL150. Four or more is feet, so `A3000` is also 3,000 ft. They
+  mean the same thing.
+- **You can shorten the callsign.** `178` or `BAW1` will find BAW178, as long as only one
+  aircraft matches. If two do, the line is refused rather than guessed at.
+- **You can leave the callsign out.** Click a target or its strip to select it, then type
+  `A30` on its own.
+- **The up arrow recalls what you typed**, including a line that was refused -- which is
+  usually one character away from a good one.
+
+### A clearance is a target, not a teleport
+
+The aircraft does not snap to what you told it. It turns at 3 degrees a second, climbs and
+descends at 1,500 fpm, and changes speed at about 1.5 kt a second. The strip shows both
+numbers -- what the radar sees and what you cleared -- so `070 v 030` is an aircraft at 7,000
+ft on its way down to 3,000.
+
+That gap is the whole game. A turn onto a 30 degree closing heading takes ten seconds to even
+start pointing the right way, and an aircraft cleared down from the top of a stack needs eight
+minutes and thirty miles to get there. Section 2 has the arithmetic.
+
+### Refusals
+
+A clearance the aircraft or the sector cannot accept is **refused with a reason**, in red, and
+nothing changes. The line is not quietly adjusted into something legal -- if you ask an A320
+for 90 kt you are told it will not fly below 140, rather than being given 140 and left thinking
+90 was accepted.
+
+The things that get refused: a level outside the sector (1,500 ft to FL150), a speed outside
+what the type can fly, more than 250 kt below 10,000 ft, and a heading past 360. A line with
+several instructions is **all or nothing** -- if the speed is refused, the turn does not happen
+either, so you never have to work out which half took effect.
 
 ---
 

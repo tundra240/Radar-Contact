@@ -6,7 +6,12 @@ import { distanceNM, type Vec2NM } from './core/geo'
 import { stepAircraft } from './sim/aircraft'
 import { Spawner } from './sim/spawner'
 import type { Aircraft } from './sim/types'
-import { describeCommand, type Command } from './commands/types'
+import type { Command } from './commands/types'
+import { parseCommandLine } from './commands/parse'
+import { applyAll, type ApplyContext } from './commands/apply'
+import { CommandConsole } from './ui/console'
+import { TagMenu } from './ui/tagmenu'
+import { pickTarget } from './render/layers/targets'
 import { StripBay } from './ui/stripbay'
 import { Menu } from './ui/menu'
 import { Logon, type LogonDetails } from './ui/logon'
@@ -55,19 +60,27 @@ const scopeEl = document.createElement('div')
 scopeEl.className = 'scope'
 host.appendChild(scopeEl)
 
+// The picture and the command line share the left column. The canvas is
+// measured against the view rather than the column, so the status bar it
+// draws along its own bottom edge is never hidden behind the console.
+const viewEl = document.createElement('div')
+viewEl.className = 'scope-view'
+scopeEl.appendChild(viewEl)
+
 const canvas = document.createElement('canvas')
-scopeEl.appendChild(canvas)
+viewEl.appendChild(canvas)
 
 const g = canvas.getContext('2d')
 if (!g) throw new Error('2D canvas context unavailable')
 
-start(host, scopeEl, canvas, g)
+start(host, viewEl, canvas, g, scopeEl)
 
 function start(
   shell: HTMLDivElement,
   container: HTMLDivElement,
   surface: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
+  column: HTMLDivElement,
 ): void {
   // World space is anchored on the airport reference point, so centring the
   // camera on the origin centres it on the field.
@@ -120,21 +133,40 @@ function start(
 
   window.addEventListener('resize', resize)
 
+  /** A mouse event in the canvas's own pixels, which is what picking wants. */
+  const pointIn = (e: MouseEvent): { readonly x: number; readonly y: number } => {
+    const rect = surface.getBoundingClientRect()
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
+
   surface.addEventListener('wheel', (e: WheelEvent) => {
     e.preventDefault()
-    const rect = surface.getBoundingClientRect()
-    const anchor = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    // An open menu is anchored to a point on the screen, and zooming moves
+    // the aircraft out from under it.
+    tagMenu.close()
     // One notch is a 10 percent range change, in the direction of scroll.
-    cam.zoomAt(anchor, e.deltaY < 0 ? 1.1 : 1 / 1.1)
+    cam.zoomAt(pointIn(e), e.deltaY < 0 ? 1.1 : 1 / 1.1)
     requestDraw()
   }, { passive: false })
 
   let dragging = false
   let lastX = 0
   let lastY = 0
+  /**
+   * How far the pointer has travelled since it went down. A press that
+   * moves a pixel or two is a click on a target, not a pan -- without the
+   * slop, picking up a target with a trackpad is close to impossible.
+   */
+  let travelledPx = 0
+  const CLICK_SLOP_PX = 4
 
   surface.addEventListener('pointerdown', (e: PointerEvent) => {
+    // The left button only. The right button belongs to the tag menu, and
+    // a right-drag that also panned would slide the picture out from under
+    // the menu it had just opened.
+    if (e.button !== 0) return
     dragging = true
+    travelledPx = 0
     lastX = e.clientX
     lastY = e.clientY
     surface.setPointerCapture(e.pointerId)
@@ -142,17 +174,46 @@ function start(
 
   surface.addEventListener('pointermove', (e: PointerEvent) => {
     if (!dragging) return
+    travelledPx += Math.abs(e.clientX - lastX) + Math.abs(e.clientY - lastY)
     cam.panByPx(e.clientX - lastX, e.clientY - lastY)
     lastX = e.clientX
     lastY = e.clientY
     requestDraw()
   })
 
-  const endDrag = (): void => {
+  surface.addEventListener('pointerup', (e: PointerEvent) => {
+    const panned = dragging && travelledPx > CLICK_SLOP_PX
     dragging = false
-  }
-  surface.addEventListener('pointerup', endDrag)
-  surface.addEventListener('pointercancel', endDrag)
+    if (e.button !== 0 || panned) return
+
+    // Left-click picks a target up, and picks nothing up on empty scope,
+    // which is how you let go of one.
+    const target = pickTarget(cam, traffic, pointIn(e))
+    selected = target === null ? null : target.callsign === selected ? null : target.callsign
+    syncStrips()
+    requestDraw()
+  })
+
+  surface.addEventListener('pointercancel', (): void => {
+    dragging = false
+  })
+
+  // Right-click a target: its clearances, at the cursor. On empty scope
+  // there is nothing to instruct, so the menu just closes.
+  surface.addEventListener('contextmenu', (e: MouseEvent) => {
+    e.preventDefault()
+    const target = pickTarget(cam, traffic, pointIn(e))
+    if (target === null) {
+      tagMenu.close()
+      return
+    }
+    // Opening the menu picks the target up too: the aircraft being given
+    // an instruction should be the one highlighted on the scope.
+    selected = target.callsign
+    syncStrips()
+    requestDraw()
+    tagMenu.openFor(target, { x: e.clientX, y: e.clientY })
+  })
 
   // ---- interface sound -------------------------------------------------
   // One delegated listener rather than a handler per control: the strip bay
@@ -257,9 +318,14 @@ function start(
 
   const bay = new StripBay({
     mount: shell,
-    quickDescendFt: airport.sector.interceptAltMaxFt,
-    quickSpeedKts: 160,
-    defaultRunway: airport.arrivalRunways[0]?.id ?? '27R',
+    onContextMenu: (callsign, at) => {
+      const target = traffic.find((a) => a.callsign === callsign)
+      if (target === undefined) return
+      selected = callsign
+      syncStrips()
+      requestDraw()
+      tagMenu.openFor(target, at)
+    },
     onSelect: (callsign) => {
       // Clicking the same strip again clears the selection, which is how
       // you let go of a target without picking another.
@@ -267,11 +333,9 @@ function start(
       syncStrips()
       requestDraw()
     },
-    onCommand: (command: Command) => {
-      // Temporary sink. Day 2 points this at commands/apply.ts; until then
-      // the readback proves the strip buttons produce real commands.
-      console.info('command:', describeCommand(command), command)
-    },
+    // Quick-buttons go through exactly the same gate as a typed line, so
+    // there is one validation path and one readback format however the
+    // clearance was issued.
     onLayoutChange: () => resize(),
   })
 
@@ -289,7 +353,96 @@ function start(
 
   const syncStrips = (): void => {
     bay.update(traffic, selected)
+    tagMenu.sync(traffic)
   }
+
+  // ---- clearances ------------------------------------------------------
+  // Every input path -- the typed console, the strip quick-buttons, and the
+  // mouse rubber-band when it arrives -- builds the same Command objects and
+  // passes them through the same gate in commands/apply.ts. One place a
+  // clearance can be refused, one readback format, one thing to test.
+
+  const applyContext: ApplyContext = {
+    floorFt: airport.sector.floorFt,
+    ceilingFt: airport.sector.ceilingFt,
+    speedLimitKts: airport.sector.speedLimitKts,
+    speedLimitBelowFt: airport.sector.speedLimitBelowFt,
+    envelopeFor: (type) => {
+      const t = airport.aircraftTypes.find((x) => x.type === type)
+      return t === undefined
+        ? null
+        : { minSpeedKts: t.approachKts, maxSpeedKts: t.cruiseKts }
+    },
+  }
+
+  const commandConsole = new CommandConsole({
+    mount: column,
+    placeholder: 'e.g. BAW123 H270 A30 S180',
+    onSubmit: (line) => {
+      commandConsole.write(line, 'command')
+      if (controller === null) {
+        commandConsole.write('log on before issuing clearances', 'reject')
+        return
+      }
+      const parsed = parseCommandLine(line, {
+        callsigns: traffic.map((a) => a.callsign),
+        selected,
+      })
+      if (!parsed.ok) {
+        commandConsole.write(parsed.error, 'reject')
+        return
+      }
+      issue(parsed.commands)
+    },
+  })
+
+  /**
+   * Issues a line's worth of commands to one aircraft.
+   *
+   * All or nothing, so a refused speed does not leave the aircraft already
+   * turned and descending -- the controller would then have to work out
+   * which half of what they typed had taken effect.
+   */
+  function issue(commands: readonly Command[]): void {
+    const first = commands[0]
+    if (first === undefined) return
+
+    const target = traffic.find((a) => a.callsign === first.callsign)
+    if (target === undefined) {
+      commandConsole.write(`no aircraft ${first.callsign} on frequency`, 'reject')
+      return
+    }
+
+    const outcome = applyAll(commands, target, applyContext)
+    if (!outcome.ok) {
+      commandConsole.write(outcome.reason, 'reject')
+      return
+    }
+
+    traffic = traffic.map((a) => (a.callsign === first.callsign ? outcome.aircraft : a))
+    for (const readback of outcome.readbacks) commandConsole.write(readback, 'readback')
+    syncStrips()
+    requestDraw()
+  }
+
+  /**
+   * The tag menu, fed by the same sink as the console so a clearance
+   * issued by pointing and a clearance issued by typing are the same
+   * event as far as everything downstream is concerned.
+   */
+  const tagMenu = new TagMenu({
+    mount: shell,
+    onCommand: (command) => issue([command]),
+    limits: {
+      floorFt: airport.sector.floorFt,
+      ceilingFt: airport.sector.ceilingFt,
+      speedLimitKts: airport.sector.speedLimitKts,
+      speedLimitBelowFt: airport.sector.speedLimitBelowFt,
+    },
+    runways: airport.arrivalRunways.map((r) => r.id),
+    holdFixes: airport.navaids.filter((n) => n.hold !== null).map((n) => n.name),
+    envelopeFor: applyContext.envelopeFor,
+  })
 
   // ---- the session -----------------------------------------------------
   // Who is working the position. Null until someone logs on, which is also
@@ -407,6 +560,13 @@ function start(
       logon.hide()
       menu.setOpen(false)
       loop.setPaused(false)
+      commandConsole.write(`${details.initials} on position ${details.position}`, 'note')
+      commandConsole.write(
+        'Clearances: CALLSIGN H<heading> A<altitude> S<speed>, or select a strip and omit the callsign.',
+        'note',
+      )
+      // The console is where the work happens, so it starts with the caret.
+      commandConsole.focus()
       paintMenu()
       requestDraw()
     },

@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { Command } from '../commands/types'
 import type { Aircraft, NavMode } from '../sim/types'
 import { StripBay, type StripBayOptions } from './stripbay'
 
@@ -31,7 +30,7 @@ function ac(over: Partial<Aircraft>): Aircraft {
 interface Harness {
   bay: StripBay
   mount: HTMLElement
-  commands: Command[]
+  menus: { callsign: string; at: { x: number; y: number } }[]
   selections: (string | null)[]
   layoutChanges: number
 }
@@ -41,20 +40,17 @@ function mountBay(extra?: { demo?: boolean }): Harness {
   const mount = document.createElement('div')
   document.body.appendChild(mount)
 
-  const commands: Command[] = []
+  const menus: { callsign: string; at: { x: number; y: number } }[] = []
   const selections: (string | null)[] = []
   const state = { layoutChanges: 0 }
 
   const opts: StripBayOptions = {
     mount,
-    onCommand: (c) => commands.push(c),
+    onContextMenu: (callsign, at) => menus.push({ callsign, at: { x: at.x, y: at.y } }),
     onSelect: (s) => selections.push(s),
     onLayoutChange: () => {
       state.layoutChanges += 1
     },
-    quickDescendFt: 3000,
-    quickSpeedKts: 160,
-    defaultRunway: '27R',
     ...(extra?.demo !== undefined ? { demo: extra.demo } : {}),
   }
 
@@ -62,7 +58,7 @@ function mountBay(extra?: { demo?: boolean }): Harness {
   return {
     bay,
     mount,
-    commands,
+    menus,
     selections,
     get layoutChanges() {
       return state.layoutChanges
@@ -289,65 +285,65 @@ describe('selection', () => {
   })
 })
 
-describe('quick actions', () => {
-  const actions = (strip: HTMLElement): HTMLButtonElement[] =>
-    [...strip.querySelectorAll<HTMLButtonElement>('.strip-action')]
+describe('right-click', () => {
+  const stripFor = (callsign: string): HTMLElement => {
+    const el = strips().find((s) => s.textContent?.includes(callsign))
+    if (!el) throw new Error(`no strip for ${callsign}`)
+    return el
+  }
 
-  it('issues a descent to the sector intercept altitude', () => {
-    h.bay.update([base], null)
-    const [descend] = actions(strips()[0] as HTMLElement)
-    expect(descend?.textContent).toBe('DES 3000')
-    descend?.click()
-    expect(h.commands).toEqual([{ kind: 'altitude', callsign: 'BAW178', ft: 3000 }])
+  const rightClick = (el: HTMLElement, at = { x: 300, y: 200 }): MouseEvent => {
+    const e = new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: at.x,
+      clientY: at.y,
+    })
+    el.dispatchEvent(e)
+    return e
+  }
+
+  it('opens the tag menu for the strip that was clicked, at the cursor', () => {
+    h.bay.update([base, ac({ callsign: 'VIR22' })], null)
+    rightClick(stripFor('VIR22'), { x: 640, y: 480 })
+    expect(h.menus).toEqual([{ callsign: 'VIR22', at: { x: 640, y: 480 } }])
   })
 
-  it('issues a speed reduction', () => {
+  it('suppresses the browser menu, which would open on top of its own', () => {
     h.bay.update([base], null)
-    const slow = actions(strips()[0] as HTMLElement)[1]
-    expect(slow?.textContent).toBe('SPD 160')
-    slow?.click()
-    expect(h.commands).toEqual([{ kind: 'speed', callsign: 'BAW178', kts: 160 }])
+    expect(rightClick(stripFor('BAW178')).defaultPrevented).toBe(true)
   })
 
-  it('clears the approach to the active runway by default', () => {
+  it('leaves the selection alone', () => {
+    // main.ts picks the target up as it opens the menu. The bay reporting a
+    // selection as well would report it twice.
     h.bay.update([base], null)
-    actions(strips()[0] as HTMLElement)[2]?.click()
-    expect(h.commands).toEqual([
-      { kind: 'approach', callsign: 'BAW178', runway: '27R' },
-    ])
-  })
-
-  it('clears the approach to the runway already assigned', () => {
-    // Otherwise the button would quietly re-clear an aircraft onto the
-    // other runway, which is a genuinely dangerous thing for a UI to do.
-    h.bay.update([ac({ navMode: 'VECTOR', clearedApproach: '27L' })], null)
-    actions(strips()[0] as HTMLElement)[2]?.click()
-    expect(h.commands).toEqual([
-      { kind: 'approach', callsign: 'BAW178', runway: '27L' },
-    ])
-  })
-
-  it('does not select the strip when a button is pressed', () => {
-    // The click would otherwise bubble and steal the selection.
-    h.bay.update([base], null)
-    actions(strips()[0] as HTMLElement)[0]?.click()
-    expect(h.commands).toHaveLength(1)
+    rightClick(stripFor('BAW178'))
     expect(h.selections).toEqual([])
   })
 
-  it('disables the approach button once there is nothing left to clear', () => {
-    for (const navMode of ['LOC_ARMED', 'LOC_CAPTURED', 'GS_TRACKING', 'LANDED'] as NavMode[]) {
-      h.bay.update([ac({ navMode, clearedApproach: '27R' })], null)
-      const approach = actions(strips()[0] as HTMLElement)[2]
-      expect(approach?.disabled, navMode).toBe(true)
-    }
+  it('opens from the keyboard, anchored on the strip', () => {
+    h.bay.update([base], null)
+    stripFor('BAW178').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true }),
+    )
+    expect(h.menus).toHaveLength(1)
+    expect(h.menus[0]?.callsign).toBe('BAW178')
   })
 
-  it('leaves the approach button live while still being vectored', () => {
-    for (const navMode of ['VECTOR', 'HOLD', 'GO_AROUND'] as NavMode[]) {
-      h.bay.update([ac({ navMode })], null)
-      expect(actions(strips()[0] as HTMLElement)[2]?.disabled, navMode).toBe(false)
-    }
+  it('opens from Shift+F10 too, which is the other platform route', () => {
+    h.bay.update([base], null)
+    stripFor('BAW178').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true }),
+    )
+    expect(h.menus).toHaveLength(1)
+  })
+
+  it('puts nothing pressable on a strip at all', () => {
+    // The strip is a view. Every instruction goes through the tag menu, so
+    // there is nothing left on a strip to catch a stray click.
+    h.bay.update([base], null)
+    expect(stripFor('BAW178').querySelectorAll('button')).toHaveLength(0)
   })
 })
 
