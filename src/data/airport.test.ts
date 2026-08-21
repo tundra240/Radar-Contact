@@ -333,144 +333,196 @@ describe('navaids', () => {
     expect(fix('CPT').hold).toBeNull()
   })
 })
+describe('airspace from the sector file', () => {
+  const published = egll.airspace.filter((v) => v.derivation === 'aip')
+  const ruled = egll.airspace.filter((v) => v.derivation === 'rule')
 
-describe('airspace', () => {
-  function volume(id: string) {
+  function byId(id: string) {
     const v = egll.airspace.find((x) => x.id === id)
     if (!v) throw new Error(`no airspace ${id}`)
     return v
   }
 
-  it('loads the TMA, the control zones and the traffic zones', () => {
-    expect(egll.airspace.length).toBeGreaterThanOrEqual(15)
-    for (const id of ['LONDON TMA', 'LONDON CTR', 'GATWICK CTR', 'EGWU ATZ']) {
-      expect(egll.airspace.map((v) => v.id), id).toContain(id)
+  it('loads published boundaries for the London airspace', () => {
+    expect(published.length).toBeGreaterThanOrEqual(50)
+    const labels = new Set(egll.airspace.map((v) => v.label))
+    for (const l of [
+      'LONDON TMA',
+      'LONDON CTR',
+      'GATWICK CTR',
+      'LUTON CTR',
+      'STANSTED CTA',
+      'FARNBOROUGH CTR',
+      'CITY CTA',
+    ]) {
+      expect(labels, l).toContain(l)
     }
   })
 
-  it('describes the TMA as a class A volume above the zones', () => {
-    const tma = volume('LONDON TMA')
+  it('describes the TMA as class A above the control zones', () => {
+    const tma = byId('London TMA 1')
     expect(tma.airspaceClass).toBe('A')
     expect(tma.floorFt).toBe(2500)
     expect(tma.ceilingFt).toBe(19500)
-    expect(tma.shape.kind).toBe('circle')
+    expect(tma.verticalSource).toBe('file')
   })
 
-  it('anchors a zone on the aerodrome it names', () => {
-    const ctr = volume('GATWICK CTR')
-    const kk = egll.airports.find((a) => a.icao === 'EGKK')
-    expect(kk).toBeDefined()
-    if (!kk || ctr.shape.kind !== 'circle') return
-    expect(distanceNM(ctr.shape.centreNM, kk.posNM)).toBeCloseTo(0, 9)
-  })
+  it('stores boundaries as open line work, never closed rings', () => {
+    // The source is a set of independent boundary lines: only two of sixty
+    // regions chained into a closed ring. Storing them as polygons would
+    // draw invented edges of up to 30 NM, so they are polylines and the
+    // renderer never closes them.
+    const lines = egll.airspace.filter((v) => v.shape.kind === 'lines')
+    expect(lines.length).toBeGreaterThanOrEqual(45)
 
-  it('derives traffic zones from the UK rule rather than guessing', () => {
-    // Radius 2 NM where the longest runway is 1850 m or less, otherwise
-    // 2.5 NM, up to 2000 ft above aerodrome level. Because that is a rule
-    // and not an estimate, these are NOT flagged approximate.
-    const atzs = egll.airspace.filter((v) => v.id.endsWith(' ATZ'))
-    expect(atzs.length).toBeGreaterThanOrEqual(8)
-
-    for (const atz of atzs) {
-      expect(atz.derivation, atz.id).toBe('rule')
-      expect(atz.approximate, atz.id).toBe(false)
-      expect(atz.airspaceClass, atz.id).toBe('G')
-      if (atz.shape.kind !== 'circle') throw new Error('ATZ must be a circle')
-      expect([2, 2.5], atz.id).toContain(atz.shape.radiusNM)
-
-      const icao = atz.id.slice(0, 4)
-      const field = egll.airports.find((a) => a.icao === icao)
-      expect(field, icao).toBeDefined()
-      if (!field) continue
-      expect(atz.ceilingFt, atz.id).toBe(field.elevationFt + 2000)
-      // And the radius must match the rule for that field's runway.
-      const m = (field.primaryRunway?.lengthNM ?? 0) * 1852
-      expect(atz.shape.radiusNM, `${atz.id} radius for ${Math.round(m)} m`).toBe(
-        m <= 1850 ? 2 : 2.5,
-      )
+    for (const v of lines) {
+      if (v.shape.kind !== 'lines') continue
+      expect(v.shape.pathsNM.length, v.id).toBeGreaterThan(0)
+      for (const path of v.shape.pathsNM) {
+        expect(path.length, v.id).toBeGreaterThanOrEqual(2)
+      }
     }
   })
 
-  it('flags the control zones as approximations', () => {
-    // They are irregular polygons in the AIP; circles are stand-ins and the
-    // display dashes them so that is visible rather than implied.
-    for (const id of ['LONDON CTR', 'GATWICK CTR', 'LONDON TMA']) {
-      expect(volume(id).approximate, id).toBe(true)
-      expect(volume(id).derivation, id).toBe('approx')
+  it('projects the line work into plausible world positions', () => {
+    const ctr = byId('London CTR')
+    if (ctr.shape.kind !== 'lines') throw new Error('expected line work')
+    const pts = ctr.shape.pathsNM.flat()
+    expect(pts.length).toBeGreaterThan(10)
+    // The Heathrow CTR is a local zone: every vertex within 30 NM of the
+    // field, which would fail loudly on a hemisphere or DMS parsing slip.
+    for (const p of pts) {
+      expect(distanceNM({ x: 0, y: 0 }, p), `${p.x},${p.y}`).toBeLessThan(30)
     }
+  })
+
+  it('prefers the published traffic zone over the runway-length rule', () => {
+    // Biggin Hill is notified as 2.5 NM. The UK rule applied to its 1806 m
+    // runway would have given 2 NM, so this is a case where the published
+    // data corrects the derivation -- the reason for using the source.
+    const kb = byId('EGKB Biggin Hill ATZ')
+    expect(kb.derivation).toBe('aip')
+    expect(kb.shape.kind).toBe('circle')
+    if (kb.shape.kind !== 'circle') return
+    expect(kb.shape.radiusNM).toBe(2.5)
+  })
+
+  it('keeps rule-derived zones only where the source is silent', () => {
+    expect(ruled.length).toBeGreaterThan(0)
+    for (const v of ruled) {
+      expect(v.approximate, v.id).toBe(true)
+      expect(v.shape.kind, v.id).toBe('circle')
+      // No aerodrome should have both a published and a derived zone.
+      const icao = v.id.slice(0, 4)
+      const alsoPublished = published.some((p) => p.label.startsWith(icao))
+      expect(alsoPublished, `${icao} has both`).toBe(false)
+    }
+  })
+
+  it('marks published boundaries as not approximate', () => {
+    for (const v of published) expect(v.approximate, v.id).toBe(false)
+  })
+
+  it('records where each vertical extent came from', () => {
+    for (const v of egll.airspace) {
+      expect(['file', 'rule', 'assumed'], v.id).toContain(v.verticalSource)
+    }
+    // The sector file omits limits for these, so they are flagged rather
+    // than presented as published.
+    expect(byId('Gatwick CTR').verticalSource).toBe('assumed')
+    expect(byId('London CTR').verticalSource).toBe('file')
+  })
+
+  it('still anchors rule-derived zones on their aerodrome', () => {
+    const atz = ruled.find((v) => v.id.startsWith('EGWU'))
+    expect(atz).toBeDefined()
+    const wu = egll.airports.find((a) => a.icao === 'EGWU')
+    if (!atz || !wu || atz.shape.kind !== 'circle') return
+    expect(distanceNM(atz.shape.centreNM, wu.posNM)).toBeCloseTo(0, 9)
   })
 })
 
 describe('airspace validation', () => {
-  function mutateAirspace(fn: (v: Record<string, unknown>[]) => void): () => Airport {
+  function load(fn: (v: Record<string, unknown>[]) => void): () => Airport {
     return () => {
       const cfg = structuredClone(raw) as Record<string, unknown>
       fn(cfg['airspace'] as Record<string, unknown>[])
       return loadAirport(cfg)
     }
   }
+  const firstCircle = (v: Record<string, unknown>[]): Record<string, unknown> => {
+    const c = v.find((x) => x['kind'] === 'circle')
+    if (!c) throw new Error('fixture has no circle volume')
+    return c
+  }
 
   it('rejects a zone anchored on an unknown aerodrome', () => {
     expect(
-      mutateAirspace((v) => {
-        const first = v[0]
-        if (first) {
-          delete first['centre']
-          first['centreAirport'] = 'ZZZZ'
-        }
+      load((v) => {
+        const c = firstCircle(v)
+        delete c['centre']
+        c['centreAirport'] = 'ZZZZ'
       }),
     ).toThrow(/unknown aerodrome "ZZZZ"/)
   })
 
   it('rejects an airspace class outside A-G', () => {
     expect(
-      mutateAirspace((v) => {
-        const first = v[0]
-        if (first) first['class'] = 'Q'
+      load((v) => {
+        if (v[0]) v[0]['class'] = 'Q'
       }),
     ).toThrow(/single letter A-G/)
   })
 
   it('rejects a ceiling at or below the floor', () => {
     expect(
-      mutateAirspace((v) => {
-        const first = v[0]
-        if (first) first['ceilingFt'] = 0
+      load((v) => {
+        if (v[0]) v[0]['ceilingFt'] = 0
       }),
     ).toThrow(/ceilingFt must be above floorFt/)
   })
 
   it('rejects an unknown shape kind', () => {
     expect(
-      mutateAirspace((v) => {
-        const first = v[0]
-        if (first) first['kind'] = 'blob'
+      load((v) => {
+        if (v[0]) v[0]['kind'] = 'blob'
       }),
-    ).toThrow(/must be "circle" or "polygon"/)
+    ).toThrow(/must be "circle", "polygon" or "lines"/)
   })
 
-  it('rejects a degenerate polygon', () => {
+  it('rejects a degenerate polyline', () => {
     expect(
-      mutateAirspace((v) => {
-        const first = v[0]
-        if (first) {
-          first['kind'] = 'polygon'
-          first['vertices'] = [{ lat: 51.5, lon: -0.4 }, { lat: 51.6, lon: -0.3 }]
+      load((v) => {
+        if (v[0]) {
+          v[0]['kind'] = 'lines'
+          v[0]['paths'] = [[{ lat: 51.5, lon: -0.4 }]]
         }
       }),
-    ).toThrow(/at least 3 points/)
+    ).toThrow(/paths\[0\] must have at least 2 points/)
   })
 
-  it('accepts a real polygon boundary', () => {
-    // The path an authoritative AIP boundary takes when it replaces one of
-    // the circular stand-ins: no code change, just different config.
-    const loaded = mutateAirspace((v) => {
-      const first = v[0]
-      if (first) {
-        first['kind'] = 'polygon'
-        first['approximate'] = false
-        first['derivation'] = 'aip'
-        first['vertices'] = [
+  it('rejects an unknown derivation or vertical source', () => {
+    expect(
+      load((v) => {
+        if (v[0]) v[0]['derivation'] = 'vibes'
+      }),
+    ).toThrow(/must be aip, rule or approx/)
+    expect(
+      load((v) => {
+        if (v[0]) v[0]['verticalSource'] = 'vibes'
+      }),
+    ).toThrow(/must be file, rule or assumed/)
+  })
+
+  it('still accepts a closed polygon boundary', () => {
+    // Kept in the schema: if ordered closed rings are ever transcribed from
+    // the AIP, they load with no code change and can be filled or tested
+    // for containment, which line work cannot.
+    const loaded = load((v) => {
+      if (v[0]) {
+        v[0]['kind'] = 'polygon'
+        v[0]['derivation'] = 'aip'
+        v[0]['vertices'] = [
           { lat: 51.7, lon: -0.7 },
           { lat: 51.7, lon: -0.2 },
           { lat: 51.3, lon: -0.2 },
@@ -482,10 +534,8 @@ describe('airspace validation', () => {
     const v = loaded.airspace[0]
     expect(v?.shape.kind).toBe('polygon')
     expect(v?.approximate).toBe(false)
-    expect(v?.derivation).toBe('aip')
     if (v?.shape.kind !== 'polygon') return
     expect(v.shape.verticesNM.length).toBe(4)
-    // Projected, so the northern edge really is north of the southern one.
     expect(v.shape.verticesNM[0]?.y).toBeGreaterThan(v.shape.verticesNM[2]?.y ?? 0)
   })
 })

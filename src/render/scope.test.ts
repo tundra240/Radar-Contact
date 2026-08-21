@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { Camera } from '../core/camera'
 import { loadAirport, runwayScaleAt } from '../data/airport'
 import raw from '../data/egll.json'
 import { drawScope } from './scope'
+import { palettes, setPalette } from './theme'
 
 /**
  * End-to-end check on the coordinate pipeline: published lat/lon -> world
@@ -27,13 +28,17 @@ function recorder(): {
   texts: Text[]
   arcs: Arc[]
   dashes: number[][]
+  fills: string[]
 } {
   const texts: Text[] = []
   const arcs: Arc[] = []
   const dashes: number[][] = []
+  const fills: string[] = []
   const noop = (): void => {}
-  const stub = {
-    fillRect: noop,
+  const stub: Record<string, unknown> = {
+    fillRect: () => {
+      fills.push(String(stub["fillStyle"]))
+    },
     beginPath: noop,
     closePath: noop,
     moveTo: noop,
@@ -60,7 +65,7 @@ function recorder(): {
     textAlign: 'left',
     textBaseline: 'top',
   }
-  return { ctx: stub as unknown as CanvasRenderingContext2D, texts, arcs, dashes }
+  return { ctx: stub as unknown as CanvasRenderingContext2D, texts, arcs, dashes, fills }
 }
 
 const airport = loadAirport(raw)
@@ -168,15 +173,13 @@ describe('airspace overlay', () => {
     expect(labels).toContain('2500-FL195')
   })
 
-  it('anchors a zone on the aerodrome it belongs to', () => {
-    // GATWICK CTR is defined by centreAirport, so its circle must sit on
-    // Gatwick rather than on the field being controlled.
-    const { arcs, texts } = render()
-    const gatwick = at(texts, 'EGKK')
-    const ctr = arcs.find((a) => Math.round(a.r) === 80)
-    expect(ctr).toBeDefined()
-    if (!ctr) return
-    expect(ctr.x).toBeCloseTo(gatwick.x, 0)
+  it('anchors a rule-derived traffic zone on its aerodrome', () => {
+    // Published zones are line work now; the circles left are the ATZs the
+    // sector file does not cover, and those must sit on their field.
+    const { arcs, texts } = render(1000, 600, 8)
+    const northolt = at(texts, 'EGWU')
+    const atz = arcs.find((a) => Math.abs(a.x - northolt.x) < 2 && Math.round(a.r) > 20)
+    expect(atz, 'an ATZ circle near EGWU').toBeDefined()
   })
 
   it('dashes approximate boundaries and leaves rule-derived ones solid', () => {
@@ -185,8 +188,10 @@ describe('airspace overlay', () => {
     expect(dashes.some((d) => d.length === 0)).toBe(true)
   })
 
-  it('says on the display which boundaries are approximate', () => {
-    expect(render().labels.some((s) => s.includes('approximate'))).toBe(true)
+  it('states airspace provenance on the display', () => {
+    const { labels } = render()
+    expect(labels.some((s) => s.includes('published (solid)'))).toBe(true)
+    expect(labels.some((s) => s.includes('rule-derived (dotted)'))).toBe(true)
   })
 
   it('shows the rule-derived traffic zones when zoomed in', () => {
@@ -212,5 +217,54 @@ describe('runway display scale', () => {
 
   it('reports the current magnification on the display', () => {
     expect(render().labels.some((s) => s.includes('RWY x'))).toBe(true)
+  })
+})
+
+describe('published airspace rendering', () => {
+  it('collapses the TMA to one label per altitude band', () => {
+    // The London TMA is twenty separate volumes. Labelling each would bury
+    // the display, so labels are deduplicated by name and band.
+    const { labels } = render()
+    const tma = labels.filter((s) => s === 'LONDON TMA')
+    expect(tma.length).toBeGreaterThanOrEqual(1)
+    expect(tma.length).toBeLessThanOrEqual(8)
+    expect(airport.airspace.filter((v) => v.label === 'LONDON TMA').length)
+      .toBeGreaterThan(tma.length)
+  })
+
+  it('distinguishes published from rule-derived by line style', () => {
+    const { dashes } = render(1000, 600, 8)
+    // Solid for published, dotted for rule-derived.
+    expect(dashes.some((d) => d.length === 0)).toBe(true)
+    expect(dashes.some((d) => d.length === 2 && d[0] === 1)).toBe(true)
+  })
+
+  it('brackets vertical limits the source did not state', () => {
+    // Gatwick's header carries no limits, so its label shows them in
+    // parentheses rather than presenting them as published.
+    const { labels } = render(1000, 600, 40)
+    expect(labels.some((s) => s.startsWith('(') && s.endsWith(')'))).toBe(true)
+  })
+})
+
+describe('palette switching', () => {
+  afterEach(() => {
+    setPalette('beige')
+  })
+
+  it('paints the ground from the active palette', () => {
+    expect(render().fills[0]).toBe(palettes.beige.bg)
+    setPalette('dark')
+    expect(render().fills[0]).toBe(palettes.dark.bg)
+  })
+
+  it('redraws the whole picture in the new scheme', () => {
+    // Every label still renders after a switch; a missing colour would
+    // throw or silently draw nothing.
+    setPalette('dark')
+    const { labels } = render()
+    expect(labels).toContain('EGLL APPROACH')
+    expect(labels).toContain('LAM')
+    expect(labels).toContain('LONDON TMA')
   })
 })

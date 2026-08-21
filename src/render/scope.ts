@@ -34,8 +34,9 @@ export function drawScope(
   // Bottom to top: airspace is the faintest wash, the field being worked
   // is the boldest thing on the display.
   for (const volume of airport.airspace) {
-    drawAirspace(g, cam, volume)
+    drawAirspaceBoundary(g, cam, volume)
   }
+  drawAirspaceLabels(g, cam, airport.airspace)
 
   drawRangeRings(g, cam, airport)
   drawCardinals(g, cam, airport)
@@ -58,72 +59,137 @@ export function drawScope(
 
 /* ------------------------------------------------------------- airspace */
 
-function drawAirspace(
+/**
+ * Line style carries provenance, so the display never implies more
+ * precision than the data has: solid straight from the published source,
+ * dotted computed from a rule, dashed a stand-in.
+ */
+function dashFor(derivation: string): number[] {
+  if (derivation === 'aip') return []
+  if (derivation === 'rule') return [1, 3]
+  return [4, 4]
+}
+
+function drawAirspaceBoundary(
   g: CanvasRenderingContext2D,
   cam: Camera,
   volume: AirspaceVolume,
 ): void {
-  const colour = airspaceColour(volume.airspaceClass)
-
   g.save()
-  g.strokeStyle = colour
-  g.lineWidth = volume.airspaceClass === 'G' ? 1 : 1.4
-  // A dashed edge means the boundary drawn is a stand-in for the real one.
-  // Anything solid is either rule-derived or straight from the AIP.
-  g.setLineDash(volume.approximate ? [3, 4] : [])
-  g.globalAlpha = volume.airspaceClass === 'G' ? 0.55 : 0.8
+  g.strokeStyle = airspaceColour(volume.airspaceClass)
+  g.lineWidth = volume.airspaceClass === 'G' ? 1 : 1.3
+  g.setLineDash(dashFor(volume.derivation))
+  g.globalAlpha = volume.airspaceClass === 'G' ? 0.5 : 0.75
 
-  let labelAt: Vec2NM | null = null
-
-  if (volume.shape.kind === 'circle') {
-    const c = cam.worldToScreen(volume.shape.centreNM)
-    const r = cam.nmToPx(volume.shape.radiusNM)
-    if (r < 4) {
-      g.restore()
-      return
+  const shape = volume.shape
+  if (shape.kind === 'circle') {
+    const c = cam.worldToScreen(shape.centreNM)
+    const r = cam.nmToPx(shape.radiusNM)
+    if (r >= 3) {
+      g.beginPath()
+      g.arc(c.x, c.y, r, 0, Math.PI * 2)
+      g.stroke()
     }
+  } else if (shape.kind === 'polygon') {
     g.beginPath()
-    g.arc(c.x, c.y, r, 0, Math.PI * 2)
-    g.stroke()
-    labelAt = {
-      x: volume.shape.centreNM.x,
-      y: volume.shape.centreNM.y + volume.shape.radiusNM,
-    }
-  } else {
-    const verts = volume.shape.verticesNM
-    g.beginPath()
-    verts.forEach((v, i) => {
+    shape.verticesNM.forEach((v, i) => {
       const p = cam.worldToScreen(v)
       if (i === 0) g.moveTo(p.x, p.y)
       else g.lineTo(p.x, p.y)
     })
     g.closePath()
     g.stroke()
-    labelAt = verts.reduce(
-      (best, v) => (v.y > best.y ? v : best),
-      verts[0] ?? ORIGIN,
-    )
+  } else {
+    // Open polylines: never closed, or the display would invent edges the
+    // source does not contain.
+    for (const line of shape.pathsNM) {
+      g.beginPath()
+      line.forEach((v, i) => {
+        const p = cam.worldToScreen(v)
+        if (i === 0) g.moveTo(p.x, p.y)
+        else g.lineTo(p.x, p.y)
+      })
+      g.stroke()
+    }
   }
 
   g.restore()
+}
 
-  // Only label when the volume is big enough on screen to carry text.
-  const onScreenSize =
-    volume.shape.kind === 'circle' ? cam.nmToPx(volume.shape.radiusNM) : 60
-  if (!labelAt || onScreenSize < 34) return
+interface AirspaceLabel {
+  key: string
+  at: Vec2NM
+  text: string
+  limits: string
+  colour: string
+  assumed: boolean
+}
 
-  const p = cam.worldToScreen(labelAt)
-  g.fillStyle = theme.airspaceLabel
+/**
+ * One label per name and altitude band, placed at the northernmost point
+ * of the volume. The London TMA alone is twenty volumes across six bands,
+ * so labelling each one individually would bury the display.
+ */
+function airspaceLabel(cam: Camera, volume: AirspaceVolume): AirspaceLabel | null {
+  const shape = volume.shape
+  let at: Vec2NM | null = null
+  let size = 0
+
+  if (shape.kind === 'circle') {
+    at = { x: shape.centreNM.x, y: shape.centreNM.y + shape.radiusNM }
+    size = cam.nmToPx(shape.radiusNM) * 2
+  } else {
+    const all: readonly Vec2NM[] =
+      shape.kind === 'polygon' ? shape.verticesNM : shape.pathsNM.flat()
+    if (all.length === 0) return null
+    let top = all[0] as Vec2NM
+    let minX = top.x
+    let maxX = top.x
+    for (const v of all) {
+      if (v.y > top.y) top = v
+      if (v.x < minX) minX = v.x
+      if (v.x > maxX) maxX = v.x
+    }
+    at = top
+    size = cam.nmToPx(maxX - minX)
+  }
+
+  if (!at || size < 40) return null
+
+  const limits = `${formatLevel(volume.floorFt)}-${formatLevel(volume.ceilingFt)}`
+  return {
+    key: `${volume.label}|${limits}`,
+    at,
+    text: volume.label,
+    limits,
+    colour: airspaceColour(volume.airspaceClass),
+    assumed: volume.verticalSource === 'assumed',
+  }
+}
+
+function drawAirspaceLabels(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  volumes: readonly AirspaceVolume[],
+): void {
+  const seen = new Map<string, AirspaceLabel>()
+  for (const v of volumes) {
+    const l = airspaceLabel(cam, v)
+    if (l && !seen.has(l.key)) seen.set(l.key, l)
+  }
+
   g.font = fonts.label(9)
   g.textAlign = 'center'
-  g.textBaseline = 'bottom'
-  g.fillText(volume.label, p.x, p.y - 3)
-  g.fillStyle = colour
-  g.fillText(
-    `${formatLevel(volume.floorFt)}-${formatLevel(volume.ceilingFt)}`,
-    p.x,
-    p.y + 11,
-  )
+  for (const l of seen.values()) {
+    const p = cam.worldToScreen(l.at)
+    g.fillStyle = theme.airspaceLabel
+    g.textBaseline = 'bottom'
+    g.fillText(l.text, p.x, p.y - 3)
+    g.fillStyle = l.colour
+    g.textBaseline = 'top'
+    // Parentheses mark limits the source did not state.
+    g.fillText(l.assumed ? `(${l.limits})` : l.limits, p.x, p.y + 2)
+  }
 }
 
 /* ---------------------------------------------------------------- rings */
@@ -392,12 +458,16 @@ function drawHud(
     12,
     30,
   )
-  g.fillText('drag pan / wheel zoom / R reset', 12, 44)
+  g.fillText('drag pan / wheel zoom / R reset / D theme', 12, 44)
 
-  // Airspace honesty, on the display rather than buried in a config file.
-  const approx = airport.airspace.filter((v) => v.approximate).length
-  if (approx > 0) {
-    g.fillStyle = theme.airspaceLabel
-    g.fillText(`dashed airspace approximate (${approx} of ${airport.airspace.length})`, 12, 58)
-  }
+  // Airspace provenance, on the display rather than buried in a config
+  // file: solid boundaries are published, dotted are rule-derived.
+  const published = airport.airspace.filter((v) => v.derivation === "aip").length
+  const ruled = airport.airspace.filter((v) => v.derivation === "rule").length
+  g.fillStyle = theme.airspaceLabel
+  g.fillText(
+    `airspace ${published} published (solid) / ${ruled} rule-derived (dotted)`,
+    12,
+    58,
+  )
 }

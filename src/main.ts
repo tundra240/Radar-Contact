@@ -3,6 +3,12 @@ import { Camera } from './core/camera'
 import { loadAirport } from './data/airport'
 import egllConfig from './data/egll.json'
 import { drawScope } from './render/scope'
+import {
+  paletteName,
+  setPalette,
+  theme,
+  type PaletteName,
+} from './render/theme'
 
 /**
  * Day 0 wiring: load and project the airport, hand it to the camera, and
@@ -108,6 +114,70 @@ function start(
   })
 
   resize()
+
+  // ---- light / dark control -------------------------------------------
+  // The palette is a live object shared by every render module, so
+  // switching it and asking for a redraw is the whole implementation.
+
+  const STORAGE_KEY = 'radar-contact:palette'
+
+  const storedPalette = (): PaletteName | null => {
+    try {
+      const v = window.localStorage.getItem(STORAGE_KEY)
+      return v === 'beige' || v === 'dark' ? v : null
+    } catch {
+      // Private browsing and blocked storage both throw; a missing
+      // preference is not worth failing the whole display over.
+      return null
+    }
+  }
+
+  const remember = (name: PaletteName): void => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, name)
+    } catch {
+      /* preference simply will not persist */
+    }
+  }
+
+  const toggle = document.createElement('button')
+  toggle.type = 'button'
+  toggle.className = 'mode-toggle'
+  document.body.appendChild(toggle)
+
+  const paintChrome = (): void => {
+    const dark = paletteName() === 'dark'
+    toggle.textContent = dark ? 'LIGHT' : 'DARK'
+    toggle.title = dark ? 'Switch to the beige display' : 'Switch to the dark display'
+    toggle.setAttribute('aria-pressed', String(dark))
+    // Colours live in TypeScript, so the chrome is styled from the palette
+    // rather than duplicating hex values in the stylesheet.
+    toggle.style.background = theme.bg
+    toggle.style.color = theme.accent
+    toggle.style.borderColor = theme.ringStrong
+    document.body.style.background = theme.bg
+    document.body.style.color = theme.text
+  }
+
+  const applyPalette = (name: PaletteName): void => {
+    setPalette(name)
+    remember(name)
+    paintChrome()
+    requestDraw()
+  }
+
+  toggle.addEventListener('click', () => {
+    applyPalette(paletteName() === 'dark' ? 'beige' : 'dark')
+  })
+
+  window.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'd' || e.key === 'D') {
+      applyPalette(paletteName() === 'dark' ? 'beige' : 'dark')
+    }
+  })
+
+  applyPalette(storedPalette() ?? paletteName())
+
 
   // Sanity line in the console: if the projection were wrong, these
   // distances and bearings would be visibly nonsense.

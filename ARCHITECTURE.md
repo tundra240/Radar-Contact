@@ -265,25 +265,40 @@ That is real, not a data error, and it means a holding fix symbol and an aerodro
 land on top of each other; the renderer has to tolerate collisions rather than assume they
 cannot happen. There is a test pinning it.
 
-### Airspace: what is exact and what is not
+### Airspace: what is published and what is derived
 
-Airspace is the one part of this data that is not authoritative, and the code says so rather
-than implying otherwise.
+Airspace boundaries come from the **VATSIM UK Sector File**, an open transcription of UK
+airspace. See `ATTRIBUTION.md` -- it is GPL-3.0, which has consequences for how this project
+can be distributed.
 
-| Volume type | Geometry | Flagged |
-|---|---|---|
-| Aerodrome traffic zones | Computed from the UK rule: 2 NM radius where the longest runway is 1850 m or less, 2.5 NM otherwise, to 2000 ft above aerodrome level | `derivation: "rule"`, `approximate: false` -- drawn solid |
-| Control zones and the TMA | Circles standing in for the real irregular boundaries | `derivation: "approx"`, `approximate: true` -- drawn dashed, and the display says how many are approximate |
+| Volume type | Count | Geometry | Drawn |
+|---|---|---|---|
+| London TMA | 20 volumes, class A, 2500 ft to FL195 | Published line work | Solid |
+| CTRs and CTAs | Heathrow, City, Gatwick, Luton, Stansted, Farnborough | Published line work | Solid |
+| ATZ / MATZ | Biggin Hill, Wycombe, Odiham | Published circles | Solid |
+| Other traffic zones | 7 fields the source omits | UK rule: 2 NM to 1850 m of runway, else 2.5 NM, to 2000 ft aal | Dotted |
 
-The schema accepts a `polygon` vertex list as well as a `circle`, so authoritative AIP
-boundaries can replace the stand-ins with no code change at all -- there is a test that
-loads a polygon volume to prove that path works.
+**They are line work, not polygons.** This is the single most important thing to know about
+this data. Each record in the source is an independent boundary line, and when chained, only
+**2 of 60** regions closed into a ring -- the rest left gaps of up to 30 NM. Storing them as
+polygons would have drawn thirty-mile edges that do not exist. So a volume's shape is
+`lines`: one or more OPEN polylines, stroked without closure.
 
-On sourcing real boundaries: the VATSIM UK sector file is an open, community-maintained
-transcription of UK airspace and would be an excellent source, but it is **GPL-3.0**
-licensed, so nothing was copied from it here. Using it would be a licensing decision about
-this project, not a technical one. The alternative is openAIP, which needs an API key, or
-transcribing the UK AIP ENR charts directly.
+The consequence to plan around: a `lines` volume **cannot answer "is this aircraft inside the
+zone"**. Containment needs ordered closed rings. If the simulation ever needs that -- for
+airspace infringement warnings, say -- it is separate work: either order and close the rings,
+or transcribe closed boundaries from the AIP. The schema keeps `polygon` for exactly that,
+and a test loads one to prove the path works.
+
+`derivation` records where each boundary came from and the line style follows it, so the
+display never implies more precision than the data has: **solid** published, **dotted**
+rule-derived. `verticalSource` does the same for altitudes -- `file` from the source header,
+`rule` for ATZ tops at 2000 ft aal, `assumed` where the header omitted limits (London City
+CTA, both Gatwick volumes, the Odiham MATZ). Assumed limits render in parentheses.
+
+Using the published data earned its keep immediately: **Biggin Hill's ATZ is notified as
+2.5 NM**, where the runway-length rule gives 2 NM. The rule was wrong, and the source
+corrected it.
 
 ### Display scale
 
@@ -375,7 +390,9 @@ Rendering and interaction get checked by eye, which is what HMR is for.
    the accents were retuned whole, because a colour that glows on black turns to mud on
    beige. Both palettes live in `render/theme.ts` as `palettes.beige` and `palettes.dark`,
    and the active one is a single named export, so reverting or adding a third scheme is one
-   line. Remaining sub-question: whether aircraft symbology in Day 1 wants a fourth accent
+   line -- and there is now a light/dark button in the top right, plus `D`, so the choice is
+   the player's at runtime and the preference persists in local storage. Remaining
+   sub-question: whether aircraft symbology in Day 1 wants a fourth accent
    for "established on ILS" that reads against beige without competing with the amber used
    for holds.
 2. **Runway mode.** The MVP lands both 27R and 27L. Real Heathrow segregates arrivals and

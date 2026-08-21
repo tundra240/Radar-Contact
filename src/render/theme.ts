@@ -117,8 +117,37 @@ export const palettes: Record<'beige' | 'dark', Palette> = {
   },
 }
 
-/** The active palette. Change this one word to swap the whole display. */
-export const theme: Palette = palettes.beige
+export type PaletteName = keyof typeof palettes
+
+type Writable<T> = { -readonly [K in keyof T]: T[K] }
+
+/** Beige is the shipped default; the button switches away from it. */
+const DEFAULT_PALETTE: PaletteName = 'beige'
+
+/**
+ * The active palette, exported as a live object rather than a value. Every
+ * render module holds this same reference, so switching schemes mutates it
+ * in place and the next frame simply picks up the new colours -- no
+ * re-wiring, no palette argument threaded through every draw call.
+ */
+const active: Writable<Palette> = { ...palettes[DEFAULT_PALETTE] }
+export const theme: Palette = active
+
+let activeName: PaletteName = DEFAULT_PALETTE
+
+export function paletteName(): PaletteName {
+  return activeName
+}
+
+export function setPalette(name: PaletteName): void {
+  Object.assign(active, palettes[name])
+  activeName = name
+}
+
+export function togglePalette(): PaletteName {
+  setPalette(activeName === 'beige' ? 'dark' : 'beige')
+  return activeName
+}
 
 export const FONT_MONO = 'ui-monospace, "Cascadia Mono", Consolas, monospace'
 

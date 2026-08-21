@@ -90,6 +90,18 @@ export interface NeighbourAirport {
 export type AirspaceShape =
   | { readonly kind: 'circle'; readonly centreNM: Vec2NM; readonly radiusNM: number }
   | { readonly kind: 'polygon'; readonly verticesNM: readonly Vec2NM[] }
+  /**
+   * Boundary line work: one or more OPEN polylines, stroked without
+   * closure. This is what the VATSIM UK sector file actually contains --
+   * each record is an independent boundary line, and only two of sixty
+   * regions chained into a closed ring. Closing them would invent edges of
+   * up to 30 NM. The trade-off is that a `lines` volume cannot answer
+   * "is this aircraft inside the zone"; that needs ordered closed rings.
+   */
+  | { readonly kind: 'lines'; readonly pathsNM: readonly (readonly Vec2NM[])[] }
+
+/** Where a volume's vertical extent came from. */
+export type VerticalSource = 'file' | 'rule' | 'assumed'
 
 export interface AirspaceVolume {
   readonly id: string
@@ -100,6 +112,7 @@ export interface AirspaceVolume {
   /** True when the drawn boundary is a stand-in for the real one. */
   readonly approximate: boolean
   readonly derivation: Derivation
+  readonly verticalSource: VerticalSource
   readonly shape: AirspaceShape
 }
 
@@ -497,20 +510,8 @@ function parseAirspace(
     throw new ConfigError(`${path}.ceilingFt`, 'must be above floorFt')
   }
 
-  const approximate = bool(o['approximate'], `${path}.approximate`)
-  const rawDeriv = o['derivation']
-  let derivation: Derivation
-  if (rawDeriv === undefined) {
-    // Default follows the honesty flag: an approximated boundary is an
-    // approximation, an exact one is assumed to come from the AIP.
-    derivation = approximate ? 'approx' : 'aip'
-  } else {
-    const s = str(rawDeriv, `${path}.derivation`)
-    if (s !== 'aip' && s !== 'rule' && s !== 'approx') {
-      throw new ConfigError(`${path}.derivation`, `must be aip, rule or approx (got ${s})`)
-    }
-    derivation = s
-  }
+  const derivation = parseDerivation(o['derivation'], `${path}.derivation`)
+  const verticalSource = parseVerticalSource(o['verticalSource'], `${path}.verticalSource`)
 
   const kind = str(o['kind'], `${path}.kind`)
   let shape: AirspaceShape
@@ -535,8 +536,6 @@ function parseAirspace(
     }
     shape = { kind: 'circle', centreNM, radiusNM }
   } else if (kind === 'polygon') {
-    // Not used by the shipped config, but this is the path real AIP
-    // boundaries take when they replace the circular stand-ins.
     const verts = arr(o['vertices'], `${path}.vertices`)
     if (verts.length < 3) {
       throw new ConfigError(`${path}.vertices`, 'must have at least 3 points')
@@ -547,8 +546,25 @@ function parseAirspace(
         projection.toWorld(latLon(v, `${path}.vertices[${i}]`)),
       ),
     }
+  } else if (kind === 'lines') {
+    const paths = arr(o['paths'], `${path}.paths`)
+    shape = {
+      kind: 'lines',
+      pathsNM: paths.map((line, i) => {
+        const pts = arr(line, `${path}.paths[${i}]`)
+        if (pts.length < 2) {
+          throw new ConfigError(`${path}.paths[${i}]`, 'must have at least 2 points')
+        }
+        return pts.map((v, j) =>
+          projection.toWorld(latLon(v, `${path}.paths[${i}][${j}]`)),
+        )
+      }),
+    }
   } else {
-    throw new ConfigError(`${path}.kind`, `must be "circle" or "polygon" (got ${kind})`)
+    throw new ConfigError(
+      `${path}.kind`,
+      `must be "circle", "polygon" or "lines" (got ${kind})`,
+    )
   }
 
   return {
@@ -557,10 +573,32 @@ function parseAirspace(
     airspaceClass: airspaceClass(o['class'], `${path}.class`),
     floorFt,
     ceilingFt,
-    approximate,
+    // Not a config field: a boundary is a stand-in exactly when it did not
+    // come from the published source, so deriving this keeps the flag and
+    // the provenance from ever disagreeing.
+    approximate: derivation !== 'aip',
     derivation,
+    verticalSource,
     shape,
   }
+}
+
+function parseDerivation(raw: unknown, path: string): Derivation {
+  if (raw === undefined) return 'approx'
+  const s = str(raw, path)
+  if (s !== 'aip' && s !== 'rule' && s !== 'approx') {
+    throw new ConfigError(path, `must be aip, rule or approx (got ${s})`)
+  }
+  return s
+}
+
+function parseVerticalSource(raw: unknown, path: string): VerticalSource {
+  if (raw === undefined) return 'file'
+  const s = str(raw, path)
+  if (s !== 'file' && s !== 'rule' && s !== 'assumed') {
+    throw new ConfigError(path, `must be file, rule or assumed (got ${s})`)
+  }
+  return s
 }
 
 function parseAircraftType(raw: unknown, path: string): AircraftType {
