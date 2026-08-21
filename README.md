@@ -232,6 +232,16 @@ issued by right-clicking an aircraft -- on the scope or on its strip. The three 
 quick-buttons that used to sit on every strip are gone: they could only ever offer three
 clearances at values somebody had to guess in advance, and a strip is a view.
 
+**The bay is the arrival sequence**, not a list of the radar labels again. Strips are ordered
+nearest the field first and numbered, holding traffic drops underneath as the stack, and each
+strip carries the distance still to run and the gap to the aircraft in front against what that
+pair of wake categories needs -- flagged when it is short. The gap is measured in distance to
+run rather than as the range between the two aircraft, because two aircraft on opposite base
+legs can be twenty miles apart and heading for the same slot.
+
+**Traffic differs every session.** The seed comes from the clock, not from the config, and the
+console prints it at logon; `?seed=<number>` pins it so a session can be flown again.
+
 ## Licensing
 
 Airspace boundaries are derived from the VATSIM UK Sector File, which is **GPL-3.0**. That

@@ -515,3 +515,50 @@ describe('on command', () => {
     )
   })
 })
+
+describe('the seed', () => {
+  /**
+   * The bug this covers: the seed came only from the airport config, which
+   * is a fixed number, so every session dealt the same aircraft in the same
+   * order off the same fixes. A seeded generator is meant to be pinnable,
+   * not permanently pinned.
+   */
+  const firstFew = (opts: { seed?: number }, count = 8): string[] => {
+    const spawner = opts.seed === undefined
+      ? new Spawner({ airport })
+      : new Spawner({ airport, seed: opts.seed })
+    const out: string[] = []
+    let t = 0
+    while (out.length < count && t < 60 * 60) {
+      const released = spawner.spawnNow(clockAt(t), [])
+      for (const a of released) out.push(`${a.callsign}/${a.type}/${a.originFix ?? '?'}`)
+      t += 60
+    }
+    return out
+  }
+
+  it('deals a different session for a different seed', () => {
+    const a = firstFew({ seed: 1 })
+    const b = firstFew({ seed: 2 })
+    expect(a).toHaveLength(8)
+    // Not one aircraft in common in the same slot. Two streams that shared
+    // even the opening aircraft would still feel like the same session.
+    expect(a.filter((x, i) => x === b[i])).toEqual([])
+  })
+
+  it('deals the same session for the same seed, which is the point of one', () => {
+    expect(firstFew({ seed: 4242 })).toEqual(firstFew({ seed: 4242 }))
+  })
+
+  it('separates seeds a millisecond apart, since the clock supplies them', () => {
+    const now = 1755800000000
+    const a = firstFew({ seed: now })
+    const b = firstFew({ seed: now + 1 })
+    expect(a[0]).not.toBe(b[0])
+  })
+
+  it('reports the seed it is running, so a session can be written down', () => {
+    expect(new Spawner({ airport, seed: 777 }).seed).toBe(777)
+    expect(new Spawner({ airport }).seed).toBe(airport.traffic.seed)
+  })
+})

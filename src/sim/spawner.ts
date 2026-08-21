@@ -30,7 +30,13 @@ const ARP: Vec2NM = { x: 0, y: 0 }
 
 export interface SpawnerOptions {
   readonly airport: Airport
-  /** Defaults to the seed in the airport config. */
+  /**
+   * The traffic seed. Defaults to the one in the airport config, which is
+   * fixed -- so a caller that wants a different session every time has to
+   * say so. `main.ts` does.
+   */
+  readonly seed?: number
+  /** Overrides the seed entirely, for tests that drive the draws directly. */
   readonly rng?: Rng
 }
 
@@ -53,12 +59,20 @@ export class Spawner {
 
   constructor(opts: SpawnerOptions) {
     this.airport = opts.airport
-    this.rng = opts.rng ?? makeRng(opts.airport.traffic.seed)
+    this.rng = opts.rng ?? makeRng(opts.seed ?? opts.airport.traffic.seed)
     // Only holds with an entry band: a navaid with neither is a fix on the
     // chart, not a place traffic arrives from.
     this.flights = new FlightGenerator(opts.airport)
     this.fixes = opts.airport.navaids.filter((n) => n.hold !== null && n.entry !== null)
     this.waitSeconds = opts.airport.traffic.firstSpawnSeconds
+  }
+
+  /**
+   * The seed this session is running on. Worth being able to read back: it
+   * is the whole of what makes a session reproducible.
+   */
+  get seed(): number {
+    return this.rng.seed
   }
 
   get spawned(): number {

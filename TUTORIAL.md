@@ -12,7 +12,9 @@ overlays and the rest of the interface are in [README.md](README.md); the code l
 > real data. Arrivals appear over the holds and fly, and they take headings, altitudes, speeds
 > and holding instructions -- an aircraft sent to a hold flies the real racetrack and stays
 > there until you vector it out. Approach clearances and the ILS are not built yet, so nothing
-> lands: an aircraft vectored to the centreline will fly through it. Every figure below marked *(config)* is read
+> lands: an aircraft vectored to the centreline will fly through it. Traffic is different every
+> session -- the console prints the seed at logon, and `?seed=<number>` in the address flies the
+> same one again. Every figure below marked *(config)* is read
 > live from `src/data/egll.json`, so it is what the game actually enforces.
 
 ---
@@ -41,6 +43,31 @@ Nothing in the menu is a number that gets refused when you pick it.
 
 The heading page has the nudges first -- L30 to R30, worked out from the heading the aircraft is
 actually flying -- and then every ten degrees, because a specific heading is a specific heading.
+
+### Reading the strip bay
+
+The strip bay is **not** a second copy of the radar labels. It carries the three things the
+scope cannot tell you.
+
+**The order.** The bay is the arrival sequence: nearest the field at the top, and the number in
+the margin is where that aircraft sits in the queue. Holding traffic drops to the bottom -- it
+is parked, not sequenced -- lowest first, because the bottom of a stack is what comes out of it
+next.
+
+**FLD.** How far that aircraft still has to run to the field, in miles.
+
+**GAP.** The gap to the aircraft in front, and what that gap needs to be: `GAP 4.2/5` means
+four point two miles where five are required. **The gap is measured in distance to run, not as
+the range between the two aircraft** -- two aircraft on opposite base legs can be twenty miles
+apart and still be heading for the same slot, and a gap of nothing is exactly what you want to
+be told about that.
+
+A gap below the requirement is flagged in red. That is the single most useful thing on the
+display: it is the difference between a sequence and a queue of aeroplanes that will not fit.
+
+The required figure comes from the two aircraft's wake categories, not from a fixed number --
+which is why the same four miles is fine behind an A320 and not behind a 777. See
+*Wake turbulence changes the order, not just the gap* below.
 
 ### Or type it
 

@@ -768,6 +768,46 @@ Rendering is skipped when nothing has changed. `requestDraw()` marks the picture
 tick marks it advanced; a paused, untouched scope draws nothing at all rather than sixty
 identical frames a second.
 
+### The arrival sequence, and what a strip is for
+
+`sim/sequence.ts` and `sim/separation.ts` exist because the strip bay had become worthless: it
+showed the callsign, the level, the heading and the speed, all four of which are already on the
+data block two inches to the left. A strip that repeats the radar is furniture.
+
+So the bay now shows what the radar cannot: **what order the traffic is going to land in, and
+whether the gaps are legal.** Strips are ordered nearest the field first and numbered; holding
+traffic falls below as the stack, lowest first, because the bottom of a hold is what leaves it
+next; and every strip carries its distance to run and the gap to the aircraft in front against
+what that pair needs.
+
+Two decisions in there worth defending:
+
+- **The gap is measured in distance to run, not slant range.** Two aircraft on opposite base
+  legs are twenty miles apart and heading for the same slot; the range between them says
+  everything is fine and the difference in distance-to-run says they will collide in the
+  sequence. The second is the number a controller needs, so it is the one shown.
+- **The wake minima live in code, not in egll.json.** They are ICAO figures, identical at every
+  airport, so a per-airport copy is a per-airport chance to get them wrong. Super-behind-super
+  is not in the published table and is flagged in the source as **assumed** rather than quietly
+  invented, in the same spirit as the assumed vertical limits in the airspace data.
+
+`stripOrder` is gone with this. Ordering strips by phase of flight was a placeholder for having
+a sequence to order them by, and keeping a tested function nothing calls is worse than deleting
+it.
+
+### The traffic seed
+
+The seed used to come only from `traffic.seed` in the airport config, which is a fixed number --
+so every session dealt the same aircraft, in the same order, off the same fixes. Every session
+opened with the same A380 over BNN. The point of a seeded generator is that it *can* be pinned,
+not that it always is.
+
+`main.ts` now takes the seed from the clock and prints it in the console at logon, and
+`?seed=<number>` pins it. Reproducibility is preserved -- which was the reason for seeding in
+the first place -- but it is now opt-in rather than compulsory. `Spawner` takes a `seed` and
+reports it back, and a test asserts that two seeds share no aircraft in the same slot and that
+one seed twice is identical.
+
 ### The flight strip bay and the sync seam
 
 The bay is built ahead of the simulation, which is only possible because the seam between
@@ -781,9 +821,9 @@ them is a data contract rather than a call graph:
 
 Three consequences worth stating:
 
-- **The bay holds no aircraft state.** A strip is a view over an `Aircraft` record, so there
-  is nothing to keep in step and no chance of the panel and the scope disagreeing. Day 1
-  swaps the frozen `sim/demoRoster.ts` for the live world and the bay does not change.
+- **The bay holds no aircraft state.** A strip is a view over an `Aircraft` record and the
+  sequence is derived from the world on every refresh, so there is nothing to keep in step and
+  no chance of the panel and the scope disagreeing.
 - **A strip issues nothing itself.** It has no buttons at all. Right-clicking one opens the
   same tag menu as right-clicking the target, so there is one place a clearance comes from
   however you reached it -- and nothing on a strip that can catch a stray click.

@@ -137,29 +137,3 @@ export function statusText(a: Aircraft): string {
   }
 }
 
-/**
- * Display priority for the strip bay: what the controller needs to act on
- * soonest sits at the top. Aircraft on approach are nearly resolved but
- * must not be lost track of, holding traffic is parked, and anything
- * finished sinks to the bottom.
- */
-export function stripOrder(a: Aircraft): number {
-  switch (a.navMode) {
-    case 'GO_AROUND':
-      return 0
-    case 'GS_TRACKING':
-      return 1
-    case 'LOC_CAPTURED':
-      return 2
-    case 'LOC_ARMED':
-      return 3
-    case 'VECTOR':
-      return 4
-    case 'HOLD':
-      return 5
-    case 'LANDED':
-      return 6
-    case 'HANDOFF':
-      return 7
-  }
-}

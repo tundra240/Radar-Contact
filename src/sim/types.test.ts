@@ -3,7 +3,6 @@ import {
   isHeavy,
   modeC,
   statusText,
-  stripOrder,
   trendOf,
   type Aircraft,
   type NavMode,
@@ -98,28 +97,4 @@ describe('statusText', () => {
   })
 })
 
-describe('stripOrder', () => {
-  it('puts what needs attention soonest at the top', () => {
-    const order = (navMode: NavMode): number => stripOrder({ ...base, navMode })
-    expect(order('GO_AROUND')).toBeLessThan(order('GS_TRACKING'))
-    expect(order('GS_TRACKING')).toBeLessThan(order('VECTOR'))
-    expect(order('VECTOR')).toBeLessThan(order('HOLD'))
-    expect(order('HOLD')).toBeLessThan(order('LANDED'))
-  })
-
-  it('gives every mode a distinct rank', () => {
-    const modes: NavMode[] = [
-      'HOLD',
-      'VECTOR',
-      'LOC_ARMED',
-      'LOC_CAPTURED',
-      'GS_TRACKING',
-      'GO_AROUND',
-      'LANDED',
-      'HANDOFF',
-    ]
-    const ranks = modes.map((navMode) => stripOrder({ ...base, navMode }))
-    expect(new Set(ranks).size).toBe(modes.length)
-  })
-})
 

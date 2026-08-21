@@ -448,7 +448,12 @@ canvas {
     inset -1px -1px 0 0 var(--bevel-light);
 }
 
+/* Two columns: the sequence number written in the margin, the way a
+   controller marks up a paper strip, and everything else beside it. */
 .strip {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  column-gap: 6px;
   margin-bottom: 4px;
   padding: 5px 6px;
   background: var(--face);
@@ -470,7 +475,9 @@ canvas {
 }
 
 .strip.is-selected .strip-status,
-.strip.is-selected .strip-body {
+.strip.is-selected .strip-body,
+.strip.is-selected .strip-spacing,
+.strip.is-selected .strip-seq {
   color: var(--title-text);
 }
 
@@ -479,10 +486,52 @@ canvas {
   outline-offset: -3px;
 }
 
+/* Spans every row of the strip, so the number sits against the whole
+   card rather than against its first line. */
+.strip-seq {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  align-self: center;
+  font-size: 13px;
+  font-weight: bold;
+  line-height: 1;
+  text-align: center;
+  color: var(--accent);
+}
+
+.strip-head,
+.strip-body,
+.strip-spacing,
+.strip-status {
+  grid-column: 2;
+}
+
 .strip-head {
   font-weight: bold;
   letter-spacing: 0.06em;
   white-space: pre;
+}
+
+/* Distance still to run, and the gap to the aircraft in front against
+   what that pair of wake categories needs. Neither is on the scope. */
+.strip-spacing {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--chrome-dim);
+}
+
+/* A short gap is a chip rather than a colour change: red text on the navy
+   of a selected strip would be the one place it stopped being readable,
+   and this is the thing that must never go unnoticed. */
+.strip-gap.is-tight {
+  padding: 0 3px;
+  font-weight: bold;
+  color: var(--title-text);
+  background: var(--warn);
 }
 
 .strip-body {

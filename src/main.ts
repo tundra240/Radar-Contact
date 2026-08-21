@@ -339,9 +339,31 @@ function start(
     onLayoutChange: () => resize(),
   })
 
+  /**
+   * The traffic seed.
+   *
+   * The one in the airport config is fixed, which made every session deal
+   * the same aircraft, in the same order, off the same fixes -- the whole
+   * point of a seeded generator is that it CAN be pinned, not that it
+   * always is. So the clock picks one, and the console says which, because
+   * a session you cannot reproduce is a bug you cannot reproduce.
+   *
+   * ?seed=12345 in the URL pins it, which is how a session is flown again.
+   */
+  const seedFromUrl = (): number | null => {
+    try {
+      const asked = new URLSearchParams(window.location.search).get('seed')
+      if (asked === null) return null
+      const n = Number.parseInt(asked, 10)
+      return Number.isFinite(n) && n > 0 ? n : null
+    } catch {
+      return null
+    }
+  }
+
   // The spawner owns the arrival flow; this list is the world until there
   // is a world module to own it.
-  const spawner = new Spawner({ airport })
+  const spawner = new Spawner({ airport, seed: seedFromUrl() ?? Date.now() })
   let traffic: readonly Aircraft[] = []
 
   // Landing and handoff are Day 2 and 3 work. Until then, crossing the area
@@ -575,6 +597,10 @@ function start(
       menu.setOpen(false)
       loop.setPaused(false)
       commandConsole.write(`${details.initials} on position ${details.position}`, 'note')
+      commandConsole.write(
+        `Traffic seed ${spawner.seed}. Add ?seed=${spawner.seed} to the address to fly it again.`,
+        'note',
+      )
       commandConsole.write(
         'Clearances: CALLSIGN H<heading> A<altitude> S<speed>, or select a strip and omit the callsign.',
         'note',

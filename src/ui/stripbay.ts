@@ -1,11 +1,11 @@
+import { isHeavy, modeC, statusText, trendOf, type Aircraft } from '../sim/types'
 import {
-  isHeavy,
-  modeC,
-  statusText,
-  stripOrder,
-  trendOf,
-  type Aircraft,
-} from '../sim/types'
+  buildSequence,
+  isTight,
+  sequenceOrder,
+  type SequencedFlight,
+  type StackedFlight,
+} from '../sim/sequence'
 
 /**
  * The flight progress strip bay.
@@ -18,6 +18,14 @@ import {
  * instruction now comes from -- three fixed quick-buttons per strip could
  * only ever offer three of the clearances a controller needs, at values
  * somebody had to guess in advance.
+ *
+ * What a strip shows is deliberately **not** what the data block on the
+ * scope shows. The radar picture already says where an aircraft is, what
+ * level it is passing and how fast; repeating that on a strip is why the
+ * bay used to be worth nothing. A strip carries what the scope cannot: the
+ * order the traffic is going to land in, how far each one still has to run,
+ * and whether the gap to the aircraft in front is legal for that pair of
+ * wake categories. See sim/sequence.ts.
  *
  * The other thing it deliberately does not do is rebuild itself on every
  * tick. Rows are keyed by callsign and each field is compared
@@ -47,20 +55,27 @@ const TREND_MARK: Record<string, string> = {
 }
 
 interface Rendered {
+  seq: string
   head: string
   alt: string
   spd: string
   hdg: string
+  fld: string
+  gap: string
+  tight: boolean
   status: string
   mode: string
 }
 
 interface Row {
   readonly el: HTMLLIElement
+  readonly seq: HTMLElement
   readonly head: HTMLElement
   readonly alt: HTMLElement
   readonly spd: HTMLElement
   readonly hdg: HTMLElement
+  readonly fld: HTMLElement
+  readonly gap: HTMLElement
   readonly status: HTMLElement
   rendered: Rendered
   selected: boolean
@@ -120,9 +135,8 @@ export class StripBay {
 
     this.empty = document.createElement('p')
     this.empty.className = 'strip-empty'
-    // Says why it is empty rather than looking broken. The wording goes
-    // away on its own once the spawner exists.
-    this.empty.textContent = 'No active traffic. Awaiting the arrival spawner.'
+    // Says why it is empty rather than looking broken.
+    this.empty.textContent = 'Nothing on frequency. The first arrival is on its way.'
     this.root.appendChild(this.empty)
 
     opts.mount.appendChild(this.root)
@@ -163,15 +177,20 @@ export class StripBay {
   update(aircraft: readonly Aircraft[], selected: string | null): void {
     this.selectedCallsign = selected
 
-    const ordered = [...aircraft].sort(
-      (a, b) => stripOrder(a) - stripOrder(b) || a.callsign.localeCompare(b.callsign),
-    )
+    // The bay's order IS the sequence: nearest the field first, then the
+    // stack underneath it. Ordering strips by anything else is what made
+    // them a second copy of the scope.
+    const built = buildSequence(aircraft)
+    const ordered = sequenceOrder(built)
+    const entries = new Map<string, SequencedFlight | StackedFlight>()
+    for (const f of built.sequence) entries.set(f.aircraft.callsign, f)
+    for (const f of built.stack) entries.set(f.aircraft.callsign, f)
 
     const present = new Set<string>()
     for (const a of ordered) {
       present.add(a.callsign)
       const row = this.rows.get(a.callsign) ?? this.buildRow(a.callsign)
-      this.renderRow(row, a)
+      this.renderRow(row, a, entries.get(a.callsign))
     }
 
     for (const [callsign, row] of [...this.rows]) {
@@ -184,7 +203,9 @@ export class StripBay {
     this.reorder(ordered)
 
     const count = ordered.length
-    const label = `${count} ACTIVE`
+    // Both numbers, because how much is parked is as much of the picture
+    // as how much is running.
+    const label = `${built.sequence.length} SEQ / ${built.stack.length} HOLD`
     if (this.counter.textContent !== label) this.counter.textContent = label
     // Guarded rather than assigned: setting an attribute to the value it
     // already has still counts as a DOM mutation, and an idle tick should
@@ -215,6 +236,10 @@ export class StripBay {
     el.setAttribute('role', 'option')
     el.tabIndex = 0
 
+    // The sequence number, in the margin where a controller would write it.
+    const seq = document.createElement('span')
+    seq.className = 'strip-seq'
+
     const head = document.createElement('div')
     head.className = 'strip-head'
 
@@ -228,10 +253,20 @@ export class StripBay {
     hdg.className = 'strip-hdg'
     body.append(alt, hdg, spd)
 
+    // What the scope cannot tell you: distance still to run, and the gap
+    // to the aircraft in front against what that pair needs.
+    const spacing = document.createElement('div')
+    spacing.className = 'strip-spacing'
+    const fld = document.createElement('span')
+    fld.className = 'strip-fld'
+    const gap = document.createElement('span')
+    gap.className = 'strip-gap'
+    spacing.append(fld, gap)
+
     const status = document.createElement('div')
     status.className = 'strip-status'
 
-    el.append(head, body, status)
+    el.append(seq, head, body, spacing, status)
 
     // Selecting a strip is how the corresponding radar target gets picked
     // up, so the handler is on the row rather than a dedicated control.
@@ -260,12 +295,26 @@ export class StripBay {
 
     const row: Row = {
       el,
+      seq,
       head,
       alt,
       spd,
       hdg,
+      fld,
+      gap,
       status,
-      rendered: { head: '', alt: '', spd: '', hdg: '', status: '', mode: '' },
+      rendered: {
+        seq: '',
+        head: '',
+        alt: '',
+        spd: '',
+        hdg: '',
+        fld: '',
+        gap: '',
+        tight: false,
+        status: '',
+        mode: '',
+      },
       selected: false,
     }
     this.rows.set(callsign, row)
@@ -273,11 +322,20 @@ export class StripBay {
     return row
   }
 
-  private renderRow(row: Row, a: Aircraft): void {
+  private renderRow(
+    row: Row,
+    a: Aircraft,
+    entry: SequencedFlight | StackedFlight | undefined,
+  ): void {
+    const inSequence = entry !== undefined && 'position' in entry
     const heavy = isHeavy(a.wake) ? ` ${a.wake}` : ''
     const trend = TREND_MARK[trendOf(a.vsFpm)] ?? '='
     const hdgNow = String(Math.round(a.hdg)).padStart(3, '0')
+    const flight = inSequence ? (entry as SequencedFlight) : null
     const next: Rendered = {
+      // The sequence number, or a dash for traffic that is not in the
+      // sequence yet because it is still in the stack.
+      seq: flight === null ? '--' : String(flight.position),
       head: `${a.callsign}${heavy}  ${a.type}`,
       alt: `${modeC(a.altFt)} ${trend} ${modeC(a.clearedAltFt)}`,
       spd: `SPD ${Math.round(a.gsKts)}/${Math.round(a.clearedSpdKts)}`,
@@ -285,16 +343,30 @@ export class StripBay {
         a.clearedHdg === null
           ? `HDG ${hdgNow}`
           : `HDG ${hdgNow}/${String(Math.round(a.clearedHdg)).padStart(3, '0')}`,
+      fld: entry === undefined ? 'FLD --' : `FLD ${entry.toFieldNM.toFixed(1)}`,
+      gap:
+        flight === null
+          ? 'IN STACK'
+          : flight.gapNM === null || flight.requiredNM === null
+            ? // Nobody to follow. Said outright rather than left blank, so an
+              // empty gap never reads as a gap of zero.
+              'NO 1'
+            : `GAP ${flight.gapNM.toFixed(1)}/${flight.requiredNM}`,
+      tight: flight !== null && isTight(flight),
       status: statusText(a),
       mode: a.navMode,
     }
 
     // Field by field: at 5 Hz a wholesale rewrite would be visible work for
     // no reason, and would fight text selection.
+    if (next.seq !== row.rendered.seq) row.seq.textContent = next.seq
     if (next.head !== row.rendered.head) row.head.textContent = next.head
     if (next.alt !== row.rendered.alt) row.alt.textContent = next.alt
     if (next.spd !== row.rendered.spd) row.spd.textContent = next.spd
     if (next.hdg !== row.rendered.hdg) row.hdg.textContent = next.hdg
+    if (next.fld !== row.rendered.fld) row.fld.textContent = next.fld
+    if (next.gap !== row.rendered.gap) row.gap.textContent = next.gap
+    if (next.tight !== row.rendered.tight) row.gap.classList.toggle('is-tight', next.tight)
     if (next.status !== row.rendered.status) row.status.textContent = next.status
     if (next.mode !== row.rendered.mode) {
       row.el.dataset['mode'] = next.mode
