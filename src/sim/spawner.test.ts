@@ -699,3 +699,40 @@ describe('the stack', () => {
     }
   })
 })
+
+describe('where arrivals appear', () => {
+  /**
+   * The bug this guards against: an arrival released outside the sector
+   * boundary is removed on the tick it appears. On the scope that is a
+   * target flickering into existence and vanishing, with no way to tell it
+   * from a crash. LAM's fix is 25 NM out of a 40 NM sector, so the headroom
+   * is three miles, not a comfortable margin.
+   */
+  it('releases every arrival inside the boundary, with room to spare', () => {
+    const { all } = fly(makeSpawner(), 3600, { move: false })
+    expect(all.length).toBeGreaterThan(4)
+    for (const a of all) {
+      const range = distanceNM({ x: 0, y: 0 }, a.pos)
+      expect(range, `${a.callsign} off ${a.originFix}`).toBeLessThan(airport.sector.radiusNM)
+    }
+  })
+
+  it('covers all four fixes, so the tightest one is actually exercised', () => {
+    const { all } = fly(makeSpawner(), 3600, { move: false })
+    expect(new Set(all.map((a) => a.originFix)).size).toBe(4)
+  })
+
+  it('pulls the entry in rather than overshooting a distant fix', () => {
+    // LAM is the far one. Its arrivals appear closer to it than the
+    // configured distance only if the boundary demands it -- today it does
+    // not, and this pins the arithmetic either way.
+    const { all } = fly(makeSpawner(), 3600, { move: false })
+    for (const a of all) {
+      const fix = airport.navaids.find((n) => n.name === a.originFix)
+      if (!fix) throw new Error(`no fix ${a.originFix}`)
+      const out = distanceNM(a.pos, fix.posNM)
+      expect(out, a.originFix ?? '?').toBeLessThanOrEqual(airport.traffic.entryDistanceNM + 1e-6)
+      expect(out, a.originFix ?? '?').toBeGreaterThan(0)
+    }
+  })
+})

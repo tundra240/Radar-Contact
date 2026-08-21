@@ -1,4 +1,10 @@
-import { advance, angleDelta, normalizeHeading, type Vec2NM } from '../core/geo'
+import {
+  advance,
+  angleDelta,
+  distanceNM,
+  normalizeHeading,
+  type Vec2NM,
+} from '../core/geo'
 import { autopilot, STANDARD_RATES, type Rates } from './autopilot'
 import { holdSteer } from './hold'
 import { ilsGuidance } from './ils'
@@ -26,6 +32,9 @@ export const TRAIL_INTERVAL_SECONDS = 4
 
 const SECONDS_PER_HOUR = 3600
 
+/** The airport reference point, which world space is anchored on. */
+const ORIGIN_NM: Vec2NM = { x: 0, y: 0 }
+
 /**
  * Advance a position along the track flown during the step.
  *
@@ -43,9 +52,9 @@ export function advancePosition(
   dtSeconds: number,
 ): Vec2NM {
   if (dtSeconds <= 0 || gsKts <= 0) return pos
-  const distanceNM = (gsKts / SECONDS_PER_HOUR) * dtSeconds
+  const distNM = (gsKts / SECONDS_PER_HOUR) * dtSeconds
   const mid = normalizeHeading(hdgFrom + angleDelta(hdgFrom, hdgTo) / 2)
-  return advance(pos, mid, distanceNM)
+  return advance(pos, mid, distNM)
 }
 
 /**
@@ -124,6 +133,24 @@ export function stepAircraft(
 }
 
 /** Distance flown over a step, in nautical miles. */
+/** Why an aircraft has come off the scope, or null while it is still on it. */
+export type Departure = 'landed' | 'left'
+
+/**
+ * Whether this aircraft is finished with the sector, and why.
+ *
+ * One rule, in one place, so that both reasons are accounted for. The
+ * boundary used is the sector radius itself -- the circle the scope
+ * actually draws -- because a target that vanishes five miles outside the
+ * only line on the display looks exactly like a bug, and for a while it
+ * was indistinguishable from one.
+ */
+export function departureOf(a: Aircraft, sectorRadiusNM: number): Departure | null {
+  if (a.navMode === 'LANDED') return 'landed'
+  if (distanceNM(ORIGIN_NM, a.pos) > sectorRadiusNM) return 'left'
+  return null
+}
+
 export function distanceFlownNM(gsKts: number, dtSeconds: number): number {
   return (gsKts / SECONDS_PER_HOUR) * Math.max(0, dtSeconds)
 }

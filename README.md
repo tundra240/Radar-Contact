@@ -107,7 +107,11 @@ right-click menu on the target.
 geometry actually allows it -- inside the beam, within 30 degrees of the course, at or below
 3,000 ft, on the approach side and closing -- and the glidepath is picked up when it descends
 onto the aircraft. From there it flies the path to the numbers and comes off the scope, and the
-`LANDED` cell on the status bar counts them.
+`LANDED n LOST n` cell on the status bar counts them against the ones that got away.
+
+**Nothing leaves silently.** An aircraft comes off the scope for exactly two reasons -- it landed,
+or it crossed the sector boundary -- and both are announced in the console. The boundary it
+crosses is the circle the scope actually draws, so a target never disappears in open space.
 
 An aircraft lined up badly **flies straight through the localiser** and has to be taken round
 again, which is the point: setting the intercept up is the job. A heading breaks one off an

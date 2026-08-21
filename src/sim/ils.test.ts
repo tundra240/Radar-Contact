@@ -4,7 +4,7 @@ import { advance, angleDelta, bearingDeg, distanceNM } from '../core/geo'
 import { applyAll, type ApplyContext } from '../commands/apply'
 import { loadAirport } from '../data/airport'
 import raw from '../data/egll.json'
-import { stepAircraft } from './aircraft'
+import { departureOf, stepAircraft } from './aircraft'
 import { Spawner } from './spawner'
 import {
   AIM_LEAD_NM,
@@ -398,11 +398,13 @@ describe('a whole session', () => {
       clock.ticks += 1
       clock.elapsedSeconds = clock.ticks * DT
 
-      let world = traffic.map((a) => stepAircraft(a, DT, clock.elapsedSeconds))
-      const before = world.length
-      world = world.filter((a) => a.navMode !== 'LANDED')
-      landed += before - world.length
-      world = world.filter((a) => distanceNM({ x: 0, y: 0 }, a.pos) <= airport.sector.radiusNM + 5)
+      let world: Aircraft[] = []
+      for (const a of traffic.map((x) => stepAircraft(x, DT, clock.elapsedSeconds))) {
+        // The same rule main.ts applies, rather than a second copy of it.
+        const departure = departureOf(a, airport.sector.radiusNM)
+        if (departure === 'landed') landed += 1
+        if (departure === null) world.push(a)
+      }
 
       // Once a second, work one thing per aircraft, as a controller would.
       if (i % 20 === 0) {

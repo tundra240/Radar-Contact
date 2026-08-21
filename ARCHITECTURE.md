@@ -476,6 +476,31 @@ accepted**, because that is how traffic is spaced on final. And a **heading brea
 off an approach** at any stage, clearing the approach with it -- otherwise the next tick would
 steer it straight back onto the localiser.
 
+### Coming off the scope
+
+An aircraft leaves the world for exactly two reasons, and `departureOf` in `sim/aircraft.ts` is
+the only thing that decides which: it landed, or it crossed the sector boundary. Both are
+announced in the console -- the landing as a readback, the departure as a refusal, because an
+arrival that leaves unlanded is one you lost and the log should read like it -- and the status
+bar carries both counts, since a landing rate means nothing without knowing what it cost.
+
+Two things about that were wrong and are worth recording, because both looked like a bug from
+the scope:
+
+- **The boundary used to be five miles outside the one that is drawn.** Removal was at the
+  sector radius plus a margin, and the only circle on the display is the radius itself. So a
+  target crossed the visible edge, flew on through empty space, and vanished at an invisible
+  line. The margin is gone: the line you can see is the line that matters.
+- **Leaving was silent.** No message, no counter, nothing in the log. Landing had a readback
+  from the day it worked; leaving had a bare `continue`.
+
+Related, and found while checking the first: **an arrival must be released inside the boundary.**
+LAM's fix is 25 NM out of a 40 NM sector, so a twelve mile entry puts its arrivals at 37 NM --
+three miles of headroom. A slightly larger `entryDistanceNM` would have released them outside
+the boundary, to be removed on the tick they appeared, which on the scope is a target flickering
+into existence and disappearing. The spawner now pulls the entry point in to keep it inside, and
+a test asserts every release from every fix lands inside the boundary.
+
 ### The ILS
 
 `sim/ils.ts`. `CLEARED ILS` only **arms** the capture; every tick the armed test asks all six

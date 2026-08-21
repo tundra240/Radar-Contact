@@ -7,6 +7,7 @@ import {
   TRAIL_INTERVAL_SECONDS,
   TRAIL_POINTS,
   advancePosition,
+  departureOf,
   distanceFlownNM,
   stepAircraft,
   stepTrail,
@@ -399,5 +400,48 @@ describe('the flow, end to end', () => {
     )
     expect(a).toEqual(b)
     expect(a.length).toBeGreaterThan(0)
+  })
+})
+
+describe('departureOf', () => {
+  /**
+   * Why an aircraft comes off the scope, in one place.
+   *
+   * The bug this pins down: leaving the sector removed the aircraft with no
+   * message and no counter, and did it five miles outside the only boundary
+   * the scope draws. A target that vanishes silently, in empty space, is
+   * indistinguishable from a crash.
+   */
+  const RADIUS = 40
+  const ac = (over: Partial<Aircraft>): Aircraft => ({ ...base, ...over })
+
+  it('keeps an aircraft that is still inside the sector', () => {
+    expect(departureOf(ac({ pos: { x: 10, y: 10 } }), RADIUS)).toBeNull()
+    expect(departureOf(ac({ pos: { x: 39, y: 0 } }), RADIUS)).toBeNull()
+  })
+
+  it('keeps one exactly on the boundary, so the line itself is inside', () => {
+    expect(departureOf(ac({ pos: { x: RADIUS, y: 0 } }), RADIUS)).toBeNull()
+  })
+
+  it('reports one that has crossed the boundary', () => {
+    expect(departureOf(ac({ pos: { x: RADIUS + 0.1, y: 0 } }), RADIUS)).toBe('left')
+  })
+
+  it('measures against the boundary it is given, not a hidden margin', () => {
+    // The whole point: the radius passed in is the circle the scope draws.
+    const out = ac({ pos: { x: 42, y: 0 } })
+    expect(departureOf(out, 40)).toBe('left')
+    expect(departureOf(out, 45)).toBeNull()
+  })
+
+  it('reports a landing wherever it happens', () => {
+    // A landed aircraft is at the threshold, well inside, so position must
+    // not be what decides this.
+    expect(departureOf(ac({ navMode: 'LANDED', pos: { x: 1, y: 0 } }), RADIUS)).toBe('landed')
+  })
+
+  it('calls it landed rather than left when it is both', () => {
+    expect(departureOf(ac({ navMode: 'LANDED', pos: { x: 99, y: 0 } }), RADIUS)).toBe('landed')
   })
 })

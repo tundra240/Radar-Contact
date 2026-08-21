@@ -109,7 +109,7 @@ const STATUS: ScopeStatus = {
   clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 12 * 3600 },
   speed: 1,
   paused: false,
-  traffic: { spawned: 0, held: 0, landed: 0 },
+  traffic: { spawned: 0, held: 0, landed: 0, left: 0 },
   controller: null,
 }
 
@@ -772,7 +772,7 @@ describe('the clock and rate readouts', () => {
       clock: { ticks: 1200, elapsedSeconds: 60, timeOfDaySeconds: 13 * 3600 + 61 },
       speed: 1,
       paused: false,
-      traffic: { spawned: 0, held: 0, landed: 0 },
+      traffic: { spawned: 0, held: 0, landed: 0, left: 0 },
   controller: null,
     })
     expect(labels).toContain('TIME')
@@ -790,7 +790,7 @@ describe('the clock and rate readouts', () => {
         clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
         speed,
         paused: false,
-        traffic: { spawned: 0, held: 0, landed: 0 },
+        traffic: { spawned: 0, held: 0, landed: 0, left: 0 },
   controller: null,
       })
       expect(labels, `x${speed}`).toContain('RATE')
@@ -804,7 +804,7 @@ describe('the clock and rate readouts', () => {
       clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
       speed: 4,
       paused: true,
-      traffic: { spawned: 0, held: 0, landed: 0 },
+      traffic: { spawned: 0, held: 0, landed: 0, left: 0 },
   controller: null,
     })
     expect(labels).toContain('PAUSED')
@@ -823,7 +823,7 @@ describe('the traffic readout', () => {
       clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
       speed: 1,
       paused: false,
-      traffic: { spawned: 7, held: 3, landed: 2 },
+      traffic: { spawned: 7, held: 3, landed: 2, left: 1 },
       controller: null,
     })
     const labels = rec.texts.map((t) => t.s)
@@ -1202,5 +1202,30 @@ describe('a vector being dragged', () => {
     expect(readout).toBeGreaterThan(-1)
     expect(block).toBeGreaterThan(-1)
     expect(readout).toBeGreaterThan(block)
+  })
+})
+
+describe('the departures readout', () => {
+  const draw = (landed: number, left: number) => {
+    const cam = new Camera({ x: 0, y: 0 }, 30, { maxNM: 200 })
+    cam.setViewport(1400, 800)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.full, {
+      ...STATUS,
+      traffic: { spawned: 20, held: 4, landed, left },
+    })
+    return rec.texts.map((t) => t.s)
+  }
+
+  it('shows both numbers, because one without the other says nothing', () => {
+    // Twelve landings means something different alongside one that got away
+    // than alongside nine.
+    const labels = draw(12, 3)
+    expect(labels).toContain('LANDED')
+    expect(labels.some((s) => s.includes('12') && s.includes('LOST') && s.includes('3'))).toBe(true)
+  })
+
+  it('reads zero and zero at the start of a session', () => {
+    expect(draw(0, 0).some((s) => /^0 LOST 0$/.test(s))).toBe(true)
   })
 })

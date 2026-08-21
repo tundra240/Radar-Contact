@@ -43,6 +43,8 @@ export interface ScopeStatus {
     readonly held: number
     /** Landed this session -- the only number here that is a score. */
     readonly landed: number
+    /** And lost off the boundary unlanded, which is the other half of it. */
+    readonly left: number
   }
   /** Who is working the position, or null before anyone has logged on. */
   readonly controller: { readonly initials: string; readonly position: string } | null
@@ -1023,7 +1025,12 @@ function drawStatusBar(
       label: 'TRAFFIC',
       value: `${status.traffic.spawned} HELD ${status.traffic.held}`,
     },
-    { label: 'LANDED', value: String(status.traffic.landed) },
+    {
+      label: 'LANDED',
+      // With the ones that got away, because a landing rate means nothing
+      // without knowing how many left unlanded to achieve it.
+      value: `${status.traffic.landed} LOST ${status.traffic.left}`,
+    },
     {
       label: 'OVERLAYS',
       // Counted from the list rather than written down, so adding a layer

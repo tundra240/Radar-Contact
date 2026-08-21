@@ -2,8 +2,7 @@ import './style.css'
 import { Camera } from './core/camera'
 import { loadAirport } from './data/airport'
 import egllConfig from './data/egll.json'
-import { distanceNM, type Vec2NM } from './core/geo'
-import { stepAircraft } from './sim/aircraft'
+import { departureOf, stepAircraft } from './sim/aircraft'
 import { Spawner } from './sim/spawner'
 import type { Aircraft } from './sim/types'
 import type { Command } from './commands/types'
@@ -460,9 +459,6 @@ function start(
   // Landing and handoff are Day 2 and 3 work. Until then, crossing the area
   // of responsibility is how an arrival finishes -- and letting go of them
   // is what stops the concurrency cap filling permanently.
-  const ORIGIN: Vec2NM = { x: 0, y: 0 }
-  const HANDOFF_MARGIN_NM = 5
-  const handoffRadiusNM = airport.sector.radiusNM + HANDOFF_MARGIN_NM
 
   const syncStrips = (): void => {
     bay.update(traffic, selected)
@@ -598,6 +594,8 @@ function start(
 
   /** How many have been landed this session. */
   let landed = 0
+  /** And how many crossed the boundary without being landed. */
+  let left = 0
 
   // ---- the loop --------------------------------------------------------
 
@@ -611,21 +609,28 @@ function start(
     tick: (dt, clock) => {
       simAdvanced = true
 
-      // Fly everything, then take off the scope whatever has finished with
-      // it: on the ground, or across the sector boundary.
+      // Fly everything, then take off the scope whatever is finished with
+      // it. Both reasons are announced: a target that simply vanishes is
+      // indistinguishable from a bug, and one of them used to happen five
+      // miles outside the only boundary the scope draws.
       const flown: Aircraft[] = []
       for (const a of traffic.map((x) => stepAircraft(x, dt, clock.elapsedSeconds))) {
-        if (a.navMode === 'LANDED') {
+        const departure = departureOf(a, airport.sector.radiusNM)
+        if (departure === 'landed') {
           landed += 1
-          // The one thing in the whole simulation that counts as a win, so
-          // it says so rather than the aircraft simply vanishing.
           commandConsole.write(
             `${a.callsign} landed ${a.clearedApproach?.runway ?? ''}`.trimEnd(),
             'readback',
           )
           continue
         }
-        if (distanceNM(ORIGIN, a.pos) > handoffRadiusNM) continue
+        if (departure === 'left') {
+          left += 1
+          // Refused rather than noted: an arrival that leaves the sector
+          // unlanded is one you lost, and the log should read like it.
+          commandConsole.write(`${a.callsign} left the sector unlanded`, 'reject')
+          continue
+        }
         flown.push(a)
       }
 
@@ -654,7 +659,7 @@ function start(
           clock: loop.clock,
           speed: loop.speed,
           paused: loop.paused,
-          traffic: { spawned: spawner.spawned, held: spawner.deferred, landed },
+          traffic: { spawned: spawner.spawned, held: spawner.deferred, landed, left },
           controller,
         },
         { aircraft: traffic, selected, drag: currentDrag() },
