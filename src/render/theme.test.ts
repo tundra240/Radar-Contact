@@ -15,13 +15,13 @@ import {
 afterEach(() => {
   // The active palette is module state shared by every render module, so
   // leaving it switched would leak into other tests.
-  setPalette('beige')
+  setPalette('tracon')
 })
 
 describe('palettes', () => {
-  it('starts on beige', () => {
-    expect(paletteName()).toBe('beige')
-    expect(theme.bg).toBe(palettes.beige.bg)
+  it('starts on the modern position', () => {
+    expect(paletteName()).toBe('tracon')
+    expect(theme.bg).toBe(palettes.tracon.bg)
   })
 
   it('defines every colour in every palette', () => {
@@ -34,6 +34,27 @@ describe('palettes', () => {
       for (const key of reference) {
         expect(p[key as keyof typeof p], `${name}.${key}`).toBeTruthy()
       }
+    }
+  })
+
+  it('declares how each one draws its panel edges', () => {
+    // Bevelled or flat is geometry, not colour, and both the canvas chrome
+    // and the stylesheet read this one field -- so a scheme cannot end up
+    // half a 1999 desktop and half a modern position.
+    for (const name of PALETTE_ORDER) {
+      expect(['bevel', 'flat'], name).toContain(palettes[name].chromeStyle)
+    }
+    expect(palettes.tracon.chromeStyle).toBe('flat')
+    expect(palettes.beige.chromeStyle).toBe('bevel')
+  })
+
+  it('keeps the edge colours ordered even where nothing is bevelled', () => {
+    // The flat scheme uses the light as a hairline and never draws the
+    // shadow, but the ordering still has to hold: the moment it does not,
+    // switching that scheme to bevelled would render inside out.
+    for (const name of PALETTE_ORDER) {
+      const p = palettes[name]
+      expect(contrast(p.chromeLight, p.chromeFace), name).toBeGreaterThan(1.1)
     }
   })
 
@@ -54,11 +75,12 @@ describe('palettes', () => {
   })
 
   it('cycles through every scheme and wraps', () => {
-    expect(nextPaletteName()).toBe('dark')
+    expect(nextPaletteName()).toBe('beige')
+    expect(cyclePalette()).toBe('beige')
     expect(cyclePalette()).toBe('dark')
     expect(cyclePalette()).toBe('amber')
-    expect(cyclePalette()).toBe('beige')
-    expect(theme.bg).toBe(palettes.beige.bg)
+    expect(cyclePalette()).toBe('tracon')
+    expect(theme.bg).toBe(palettes.tracon.bg)
   })
 
   it('keeps one light ground and two dark ones', () => {

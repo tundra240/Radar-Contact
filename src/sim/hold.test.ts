@@ -4,7 +4,8 @@ import { advance, angleDelta, distanceNM } from '../core/geo'
 import { loadAirport } from '../data/airport'
 import raw from '../data/egll.json'
 import { stepAircraft } from './aircraft'
-import { isControlled } from './airspace'
+import { Spawner } from './spawner'
+import { isControlled, isWithinFootprint } from './airspace'
 import { alongTrackNM, holdLeg, holdLegNM, holdSteer, leadHeading } from './hold'
 import { statusText, type Aircraft, type HoldClearance } from './types'
 
@@ -355,4 +356,53 @@ describe('holding inside the real airspace', () => {
       expect(outside, `${navaid.name} left controlled airspace`).toBe(0)
     }
   })
+})
+describe('the real holds stay in the airspace', () => {
+  // The bug this guards. Bovingdon sits two miles inside the edge of the
+  // TMA, so its hold has to be turned to fit -- and the test deciding which
+  // way to turn it sampled a rectangle from the fix outwards on the turn
+  // side only. That is not the shape an aeroplane flies: it overshoots the
+  // fix reversing and swings to the far side joining, and both of those went
+  // unchecked. The orientation chosen was one whose flown path left
+  // controlled airspace.
+  //
+  // Flown through the spawner rather than from a hand-placed aircraft,
+  // because the join is the part that was wrong and only the real arrival
+  // flow reproduces it faithfully.
+  const egll = loadAirport(raw)
+
+  function holdFor(fixName: string): { outside: number; inbound: number } {
+    const spawner = new Spawner({ airport: egll, seed: 7 })
+    let traffic: readonly Aircraft[] = []
+    let outside = 0
+    let established = false
+    const fix = egll.holdingFixes.find((f) => f.name === fixName)
+    if (!fix?.hold) throw new Error(`no hold at ${fixName}`)
+
+    const steps = Math.round((25 * 60) / DT)
+    for (let i = 0; i < steps; i += 1) {
+      const clock = { ticks: i, elapsedSeconds: i * DT, timeOfDaySeconds: i * DT }
+      traffic = traffic.map((a) => stepAircraft(a, DT, clock.elapsedSeconds))
+      const born = spawner.update(DT, clock, traffic)
+      if (born.length > 0) traffic = [...traffic, ...born]
+
+      const mine = traffic.find((a) => a.hold?.fix === fixName)
+      if (!mine) continue
+      // The transit in from the gate is outside by design -- an arrival is
+      // handed over before it becomes the controller's. Only the pattern
+      // itself is being judged.
+      if (distanceNM(mine.pos, fix.posNM) < 2) established = true
+      if (!established || mine.navMode !== 'HOLD') continue
+      if (!isWithinFootprint(egll.controlZone, mine.pos)) outside += DT
+    }
+    return { outside, inbound: fix.hold.inboundTrue }
+  }
+
+  for (const name of ['LAM', 'BIG', 'BNN', 'OCK']) {
+    it(`keeps an arrival holding at ${name} inside`, () => {
+      const { outside, inbound } = holdFor(name)
+      expect(outside, `${name} inbound ${inbound.toFixed(0)} spent ${outside.toFixed(1)}s outside`)
+        .toBe(0)
+    })
+  }
 })

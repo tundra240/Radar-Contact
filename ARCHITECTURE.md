@@ -343,7 +343,23 @@ corrected it.
 
 ### Colour
 
-The palettes are period references rather than a light and a dark theme of the same design.
+`tracon` is the shipped scheme and the only one that is not a period reference: a present-day
+terminal radar position, taken from photographs of real control rooms. Three things define it
+and all three are decisions rather than taste:
+
+- **The ground is not black.** It is a dark, slightly blue-green slate, `#0b171c`. Black is
+  right for a CRT and wrong for an LCD in a dimmed room, where it lifts to grey anyway and
+  takes the contrast with it.
+- **One ink for data, a very quiet map underneath.** Modern displays do not colour-code the
+  world by class the way the period schemes do; they draw almost everything in one mint green
+  and let the map recede. Airspace keeps a little hue so the classes are still separable, but
+  pulled well down. Holds are the single warm colour on the display, which is why the fixes
+  traffic is stacked over are the one thing that is not mint.
+- **The traffic wins by a wide margin.** The target sits at 12:1 against the ground where the
+  map furniture is under 2:1. That gap *is* the look, and there is a test asserting it.
+
+The other three are period references rather than a light and a dark theme of the same design.
+`beige` follows the desktop software of the era: a warm tan tube at `#c3bda9`, an interface
 `beige` follows the desktop software of the era: a warm tan tube at `#c3bda9`, an interface
 face in the canonical `#d4d0c8` with a white highlight and a mid-grey shadow, and symbology
 taken from the VGA system colours -- navy for class A, purple for the control zones, olive
@@ -357,7 +373,43 @@ whatever traffic is holding at.
 
 Schemes cycle rather than toggle -- `PALETTE_ORDER` is the single place that order is
 stated, and the control, the keyboard shortcut and the stored preference all read from it, so
-adding a fourth scheme is a palette plus one array entry.
+adding a scheme is a palette plus one array entry.
+
+### Bevelled or flat: the idiom
+
+Colour turned out to be the smaller half of what dates an interface. The rest is arrangement,
+and no hex value expresses it, so `Palette` carries a `chromeStyle` of `bevel` or `flat` and
+that one field governs the furniture as well as the edges:
+
+| | `bevel` | `flat` |
+|---|---|---|
+| Edges | light top-left, shadow bottom-right, swapped for sunken | one hairline, and a change of fill |
+| Readouts | a bevelled cell each, label beside value, inset 10 px | a ruled table, heading over value, flush to the glass |
+| Position block | a raised panel with a margin round it | a strip hard into the corner |
+| Controls | wide labelled buttons in the top-right | a rail of small square buttons down the left |
+| Captions | a saturated bar with light lettering | a ruled heading |
+| Strips | raised cards | a dense ruled list |
+
+Both halves of the interface read the same field. On the canvas, `drawHud` picks between
+`drawTitleBlock`/`drawStatusBar` and `drawPositionStrip`/`drawDataTable`; `bevel()` and the
+screen frame branch on it too. In the DOM, `main.ts` stamps it on the root as `data-chrome` and
+the stylesheet carries one block of overrides. So a scheme cannot come out half a 1999 desktop
+and half a modern position.
+
+**The readouts are the same list either way.** `statusCells()` builds them once and both
+renderers consume it, so the period bar and the modern table can never disagree about what the
+display is saying -- only about how it is arranged.
+
+Two details worth stating:
+
+- **The table drops columns from the right**, and the list is ordered by what a controller
+  needs when the window is narrow: the clock and the score outlive the airspace provenance. A
+  test asserts that what survives is a *prefix* of what fitted, which is a stronger claim than
+  "fewer columns".
+- **`chromeShadow` is never drawn under `flat`** -- there is no bottom-right edge and there are
+  no sunken cells, only dividers. That is what the test checks: seeing the shadow anywhere in
+  the chrome would mean a bevel survived. It is still required to be darker than the face, so
+  that switching a scheme from flat to bevelled cannot render it inside out.
 
 Legibility is a test, not a hope. `theme.test.ts` measures WCAG contrast for every colour
 against its own ground and asserts that primary text and runways clear 4.5:1, all symbology
@@ -526,10 +578,29 @@ Three consequences of using the real shape:
 the TMA, and holds are derived to point at the field, so its racetrack lay radially outward --
 **54% of every circuit outside controlled airspace**, and every aircraft sent there would have
 been lost for nothing. Measured, not guessed. So a *derived* leg is now refitted to the nearest
-orientation whose pattern fits, which turns BNN from 168 to 75 and LAM from 245 to 240 and
-leaves BIG and OCK alone. Nothing published is overridden, no geometry is invented, and the
+orientation whose pattern fits, which turns **BNN from 168 to 020** and leaves LAM, BIG and OCK
+pointing at the field exactly. Nothing published is overridden, no geometry is invented, and the
 result is closer to reality: the real Bovingdon hold is aligned along the TMA for exactly this
-reason. A test asserts every pattern fits.
+reason.
+
+**What the fit test samples matters more than it looks.** The first version sampled a rectangle
+-- along the outbound track from the fix, across on the turn side only. An aeroplane does not
+fly a rectangle. It overshoots the fix while it reverses and swings to the far side while it
+joins, and neither of those was checked, so an orientation whose *flown* path left the airspace
+passed. Bovingdon came out at 075, right on the edge of what the test would accept, and an
+arrival there spent three seconds a circuit outside the TMA -- half a mile beyond the fix and
+two miles to the wrong side, both of them places the sample set never looked.
+
+The samples are now the shape that is actually flown: the two legs, the half-width bulge of each
+reversal past the end it turns at, and the swing to the far side on joining. Deliberately **not**
+a bounding box around all that -- the corners of one are places no aeroplane reaches, and
+rejecting orientations for them is what had pushed Lambourne five degrees off a hold that was
+perfectly good.
+
+Two tests hold it. One walks the real racetrack -- the same geometry the renderer draws -- point
+by point and asserts every one is inside. The other flies an arrival in through the spawner for
+twenty-five minutes and asserts it never leaves; that one fails on the old sampling, which is
+what makes it worth having.
 
 `sector.radiusNM` survives as the nominal size of the sector -- the cardinals and the range-ring
 context -- and no longer decides anything about control.

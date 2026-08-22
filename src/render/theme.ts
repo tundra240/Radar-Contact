@@ -4,11 +4,16 @@
  * One file, by design: tuning a radar display is done by eye, and hunting
  * hex codes across a dozen render modules is how palettes drift.
  *
- * Two complete palettes live here, described where they are defined
+ * Four complete palettes live here, described where they are defined
  * below. Accents are NOT shared between them: a colour that glows on black
  * turns to mud on beige, so each palette is tuned whole against its own
  * ground and the contrast is asserted in theme.test.ts.
  */
+
+/**
+ * Whether panel edges are bevelled or flat. See Palette.chromeStyle.
+ */
+export type ChromeStyle = 'bevel' | 'flat'
 
 export interface Palette {
   readonly bg: string
@@ -71,10 +76,30 @@ export interface Palette {
   readonly warn: string
 
   /**
-   * Chrome: the raised and sunken panel faces that give the interface its
-   * period look. Bevels are drawn as a light edge on the top and left and a
-   * shadow edge on the bottom and right, so both need to exist per palette
-   * rather than being derived with a filter.
+   * Which idiom the interface is drawn in -- everything about the era that
+   * a colour cannot express.
+   *
+   * Not only the edges, though that is the most visible part of it:
+   *
+   * | | `bevel` | `flat` |
+   * |---|---|---|
+   * | Edges | light top-left, shadow bottom-right | one hairline |
+   * | Readouts | a bevelled cell each, inset from the corner | a ruled table with a header row, flush to the glass |
+   * | Position | a raised panel with a margin round it | a strip hard into the corner |
+   * | Controls | wide labelled buttons, top right | a rail of small square buttons down the left |
+   * | Captions | a saturated bar with light lettering | a ruled heading |
+   *
+   * `render/scope.ts` branches on this for the canvas furniture and the
+   * stylesheet branches on it through a `data-chrome` attribute, so a scheme
+   * cannot come out half a 1999 desktop and half a modern position.
+   */
+  readonly chromeStyle: ChromeStyle
+
+  /**
+   * Chrome: the panel faces that give the interface its look. Under
+   * `bevel` the light and shadow are the two edges of the bevel; under
+   * `flat` the light is the hairline border and the shadow is unused on
+   * screen, so the ordering between them still has to hold either way.
    */
   readonly chromeFace: string
   readonly chromeLight: string
@@ -88,7 +113,11 @@ export interface Palette {
 }
 
 /**
- * Two period palettes.
+ * One modern scheme and three period ones.
+ *
+ * `tracon` is the shipped look, described where it is defined at the bottom
+ * of this object: a present-day terminal radar position rather than a period
+ * reference, and the only one whose panels are flat rather than bevelled.
  *
  * `beige` takes its cue from the desktop software of the era rather than
  * from a modern light theme: a warm tan tube, an interface face in the
@@ -101,13 +130,14 @@ export interface Palette {
  * cyan symbology and phosphor amber for anything the controller is holding
  * in mind.
  *
- * Accents are never shared between the two. Each palette is tuned whole
+ * Accents are never shared between them. Each palette is tuned whole
  * against its own ground, and theme.test.ts asserts the contrast so a
  * later tweak cannot quietly make the display unreadable.
  */
 export const palettes = {
   beige: {
     bg: '#c3bda9',
+    chromeStyle: 'bevel',
 
     ringFaint: '#b4ae9a',
     ring: '#9a9482',
@@ -173,6 +203,7 @@ export const palettes = {
 
   dark: {
     bg: '#080e13',
+    chromeStyle: 'bevel',
 
     ringFaint: '#0d1a21',
     ring: '#13303c',
@@ -234,6 +265,7 @@ export const palettes = {
    */
   amber: {
     bg: '#140d03',
+    chromeStyle: 'bevel',
 
     ringFaint: '#241804',
     ring: '#3d2a08',
@@ -287,15 +319,94 @@ export const palettes = {
     chromeTitleBar: '#5c3f0d',
     chromeTitleText: '#ffe4ad',
   },
+
+  /**
+   * A 2010s terminal radar position, and the only scheme here that is not
+   * period furniture: flat panels, hairline borders, no bevel anywhere.
+   *
+   * The ground is not black. Every modern radar room photograph shows a
+   * dark, slightly blue-green slate -- black would be right for a CRT and
+   * is wrong for an LCD in a dimmed room, where it goes grey anyway and
+   * takes the contrast with it. The symbology is the mint green those
+   * displays actually use, and it is used for almost everything, because
+   * the modern convention is one ink for data and a very quiet map
+   * underneath rather than the colour-coded-by-class picture the older
+   * schemes draw. Airspace keeps a little hue so the classes are still
+   * separable, but pulled well down.
+   *
+   * The traffic is the brightest thing on the display by a wide margin --
+   * 12:1 against the ground, where the map furniture sits under 2:1. That
+   * gap is the whole look.
+   */
+  tracon: {
+    bg: '#0b171c',
+    chromeStyle: 'flat',
+
+    ringFaint: '#101f25',
+    ring: '#17323a',
+    ringStrong: '#21474f',
+    cardinal: '#1c3d45',
+    ringLabel: '#5f9a9a',
+
+    airspaceHigh: '#4f86b8',
+    airspaceControl: '#a86fc0',
+    airspaceLocal: '#8f9a58',
+    airspaceLabel: '#7f9aa0',
+
+    runway: '#dff3f0',
+    runwayLabel: '#8fd8c4',
+    centreline: '#1b3a42',
+    centrelineTick: '#3f8f80',
+    fafTick: '#7fe8d0',
+
+    navaid: '#3fc9a4',
+    navaidLabel: '#63d9b6',
+    navaidFreq: '#4a8f80',
+    // Warm against an otherwise entirely cool picture, so the fixes traffic
+    // is stacked over are the one thing that is not mint.
+    hold: '#f0b45c',
+
+    wxLight: '#2f8f5f',
+    wxModerate: '#c8a03f',
+    wxHeavy: '#e05555',
+
+    target: '#5cf0b8',
+    trail: '#2a7f68',
+
+    neighbour: '#5f8f92',
+    neighbourLabel: '#7fa8aa',
+
+    coast: '#20414a',
+    fir: '#6f93a8',
+
+    text: '#cfe6e2',
+    textDim: '#7fa39e',
+    accent: '#4fe3ab',
+    warn: '#ff5b5b',
+
+    // Flat: the face is a shade above the ground and the light is a
+    // hairline border, not a highlight. The shadow is kept darker than the
+    // face so the ordering holds, but nothing on screen draws with it.
+    chromeFace: '#132229',
+    chromeLight: '#2f5560',
+    chromeShadow: '#04090b',
+    chromeText: '#cfe6e2',
+    chromeDim: '#8fb0ac',
+    chromeWell: '#081216',
+    chromeTitleBar: '#1b4a4a',
+    chromeTitleText: '#a8f0d4',
+  },
 } satisfies Record<string, Palette>
 
 export type PaletteName = keyof typeof palettes
 
 /**
- * Cycle order for the display control. Beige first because it is the
- * shipped look; amber last because it is the most opinionated.
+ * Cycle order for the display control.  first because it is the
+ * shipped look -- the modern position the game is actually modelled on --
+ * and the three period schemes after it, amber last because it is the most
+ * opinionated.
  */
-export const PALETTE_ORDER: readonly PaletteName[] = ['beige', 'dark', 'amber']
+export const PALETTE_ORDER: readonly PaletteName[] = ['tracon', 'beige', 'dark', 'amber']
 
 export function isPaletteName(value: unknown): value is PaletteName {
   return typeof value === 'string' && (PALETTE_ORDER as readonly string[]).includes(value)
@@ -303,8 +414,8 @@ export function isPaletteName(value: unknown): value is PaletteName {
 
 type Writable<T> = { -readonly [K in keyof T]: T[K] }
 
-/** Beige is the shipped default; the button switches away from it. */
-const DEFAULT_PALETTE: PaletteName = 'beige'
+/** The modern position is the shipped default; the button cycles away. */
+const DEFAULT_PALETTE: PaletteName = 'tracon'
 
 /**
  * The active palette, exported as a live object rather than a value. Every
@@ -329,7 +440,7 @@ export function setPalette(name: PaletteName): void {
 /** The next scheme in the cycle, without switching to it. */
 export function nextPaletteName(): PaletteName {
   const i = PALETTE_ORDER.indexOf(activeName)
-  return PALETTE_ORDER[(i + 1) % PALETTE_ORDER.length] ?? 'beige'
+  return PALETTE_ORDER[(i + 1) % PALETTE_ORDER.length] ?? 'tracon'
 }
 
 /** Advances to the next scheme and returns it. */

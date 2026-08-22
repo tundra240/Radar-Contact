@@ -264,9 +264,28 @@ fast-forward is the same simulation sooner rather than a different one. The stat
 the clock and the current rate on the scope itself, so you can see whether time is running
 without opening anything. Interface sound is switched here too; controls click when it is on.
 
-**Display scheme.** Three period palettes, picked by name: **beige** (a Windows-2000-era
-desktop with a tan tube), **dark** (a colour CRT), and **amber** (a monochrome phosphor tube).
-`D` still cycles them without opening the menu, because that is a by-eye choice.
+**Display scheme.** Four palettes, picked by name. **tracon** is the shipped look and the only
+one that is not a period reference: a present-day terminal radar position, taken from
+photographs of real control rooms -- a dark blue-slate ground, mint-green symbology, and flat
+panels with hairline borders instead of bevels. Then three period schemes: **beige** (a
+Windows-2000-era desktop with a tan tube), **dark** (a colour CRT), and **amber** (a monochrome
+phosphor tube). `D` still cycles them without opening the menu, because that is a by-eye
+choice.
+
+**The difference is not only colour -- it is the furniture.** The palette carries which idiom
+the interface is drawn in, and that changes the arrangement as well as the edges:
+
+| | Period schemes | tracon |
+|---|---|---|
+| Readouts | a bevelled cell each, label beside value, inset from the corner | a ruled table, heading over value, flush along the bottom |
+| Position | a raised panel with a margin round it | a strip hard into the corner |
+| Controls | wide labelled buttons in the top right | a rail of small square buttons down the left edge |
+| Captions | a saturated bar with light lettering | a ruled heading |
+| Strips | raised cards | a dense ruled list |
+
+Both the canvas and the stylesheet read that one field, so a scheme cannot come out half 1999
+desktop and half modern position. The readouts themselves are one list either way -- only the
+arrangement changes.
 
 **Overlays.** How much context is drawn -- coastline, the Thames, the FIR boundary, airspace,
 traffic zones, other aerodromes, other navaids, **hold patterns**, labels, range rings,

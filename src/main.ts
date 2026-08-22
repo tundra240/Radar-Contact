@@ -300,6 +300,35 @@ function start(
 
   // Right-click a target: its clearances, at the cursor. On empty scope
   // there is nothing to instruct, so the menu just closes.
+  /**
+   * The other button abandons whatever the left one was doing, and opens
+   * nothing.
+   *
+   * Changing your mind halfway through a drag is the commonest thing to
+   * want, and this is where every drawing tool puts it. Without it the only
+   * way out was Escape -- and letting go of the button afterwards issued the
+   * clearance anyway, which is the part that actually bit.
+   *
+   * On the window and in the capture phase, for two reasons: the pointer is
+   * captured during a drag, so the cursor may well be out over the strip bay
+   * by the time you change your mind and the event would never reach the
+   * canvas; and running first lets it call off the menu handler below rather
+   * than racing it.
+   */
+  window.addEventListener(
+    'contextmenu',
+    (e: MouseEvent) => {
+      if (mode === 'idle') return
+      e.preventDefault()
+      e.stopPropagation()
+      // Cancelling a pan by the same rule is deliberate: it also stops a
+      // menu opening over a picture that is still sliding underneath it.
+      endDrag()
+      requestDraw()
+    },
+    true,
+  )
+
   surface.addEventListener('contextmenu', (e: MouseEvent) => {
     e.preventDefault()
     const target = pickTarget(cam, mine(), pointIn(e), undefined, selected)
@@ -1060,6 +1089,10 @@ function start(
     root.setProperty('--hold', theme.hold)
     root.setProperty('--established', theme.fafTick)
     root.setProperty('--warn', theme.warn)
+    // Whether panels are bevelled or flat is geometry rather than colour, so
+    // it travels as an attribute and the stylesheet switches on it. One
+    // source of truth: the canvas chrome reads the same field.
+    document.documentElement.dataset['chrome'] = theme.chromeStyle
     document.body.style.background = theme.bg
     document.body.style.color = theme.text
   }

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Camera } from '../core/camera'
 import { makeRng } from '../core/rng'
 import { makeWeather } from '../sim/weather'
@@ -135,6 +135,14 @@ function recorder(): {
 }
 
 const airport = loadAirport(raw)
+
+// Every test in this file states the scheme it draws in rather than
+// inheriting whatever the shipped default happens to be. Beige is a
+// bevelled scheme, which is what most of the chrome assertions below are
+// about; the flat idiom has its own describe at the end.
+beforeEach(() => {
+  setPalette('beige')
+})
 
 // A settled clock, so the status bar has something to show without the
 // tests needing a running loop.
@@ -373,6 +381,7 @@ describe('palette switching', () => {
   })
 
   it('paints the ground from the active palette', () => {
+    setPalette('beige')
     expect(render().fills[0]).toBe(palettes.beige.bg)
     setPalette('dark')
     expect(render().fills[0]).toBe(palettes.dark.bg)
@@ -1426,5 +1435,182 @@ describe('the weather layer', () => {
 
   it('hands the canvas back opaque with the cells drawn', () => {
     expect(draw().alphaAtEnd()).toBe(1)
+  })
+})
+
+describe('the flat idiom', () => {
+  // `tracon` is the one scheme that is not period furniture. The colours are
+  // covered by the contrast bands in theme.test.ts; what matters here is the
+  // structural difference, which no colour can express.
+  beforeEach(() => {
+    setPalette('tracon')
+  })
+
+  const flat = () => render(1000, 600, 30)
+
+  it('is what the display ships in', () => {
+    expect(PALETTE_ORDER[0]).toBe('tracon')
+    expect(palettes.tracon.chromeStyle).toBe('flat')
+  })
+
+  it('paints the ground in the modern slate rather than black', () => {
+    // Black is right for a CRT and wrong for an LCD in a dimmed room, where
+    // it goes grey anyway and takes the contrast with it.
+    expect(flat().fills[0]).toBe(palettes.tracon.bg)
+  })
+
+  it('draws panels with a hairline instead of a bevel', () => {
+    // One fill and one edge colour. Neither of the other two appears: the
+    // shadow is the bottom-right of a bevel, and the well is a sunken cell
+    // -- and a flat table has no sunken cells, only dividers.
+    const { fills } = flat()
+    expect(fills).toContain(palettes.tracon.chromeFace)
+    expect(fills).toContain(palettes.tracon.chromeLight)
+    expect(fills).not.toContain(palettes.tracon.chromeShadow)
+    expect(fills).not.toContain(palettes.tracon.chromeWell)
+  })
+
+  it('still bevels the schemes that are meant to be bevelled', () => {
+    // The switch is per scheme, so the period look has to survive it.
+    setPalette('beige')
+    const { fills } = flat()
+    expect(fills).toContain(palettes.beige.chromeShadow)
+    expect(fills).toContain(palettes.beige.chromeLight)
+  })
+
+  it('frames the display with one line rather than a sunken edge', () => {
+    // A modern display is a rectangle of glass in a bezel, not a window
+    // recessed into a desktop.
+    const { fills } = flat()
+    const shadowUsed = fills.filter((f) => f === palettes.tracon.chromeShadow)
+    expect(shadowUsed).toHaveLength(0)
+  })
+
+  it('keeps the traffic the brightest thing on it by a wide margin', () => {
+    // The whole look: one bright ink for data over a very quiet map.
+    const contrast = (hex: string): number => {
+      const lum = (h: string): number => {
+        const n = parseInt(h.slice(1), 16)
+        const c = (v: number): number => {
+          const s = v / 255
+          return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+        }
+        return 0.2126 * c((n >> 16) & 255) + 0.7152 * c((n >> 8) & 255) + 0.0722 * c(n & 255)
+      }
+      const a = lum(hex)
+      const b = lum(palettes.tracon.bg)
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+    }
+    expect(contrast(palettes.tracon.target)).toBeGreaterThan(10)
+    expect(contrast(palettes.tracon.coast)).toBeLessThan(2)
+    expect(contrast(palettes.tracon.ring)).toBeLessThan(2)
+  })
+
+  it('still draws the whole picture', () => {
+    // A scheme missing a colour would throw, or silently draw nothing.
+    const { labels } = flat()
+    expect(labels).toContain('EGLL APPROACH')
+    for (const n of ['LAM', 'BIG', 'BNN', 'OCK']) expect(labels).toContain(n)
+    expect(labels).toContain('27R')
+  })
+})
+describe('the flat readouts', () => {
+  // The furniture, not the paint. A modern position arranges its readouts
+  // as a ruled table hard against the glass, not as bevelled cells floating
+  // with a margin round them.
+  beforeEach(() => {
+    setPalette('tracon')
+  })
+
+  /**
+   * The HUD rows along the bottom.
+   *
+   * Picked out by finding the shared baselines with several labels on them,
+   * because map labels -- an aerodrome code, a navaid name -- can land in
+   * the same band and must not be mistaken for readouts.
+   */
+  function hudRows(w = 1000, h = 600): { y: number; cells: Text[] }[] {
+    const cam = new Camera({ x: 0, y: 0 }, 30, { maxNM: 200 })
+    cam.setViewport(w, h)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.standard, STATUS)
+
+    const byRow = new Map<number, Text[]>()
+    for (const t of rec.texts) {
+      if (t.y < h - 34) continue
+      const y = Math.round(t.y)
+      byRow.set(y, [...(byRow.get(y) ?? []), t])
+    }
+    return [...byRow.entries()]
+      .filter(([, cells]) => cells.length >= 5)
+      .map(([y, cells]) => ({ y, cells: [...cells].sort((a, b) => a.x - b.x) }))
+      .sort((a, b) => a.y - b.y)
+  }
+
+  it('sets a heading over every value', () => {
+    // Two rows: the word that names the readout, and the readout under it.
+    // Reading down beats reading sideways from a label beside a number.
+    const rows = hudRows()
+    expect(rows).toHaveLength(2)
+    const [heads, values] = rows
+    expect(values?.cells.length).toBe(heads?.cells.length)
+    // Each pair shares a left edge, which is what makes it a column.
+    heads?.cells.forEach((head, i) => {
+      expect(values?.cells[i]?.x).toBeCloseTo(head.x, 6)
+    })
+  })
+
+  it('names the columns and shows the values under them', () => {
+    const rows = hudRows()
+    expect(rows[0]?.cells.slice(0, 4).map((c) => c.s)).toEqual([
+      'TIME',
+      'SCORE',
+      'RATE',
+      'RANGE',
+    ])
+    expect(rows[1]?.cells[0]?.s).toBe('12:00:00')
+  })
+
+  it('runs the table the whole width of the glass', () => {
+    // Flush, not inset: the period bar leaves ten pixels of ground either
+    // side and this does not.
+    expect(Number(hudRows()[0]?.cells[0]?.x)).toBeLessThan(12)
+  })
+
+  it('drops columns from the right when the window narrows', () => {
+    const wide = hudRows(1000)[0]?.cells.map((c) => c.s) ?? []
+    const narrow = hudRows(360)[0]?.cells.map((c) => c.s) ?? []
+    expect(narrow.length).toBeGreaterThan(0)
+    expect(narrow.length).toBeLessThan(wide.length)
+    // What survives is a prefix of what fitted: the clock outlives the
+    // airspace provenance, which is the right way round.
+    expect(wide.slice(0, narrow.length)).toEqual(narrow)
+    expect(narrow).toContain('TIME')
+  })
+
+  it('puts the position hard into the corner', () => {
+    const cam = new Camera({ x: 0, y: 0 }, 30, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.standard, {
+      ...STATUS,
+      controller: { initials: 'NF', position: 'EGLL_APP' },
+    })
+    const title = rec.texts.find((t) => t.s === 'EGLL APPROACH')
+    const who = rec.texts.find((t) => t.s === 'EGLL_APP  NF')
+    expect(title).toBeDefined()
+    expect(who).toBeDefined()
+    // The period block is inset ten pixels and starts nineteen in; this is
+    // flush to the frame.
+    expect(Number(title?.x)).toBeLessThan(12)
+    expect(Number(title?.y)).toBeLessThan(8)
+    expect(Number(who?.y)).toBeGreaterThan(Number(title?.y))
+  })
+
+  it('leaves the period bar alone', () => {
+    // The two idioms are different furniture, not one with a flag: beige
+    // keeps its single row of inset bevelled cells.
+    setPalette('beige')
+    expect(hudRows()).toHaveLength(1)
   })
 })
