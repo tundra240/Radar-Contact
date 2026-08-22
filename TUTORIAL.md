@@ -78,18 +78,25 @@ world it does not fit.
 
 ### Weather
 
-**Most sessions are clear.** Weather turns up about one time in five, and when it does it is
-usually a single cell rather than a front -- roughly one session in ten actually puts it across an
-arrival corridor where you have to do something about it. So an empty scope is not a bug, and a
+**You will usually log on to a clear scope.** Cells form roughly once an hour, last ten or twenty
+minutes and then go, so weather is something that happens during a shift rather than something
+the shift starts with. A red core is in front of you at the start of about one session in a
+hundred; one turns up somewhere in about one hour in nine. An empty scope is not a bug, and a
 scope with a red core on it is a day worth remembering.
+
+Because they come and go, **waiting is a real option**. A cell sitting on a base leg will not be
+there in a quarter of an hour, so holding one aircraft for a few minutes is sometimes cheaper
+than vectoring six of them around it.
 
 **WX** on the scope, next to the menu button, shows and hides the precipitation. It is on to
 start with, because on the days there is any, you have to fly round it.
 
 Cells are drawn in three nested contours: **green** for light, **amber** for moderate, **red**
-for heavy. A shower is a single green blob; a storm is three rings with a red core. They drift
-slowly downwind all session, so the gap you were aiming for closes and a fix that was clear at
-the top of the hour is not at the bottom of it.
+for heavy. A shower is a single green blob; a storm is three rings with a red core -- and it gets
+there gradually. One arrives as a green smudge, builds through amber to its core about half way
+through its life, then fades back out the same way, drifting downwind the whole time. So a fix
+that was clear at the top of the hour is not at the bottom of it, and the storm on the scope now
+might be about to get worse or about to clear.
 
 **Light is a nuisance, moderate and heavy are a hazard.** Fly an aircraft into moderate or worse
 and the crew asks to leave it: the strip reads *WX -- REQUESTING VECTOR*, the data block picks up

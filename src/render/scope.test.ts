@@ -141,8 +141,10 @@ const airport = loadAirport(raw)
 /** No weather, so a test that is not about weather sees none. */
 const CALM = makeWeather(makeRng(1), {
   wind: { fromDeg: 250, speedKts: 0 },
-  chance: 0,
-  maxCells: 0,
+  cellsPerHour: 0,
+  minLifeMinutes: 5,
+  maxLifeMinutes: 10,
+  heavyChance: 0,
   minRadiusNM: 4,
   maxRadiusNM: 8,
   driftFactor: 0,
@@ -1379,8 +1381,10 @@ describe('a session with the airspace rule switched off', () => {
 describe('the weather layer', () => {
   const STORMY = makeWeather(makeRng(4), {
     wind: { fromDeg: 250, speedKts: 20 },
-    chance: 1,
-    maxCells: 5,
+    cellsPerHour: 12,
+    minLifeMinutes: 20,
+    maxLifeMinutes: 40,
+    heavyChance: 0.5,
     minRadiusNM: 5,
     maxRadiusNM: 9,
     driftFactor: 0.8,

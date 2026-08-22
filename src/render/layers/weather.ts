@@ -1,9 +1,12 @@
 import type { Camera } from '../../core/camera'
 import { advance, distanceNM, type Vec2NM } from '../../core/geo'
 import {
+  activeCells,
   cellCentreNM,
   cellRadiusNM,
   contourFraction,
+  envelopeOf,
+  radiusScaleOf,
   type Intensity,
   type Weather,
   type WeatherCell,
@@ -18,6 +21,10 @@ import { theme } from '../theme'
  * as denser rather than as a muddle. A cell that never gets bad enough for
  * a band simply has no contour for it, which is why a shower is a single
  * green blob and a storm is three rings.
+ *
+ * Only the cells alive at this moment are drawn, at the size and strength
+ * their age gives them, so one grows in green, works up through amber and
+ * fades back out rather than being there for the whole session.
  *
  * Drawn under the map symbology and the traffic, the way a real scope
  * underlays it: weather you cannot see the traffic through is weather that
@@ -46,18 +53,37 @@ export function drawWeather(
   weather: Weather,
   elapsedSeconds: number,
 ): void {
+  drawCells(g, cam, weather, activeCells(weather, elapsedSeconds), elapsedSeconds)
+}
+
+/**
+ * The same, for a cell list worked out elsewhere.
+ *
+ * Split out so the schedule and the drawing can be exercised apart: a test
+ * that wants a cell of a known strength should not have to search seeds for
+ * one.
+ */
+export function drawCells(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  weather: Weather,
+  cells: readonly WeatherCell[],
+  elapsedSeconds: number,
+): void {
   const reach = cam.visibleRadiusNM()
 
-  for (const cell of weather.cells) {
+  for (const cell of cells) {
+    const envelope = envelopeOf(cell, elapsedSeconds)
+    const scale = radiusScaleOf(envelope)
     const centre = cellCentreNM(cell, weather, elapsedSeconds)
     // Nothing to draw for a cell that has drifted off the display. Cheap,
     // and at a low zoom most of them have.
     if (distanceNM(cam.centre, centre) > reach + cell.radiusNM * 2) continue
 
     for (const band of BANDS) {
-      const fraction = contourFraction(cell, band)
+      const fraction = contourFraction(cell, band, envelope)
       if (fraction === null) continue
-      drawContour(g, cam, cell, centre, fraction, band)
+      drawContour(g, cam, cell, centre, fraction * scale, band)
     }
   }
 

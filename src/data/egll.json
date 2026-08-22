@@ -32,8 +32,10 @@
       "speedKts": 18
     },
     "windEffect": 0.35,
-    "chance": 0.2,
-    "maxCells": 4,
+    "cellsPerHour": 1,
+    "minLifeMinutes": 7,
+    "maxLifeMinutes": 18,
+    "heavyChance": 0.12,
     "minRadiusNM": 4,
     "maxRadiusNM": 12,
     "driftFactor": 0.8,

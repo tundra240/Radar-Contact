@@ -642,27 +642,59 @@ nudge.
 
 `sim/weather.ts` and `render/layers/weather.ts`.
 
-**Most sessions have none.** `chance` is 0.2, so four scopes in five are clear, and the count of
-a wet one is drawn squared against `maxCells` so half of those are a single cell. Two draws
-rather than one, because they answer different questions -- is it raining, and how much -- and
-the first is settled before any cell is placed, so a clear session draws one number and stops.
+**Weather is a schedule, not a set.** The first version fixed six cells for the whole session,
+which had them on the scope from the moment you logged on until you stopped, every time. That is
+not weather, it is terrain: a hazard met every time stops being a hazard and becomes part of the
+chart you route around by habit. Worse, with six of them and a peak distribution that let three
+cells in ten core out, `1 - 0.693^6` says a **red core appeared on 89% of sessions** -- which is
+exactly what testing found, nine in ten.
 
-The rarity is the point. Weather on every session is not weather, it is terrain: a hazard met
-every time stops being a hazard and becomes part of the chart you route around by habit. Rare
-also means an occurrence has to be worth something, which is what `spreadNM` buys. Measured over
-4000 sessions: **20.4%** have any weather, **17.0%** have something bad enough to avoid somewhere
-in radar cover, and **10.0%** have it sitting on one of the four arrival corridors. So about one
-session in five you see weather, and one in ten you have to work around it. Scattering the same
-cells over the old 34 NM spread dropped that last figure to 4.5% -- weather that was visible but
-almost never in the way, which is decoration.
+So cells now have a life. `cellsPerHour` sets how often one forms, `minLifeMinutes` and
+`maxLifeMinutes` how long it runs, and `heavyChance` -- a number you can read rather than a
+consequence of an exponent -- what share of them ever reach red at all. Births are a **Poisson
+process**, drawn per hour-slot from a seed derived from the session seed and the slot index, so
+slot -1 (the hour before you sat down) is as well defined as slot 5. Poisson rather than a fixed
+cadence because cells form independently, and because it clusters: two showers in one hour and
+then nothing for three, instead of one an hour like a metronome.
 
-Note what is *not* gated by this: the **wind** is always there. Groundspeed and drift do not wait
-for a rainy day.
+`activeCells` scans the slots that could still hold a living cell -- this hour, and as many
+previous ones as the longest life reaches back through -- so a cell born before the session began
+is found without being special-cased. That is what makes logging on into weather already in
+progress possible at all, and it is why the timeline can run forward indefinitely without being
+generated up front: hour six costs the same as hour one.
 
-**Nothing about the weather is saved.** The cells are a pure function of the session seed and
-the config, and where they have drifted to is a pure function of elapsed time -- so a loaded
-session regenerates exactly the weather it was saved with, without the save carrying a single
-polygon. It draws on its own stream rather than the traffic's, so a seed that puts a storm over
+**Strength follows a half sine over the cell's life**: nothing at formation, everything half way
+through, nothing again at collapse. The contour inversion then does double duty -- a storm at a
+tenth of its strength has no red contour for the same reason a shower never does -- so a cell
+arrives as a green blob, works up through amber, cores out and goes back down the same way. Size
+grows with it, though never to a point, because a cell shrinking to a dot reads as a disappearing
+symbol rather than as rain thinning out.
+
+Measured over 3000 sessions at the shipped settings (1 cell/hour, 7-18 minute lives,
+`heavyChance` 0.12):
+
+| | at the moment you log on | somewhere in the first hour |
+|---|---|---|
+| any precipitation | 18.9% | 69.9% |
+| bad enough to need avoiding | 5.8% | -- |
+| a red core | **0.8%** | 11.6% |
+| an arrival corridor blocked | -- | 21.5% |
+
+So you almost never start in front of a thunderstorm -- one session in 125, against nine in ten
+before -- one forms during about one hour in nine, and 5.8% of the average hour has something on
+the scope worth vectoring round. Rare also has to be worth something when it comes, which is what
+`spreadNM` buys: scattering the same cells over 34 NM instead of 22 dropped corridor interference
+from 10% of sessions to 4.5%, which is weather that is visible but almost never in the way.
+
+Note what is *not* gated by any of this: the **wind** is always there. Groundspeed and drift do
+not wait for a rainy day.
+
+
+**Nothing about the weather is saved.** The schedule is a pure function of the session seed and
+the config, and which cells exist at a given moment is a pure function of that and the clock --
+so a loaded session regenerates exactly the weather it was saved with, each cell at the same
+point in its life, without the save carrying a single polygon. This is why the clock has to be in
+the save, and it already is. It draws on its own stream rather than the traffic's, so a seed that puts a storm over
 Bovingdon does not also decide what arrives there.
 
 A cell is a **circle plus four harmonics**: cheap, smooth, closed by construction, and it reads

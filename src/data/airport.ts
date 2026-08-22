@@ -99,15 +99,20 @@ export interface WeatherSettings {
    */
   readonly windEffect: number
   /**
-   * The chance a session gets any precipitation at all, 0..1.
+   * How many cells form per hour of session time, on average.
    *
-   * Kept low on purpose. Weather on every session is not weather, it is
-   * terrain, and a hazard you meet every time stops being a hazard. The
-   * wind is not gated by this -- wind is always there.
+   * Kept low on purpose. Weather that is on the scope every session is not
+   * weather, it is terrain, and a hazard you meet every time stops being a
+   * hazard. Combined with a life of a few minutes, a low rate means you
+   * usually log on to a clear scope and meet a cell once or twice an hour.
+   * The wind is not gated by any of this -- wind is always there.
    */
-  readonly chance: number
-  /** The most cells a session with weather gets; fewer is the norm. */
-  readonly maxCells: number
+  readonly cellsPerHour: number
+  /** How long a cell lasts, forming to collapse. */
+  readonly minLifeMinutes: number
+  readonly maxLifeMinutes: number
+  /** The share of cells that ever develop a red core, 0..1. Small. */
+  readonly heavyChance: number
   readonly minRadiusNM: number
   readonly maxRadiusNM: number
   /** Cells drift at this fraction of the wind speed. */
@@ -653,13 +658,20 @@ function parseWeather(raw: unknown): WeatherSettings {
     throw new ConfigError('weather.windEffect', 'must be a fraction within 0..1')
   }
 
-  const chance = num(o['chance'], 'weather.chance')
-  if (chance < 0 || chance > 1) {
-    throw new ConfigError('weather.chance', 'must be a probability within 0..1')
+  const cellsPerHour = num(o['cellsPerHour'], 'weather.cellsPerHour')
+  if (cellsPerHour < 0) throw new ConfigError('weather.cellsPerHour', 'must not be negative')
+
+  const minLifeMinutes = num(o['minLifeMinutes'], 'weather.minLifeMinutes')
+  const maxLifeMinutes = num(o['maxLifeMinutes'], 'weather.maxLifeMinutes')
+  if (minLifeMinutes <= 0) throw new ConfigError('weather.minLifeMinutes', 'must be positive')
+  if (maxLifeMinutes < minLifeMinutes) {
+    throw new ConfigError('weather.maxLifeMinutes', 'must not be below the minimum')
   }
 
-  const maxCells = num(o['maxCells'], 'weather.maxCells')
-  if (maxCells < 0) throw new ConfigError('weather.maxCells', 'must not be negative')
+  const heavyChance = num(o['heavyChance'], 'weather.heavyChance')
+  if (heavyChance < 0 || heavyChance > 1) {
+    throw new ConfigError('weather.heavyChance', 'must be a probability within 0..1')
+  }
 
   const minRadiusNM = num(o['minRadiusNM'], 'weather.minRadiusNM')
   const maxRadiusNM = num(o['maxRadiusNM'], 'weather.maxRadiusNM')
@@ -677,8 +689,10 @@ function parseWeather(raw: unknown): WeatherSettings {
   return {
     wind: { fromDeg: normalizeHeading(fromDeg), speedKts },
     windEffect,
-    chance,
-    maxCells,
+    cellsPerHour,
+    minLifeMinutes,
+    maxLifeMinutes,
+    heavyChance,
     minRadiusNM,
     maxRadiusNM,
     driftFactor,

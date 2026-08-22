@@ -135,10 +135,13 @@ how far through the current gap the spawner is -- and a load puts it back and pa
 read the picture first. One slot; a save from another airport or another version is refused
 rather than loaded.
 
-**Sometimes there is weather.** About one session in five, and a wet one is usually a single
-cell: weather on every session would not be weather, it would be terrain. Precipitation is drawn
-in three contours -- green, amber, red -- drifting
-downwind all session, with a **WX** button on the scope to show and hide them. Fly into moderate
+**Sometimes there is weather.** Cells form about once an hour, run for ten or twenty minutes and
+are gone -- so you log on to a clear scope four times in five, a red core is in front of you at
+the start of about one session in a hundred, and weather that does turn up is a passing event
+rather than a fixture. Weather on every session would not be weather, it would be terrain.
+Precipitation is drawn in three contours -- green, amber, red -- growing as a cell builds, fading
+as it collapses and drifting
+downwind meanwhile, with a **WX** button on the scope to show and hide them. Fly into moderate
 or heavy and the crew asks for a vector out: the strip reads *WX -- REQUESTING VECTOR*, the data
 block flags **WX** in red, and the console says so. Turning the layer off stops it being drawn,
 not being there.

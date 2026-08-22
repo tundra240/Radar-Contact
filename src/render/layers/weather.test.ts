@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { Camera } from '../../core/camera'
 import { makeRng } from '../../core/rng'
-import { makeWeather, type Weather, type WeatherConfig } from '../../sim/weather'
+import {
+  makeWeather,
+  type Weather,
+  type WeatherCell,
+  type WeatherConfig,
+} from '../../sim/weather'
 import { palettes, setPalette } from '../theme'
-import { drawWeather } from './weather'
+import { drawCells, drawWeather } from './weather'
 
 /** One filled shape, with the state it was filled under. */
 interface Shape {
@@ -11,6 +16,7 @@ interface Shape {
   alpha: number
   points: number
   extent: number
+  centreX: number
 }
 
 function recorder(): {
@@ -23,6 +29,8 @@ function recorder(): {
   const strokes: Shape[] = []
   let path: { x: number; y: number }[] = []
   const noop = (): void => {}
+  const midX = (): number =>
+    path.length === 0 ? 0 : path.reduce((sum, p) => sum + p.x, 0) / path.length
   const measure = (): number => {
     if (path.length === 0) return 0
     const xs = path.map((p) => p.x)
@@ -42,6 +50,7 @@ function recorder(): {
         alpha: Number(stub['globalAlpha']),
         points: path.length,
         extent: measure(),
+        centreX: midX(),
       })
     },
     stroke: () => {
@@ -50,6 +59,7 @@ function recorder(): {
         alpha: Number(stub['globalAlpha']),
         points: path.length,
         extent: measure(),
+        centreX: midX(),
       })
     },
     arc: noop,
@@ -75,17 +85,26 @@ function recorder(): {
   }
 }
 
+/** A rate high enough that a seeded schedule reliably has something on it. */
 const CONFIG: WeatherConfig = {
   wind: { fromDeg: 250, speedKts: 20 },
-  chance: 1,
-  maxCells: 4,
+  cellsPerHour: 12,
+  minLifeMinutes: 20,
+  maxLifeMinutes: 40,
+  heavyChance: 0.5,
   minRadiusNM: 5,
   maxRadiusNM: 9,
   driftFactor: 0.8,
   spreadNM: 15,
 }
 
-const draw = (weather: Weather, elapsed = 0, rangeNM = 60) => {
+const SCHEDULE = makeWeather(makeRng(4), CONFIG)
+const CLEAR = makeWeather(makeRng(4), { ...CONFIG, cellsPerHour: 0 })
+
+/** Half an hour in, by which time the seeded schedule has cells running. */
+const MIDWAY = 1800
+
+const draw = (weather: Weather, elapsed = MIDWAY, rangeNM = 60) => {
   const cam = new Camera({ x: 0, y: 0 }, rangeNM, { maxNM: 200 })
   cam.setViewport(1000, 600)
   const rec = recorder()
@@ -93,9 +112,41 @@ const draw = (weather: Weather, elapsed = 0, rangeNM = 60) => {
   return { ...rec, cam }
 }
 
+/**
+ * One cell of a known strength, drawn at its mid-life by default so the
+ * envelope is exactly one and the geometry is the nominal geometry.
+ */
+const one = (
+  cell: Partial<WeatherCell> & { peak: number },
+  elapsed = 50,
+  rangeNM = 60,
+  weather: Weather = CLEAR,
+) => {
+  const cam = new Camera({ x: 0, y: 0 }, rangeNM, { maxNM: 200 })
+  cam.setViewport(1000, 600)
+  const rec = recorder()
+  drawCells(
+    rec.ctx,
+    cam,
+    weather,
+    [
+      {
+        originNM: { x: 0, y: 0 },
+        radiusNM: 8,
+        lobes: [],
+        bornSeconds: 0,
+        lifeSeconds: 100,
+        ...cell,
+      },
+    ],
+    elapsed,
+  )
+  return { ...rec, cam }
+}
+
 describe('drawWeather', () => {
   it('draws nothing at all for a clear scope', () => {
-    const r = draw(makeWeather(makeRng(1), { ...CONFIG, maxCells: 0 }))
+    const r = draw(CLEAR)
     expect(r.fills).toEqual([])
     expect(r.strokes).toEqual([])
   })
@@ -103,20 +154,19 @@ describe('drawWeather', () => {
   it('fills and outlines every contour it draws', () => {
     // A fill alone leaves the boundary vague, and the boundary is what a
     // band is read off.
-    const r = draw(makeWeather(makeRng(4), CONFIG))
+    const r = draw(SCHEDULE)
     expect(r.fills.length).toBeGreaterThan(0)
     expect(r.strokes).toHaveLength(r.fills.length)
   })
 
   it('draws each contour as a closed ring of many points, not a circle', () => {
-    const r = draw(makeWeather(makeRng(4), CONFIG))
-    for (const shape of r.fills) {
+    for (const shape of draw(SCHEDULE).fills) {
       expect(shape.points).toBeGreaterThan(30)
     }
   })
 
   it('fills faintly and outlines at full strength', () => {
-    const r = draw(makeWeather(makeRng(4), CONFIG))
+    const r = draw(SCHEDULE)
     for (const f of r.fills) {
       expect(f.alpha).toBeGreaterThan(0)
       expect(f.alpha).toBeLessThan(0.5)
@@ -127,20 +177,13 @@ describe('drawWeather', () => {
   it('hands the canvas back opaque', () => {
     // A leaked alpha here would wash out the airspace, the traffic and the
     // chrome, all of which are drawn afterwards.
-    expect(draw(makeWeather(makeRng(4), CONFIG)).alphaAtEnd()).toBe(1)
+    expect(draw(SCHEDULE).alphaAtEnd()).toBe(1)
   })
 })
 
 describe('the bands', () => {
-  /** One cell, exactly as bad as asked for, with no wobble to complicate it. */
-  const cell = (peak: number) => ({
-    wind: CONFIG.wind,
-    driftFactor: 0,
-    cells: [{ originNM: { x: 0, y: 0 }, radiusNM: 8, peak, lobes: [] }],
-  })
-
   it('nests them, worst innermost', () => {
-    const r = draw(cell(1))
+    const r = one({ peak: 1 })
     expect(r.fills).toHaveLength(3)
     // Drawn outside in, so each is smaller than the last and the core ends
     // up on top.
@@ -151,14 +194,14 @@ describe('the bands', () => {
   it('gives a shower one band and a storm three', () => {
     // A cell that never reaches moderate must not be drawn with a yellow
     // ring of zero size, which is what a naive contour would do.
-    expect(draw(cell(0.2)).fills).toHaveLength(1)
-    expect(draw(cell(0.5)).fills).toHaveLength(2)
-    expect(draw(cell(0.9)).fills).toHaveLength(3)
+    expect(one({ peak: 0.2 }).fills).toHaveLength(1)
+    expect(one({ peak: 0.5 }).fills).toHaveLength(2)
+    expect(one({ peak: 0.9 }).fills).toHaveLength(3)
   })
 
   it('colours them green, amber and red', () => {
     setPalette('dark')
-    const styles = draw(cell(1)).fills.map((f) => f.style)
+    const styles = one({ peak: 1 }).fills.map((f) => f.style)
     expect(styles).toEqual([
       palettes.dark.wxLight,
       palettes.dark.wxModerate,
@@ -169,30 +212,60 @@ describe('the bands', () => {
 
   it('follows the palette', () => {
     setPalette('amber')
-    expect(draw(cell(0.2)).fills[0]?.style).toBe(palettes.amber.wxLight)
+    expect(one({ peak: 0.2 }).fills[0]?.style).toBe(palettes.amber.wxLight)
     setPalette('beige')
   })
 })
 
-describe('drift and culling', () => {
-  const oneCell = {
-    wind: { fromDeg: 270, speedKts: 30 },
-    driftFactor: 1,
-    cells: [{ originNM: { x: 0, y: 0 }, radiusNM: 6, peak: 0.9, lobes: [] }],
-  }
+describe('the life of a cell', () => {
+  const storm = { peak: 1, lifeSeconds: 100 }
 
-  it('draws the cell where it has drifted to, not where it started', () => {
-    const start = draw(oneCell, 0)
-    const later = draw(oneCell, 3600)
-    // A wind from 270 at 30 kt moves it 30 NM east in the hour, so the
-    // shape lands somewhere else on the screen.
-    expect(later.fills.length).toBe(start.fills.length)
-    expect(later.fills[0]?.extent).toBeCloseTo(start.fills[0]?.extent ?? 0, 3)
+  it('draws nothing before it forms or after it collapses', () => {
+    expect(one(storm, -1).fills).toEqual([])
+    expect(one(storm, 0).fills).toEqual([])
+    expect(one(storm, 100).fills).toEqual([])
+    expect(one(storm, 101).fills).toEqual([])
   })
 
-  it('stops drawing one that has drifted off the display', () => {
-    // Cheap, and at a low zoom most of them have.
-    expect(draw(oneCell, 0, 20).fills.length).toBeGreaterThan(0)
-    expect(draw(oneCell, 20 * 3600, 20).fills).toEqual([])
+  it('works up through the bands and back down', () => {
+    // A storm arrives as a green blob, cores out, and goes back to a blob.
+    // Three rings on the first frame would read as a switch being thrown
+    // rather than as weather developing.
+    expect(one(storm, 3).fills.length).toBe(1)
+    expect(one(storm, 50).fills.length).toBe(3)
+    expect(one(storm, 97).fills.length).toBe(1)
+  })
+
+  it('grows as well as strengthens', () => {
+    const young = one(storm, 12).fills[0]!.extent
+    const grown = one(storm, 50).fills[0]!.extent
+    expect(grown).toBeGreaterThan(young)
+  })
+})
+
+describe('drift and culling', () => {
+  const BLOWN = makeWeather(makeRng(1), {
+    ...CONFIG,
+    cellsPerHour: 0,
+    wind: { fromDeg: 270, speedKts: 30 },
+    driftFactor: 1,
+  })
+  // Two hours of life, sampled a quarter and three quarters through, so the
+  // cell is the same strength at both and only its position differs.
+  const long = { peak: 0.9, radiusNM: 6, lifeSeconds: 7200 }
+
+  it('draws the cell where it has drifted to, not where it started', () => {
+    const early = one(long, 1800, 60, BLOWN)
+    const late = one(long, 5400, 60, BLOWN)
+    // A wind from 270 at 30 kt moves it east, an hour apart on the clock.
+    expect(late.fills.length).toBe(early.fills.length)
+    expect(late.fills[0]!.extent).toBeCloseTo(early.fills[0]!.extent, 3)
+    expect(late.fills[0]!.centreX).toBeGreaterThan(early.fills[0]!.centreX)
+  })
+
+  it('stops drawing one that is off the display', () => {
+    // Cheap, and at a low zoom most of them are.
+    expect(one(long, 3600, 60, BLOWN).fills.length).toBeGreaterThan(0)
+    expect(one({ ...long, originNM: { x: 400, y: 0 } }, 3600, 60, BLOWN).fills).toEqual([])
   })
 })
