@@ -398,17 +398,39 @@ function start(
   controls.appendChild(wxButton)
 
   /**
-   * The ATIS ticker, left of the menu: what the field is doing, always on
-   * screen. Pressing it opens the runway selection, because the thing you
-   * read and the thing you change are the same subject and splitting them
-   * across two controls would only invite them to disagree.
+   * The ATIS board: a button beside WX, and a small board under it showing
+   * what the field is doing and offering the runway selection.
+   *
+   * Whether it is up is remembered, because it is a preference about how you
+   * like the position laid out rather than anything about the session --
+   * the same reasoning as the display scheme.
    *
    * `setAtis` is declared further down; the closure resolves at click time,
    * by which point it exists.
    */
+  const ATIS_STORAGE = 'radar-contact:atis-board'
+
+  const storedAtisOpen = (): boolean => {
+    try {
+      // Absent means shown: a board nobody has an opinion about yet is more
+      // use up than hidden.
+      return window.localStorage.getItem(ATIS_STORAGE) !== 'off'
+    } catch {
+      return true
+    }
+  }
+
   const atisBar = new AtisBar({
     mount: controls,
+    open: storedAtisOpen(),
     onChange: (next) => setAtis(next),
+    onToggle: (open) => {
+      try {
+        window.localStorage.setItem(ATIS_STORAGE, open ? 'on' : 'off')
+      } catch {
+        // Blocked storage is not worth failing a toggle over.
+      }
+    },
   })
 
   const menu = new Menu({

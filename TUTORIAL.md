@@ -78,11 +78,20 @@ world it does not fit.
 
 ### The ATIS
 
-The strip on the toolbar reading **INFO A  ARR 27R/27L  DEP 27R  250/18** is the ATIS: the
-information letter, what is landing, what is departing, and the wind. Press it to change the
-runway configuration.
+**ATIS** on the toolbar, next to WX, shows and hides the ATIS board. It reads out the
+information letter, what is landing, what is departing and the wind:
 
-Each direction is offered with the wind on it -- `head 16  cross 8` -- so you can see which way
+```
+INFORMATION ALPHA
+ARR   27R / 27L
+DEP   27R
+WIND  250/18
+```
+
+It is a board rather than a menu, so it stays up while you work -- clicking on the scope does not
+dismiss it. Press ATIS again to put it away, and it will be however you left it next time.
+
+The runway selection is on the board. Each direction is offered with the wind on it -- `head 16  cross 8` -- so you can see which way
 is into wind rather than working it out. A direction you would be landing downwind on marks its
 tailwind in red, and the line underneath tells you when the tailwind has passed the 5 kt limit and
 which direction to go to instead.

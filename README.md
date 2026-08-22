@@ -135,9 +135,12 @@ how far through the current gap the spawner is -- and a load puts it back and pa
 read the picture first. One slot; a save from another airport or another version is refused
 rather than loaded.
 
-**There is an ATIS, and you can turn the field round.** The broadcast sits on the toolbar --
-information letter, runways in use, wind -- and pressing it opens the runway selection, with the
-headwind and crosswind on each direction so the choice is informed. Change the direction and the
+**There is an ATIS, and you can turn the field round.** An **ATIS** button beside WX shows and
+hides a small board on the scope: information letter, runways landing, runways departing, wind.
+The runway selection is on the board, with the headwind and crosswind on each direction so the
+choice is informed. Unlike the options menu the board does not dismiss itself when you click on
+the radar -- a readout that vanished the moment you touched an aircraft would be one you could
+never use while working -- and whether it is up is remembered between sessions. Change the direction and the
 scope follows: the localisers move to the runways now being landed on, an approach for a runway
 nobody is using is refused, the entry fixes re-pair to the runway on their side of the field, and
 the letter steps on to the next one. Anything already cleared for a runway that has gone out of

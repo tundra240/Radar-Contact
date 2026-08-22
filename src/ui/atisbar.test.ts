@@ -20,61 +20,104 @@ afterEach(() => {
   document.body.replaceChildren()
 })
 
-function mount(atis: Atis, runways: readonly RunwayFace[] = FACES) {
+function mount(atis: Atis, runways: readonly RunwayFace[] = FACES, open?: boolean) {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const changes: { arrivals: readonly string[]; departures: readonly string[] }[] = []
-  const bar = new AtisBar({ mount: host, onChange: (next) => changes.push(next) })
+  const toggles: boolean[] = []
+  const bar = new AtisBar({
+    mount: host,
+    onChange: (next) => changes.push(next),
+    onToggle: (o) => toggles.push(o),
+    ...(open === undefined ? {} : { open }),
+  })
   bars.push(bar)
   bar.paint({ atis, runways })
+  const q = <T extends Element>(sel: string) => host.querySelector<T>(sel)!
   return {
     host,
     bar,
     changes,
-    button: host.querySelector<HTMLButtonElement>('.atis-button')!,
-    panel: host.querySelector<HTMLDivElement>('.atis-panel')!,
+    toggles,
+    button: q<HTMLButtonElement>('.atis-button'),
+    box: q<HTMLDivElement>('.atis-box'),
+    letter: q<HTMLDivElement>('.atis-letter'),
+    values: () => [...host.querySelectorAll('.atis-readout dd')].map((d) => d.textContent),
     choices: () => [...host.querySelectorAll<HTMLButtonElement>('.atis-choice')],
-    advice: host.querySelector<HTMLParagraphElement>('.atis-advice')!,
+    advice: q<HTMLParagraphElement>('.atis-advice'),
   }
 }
 
 const START = makeAtis({ arrivals: ['27R', '27L'], departures: ['27R'], wind: WESTERLY })
 
-describe('the ticker', () => {
-  it('reads out the letter, the runways and the wind', () => {
+describe('the board', () => {
+  it('is a compact button, not a strip of text', () => {
+    // The readout belongs on the board; the toolbar gets a word, like WX.
+    expect(mount(START).button.textContent).toBe('ATIS')
+  })
+
+  it('shows the letter, both runway sets and the wind', () => {
     const ui = mount(START)
-    expect(ui.button.textContent).toBe('INFO A  ARR 27R/27L  DEP 27R  250/18')
+    expect(ui.letter.textContent).toBe('INFORMATION ALPHA')
+    expect(ui.values()).toEqual(['27R / 27L', '27R', '250/18'])
   })
 
   it('follows the broadcast when it is amended', () => {
     const ui = mount(START)
     ui.bar.paint({ atis: amend(START, { arrivals: ['09L', '09R'] }), runways: FACES })
-    expect(ui.button.textContent).toContain('INFO B')
-    expect(ui.button.textContent).toContain('ARR 09L/09R')
+    expect(ui.letter.textContent).toBe('INFORMATION BRAVO')
+    expect(ui.values()[0]).toBe('09L / 09R')
   })
 
-  it('starts closed and opens on a press', () => {
+  it('says so rather than going blank when nothing is in use', () => {
+    const shut = makeAtis({ arrivals: [], departures: [], wind: WESTERLY })
+    expect(mount(shut).values()).toEqual(['--', '--', '250/18'])
+  })
+})
+
+describe('the toggle', () => {
+  it('starts shown, with the button reading as pressed in', () => {
     const ui = mount(START)
-    expect(ui.panel.hidden).toBe(true)
-    ui.button.click()
-    expect(ui.panel.hidden).toBe(false)
+    expect(ui.box.hidden).toBe(false)
+    expect(ui.button.classList.contains('is-on')).toBe(true)
   })
 
-  it('closes on Escape and on a click elsewhere', () => {
+  it('can be asked to start hidden', () => {
+    const ui = mount(START, FACES, false)
+    expect(ui.box.hidden).toBe(true)
+    expect(ui.button.classList.contains('is-on')).toBe(false)
+  })
+
+  it('hides and shows on the button, and reports each way', () => {
     const ui = mount(START)
     ui.button.click()
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-    expect(ui.panel.hidden).toBe(true)
-
+    expect(ui.box.hidden).toBe(true)
     ui.button.click()
+    expect(ui.box.hidden).toBe(false)
+    expect(ui.toggles).toEqual([false, true])
+  })
+
+  it('stays up when you click on the scope', () => {
+    // The whole difference between a board and a menu. A readout that
+    // vanished the moment you touched an aircraft would be one you could
+    // never use while working.
+    const ui = mount(START)
     document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    expect(ui.panel.hidden).toBe(true)
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(ui.box.hidden).toBe(false)
+  })
+
+  it('keeps its readout current while hidden', () => {
+    // So it is right the instant it comes back, rather than a frame stale.
+    const ui = mount(START, FACES, false)
+    ui.bar.paint({ atis: amend(START, { arrivals: ['09L', '09R'] }), runways: FACES })
+    ui.button.click()
+    expect(ui.values()[0]).toBe('09L / 09R')
   })
 })
 
 describe('choosing a direction', () => {
   it('offers each direction once, not each runway', () => {
-    // A field chooses a direction; every parallel in it comes along.
     const ui = mount(START)
     const names = ui.choices().map((b) => b.querySelector('.atis-choice-name')?.textContent)
     expect(names).toEqual(['27R/27L', '09L/09R', '27R/27L', '09L/09R'])
@@ -82,14 +125,11 @@ describe('choosing a direction', () => {
 
   it('marks the direction in use as pressed in', () => {
     const ui = mount(START)
-    const landing = ui.choices()[0]!
-    expect(landing.classList.contains('is-on')).toBe(true)
+    expect(ui.choices()[0]!.classList.contains('is-on')).toBe(true)
     expect(ui.choices()[1]!.classList.contains('is-on')).toBe(false)
   })
 
   it('reports the whole new configuration, not just the half that changed', () => {
-    // main.ts amends one ATIS value; a callback naming only the arrivals
-    // would leave the caller guessing at the departures.
     const ui = mount(START)
     ui.choices()[1]!.click()
     expect(ui.changes).toEqual([{ arrivals: ['09L', '09R'], departures: ['27R'] }])
@@ -97,20 +137,17 @@ describe('choosing a direction', () => {
 
   it('changes the departure runways on their own', () => {
     const ui = mount(START)
-    // Third and fourth buttons are the departure row.
     ui.choices()[3]!.click()
     expect(ui.changes).toEqual([{ arrivals: ['27R', '27L'], departures: ['09L', '09R'] }])
   })
 
   it('shows the wind on each face, so the choice is informed', () => {
     const ui = mount(START)
-    const text = ui.choices()[0]!.textContent ?? ''
-    expect(text).toContain('head')
+    expect(ui.choices()[0]!.textContent).toContain('head')
     expect(ui.choices()[1]!.textContent).toContain('TAIL')
   })
 
   it('marks a downwind direction on the button itself', () => {
-    // Where the mistake would be made, rather than only in the advice line.
     const ui = mount(START)
     expect(ui.choices()[1]!.classList.contains('is-tailwind')).toBe(true)
     expect(ui.choices()[0]!.classList.contains('is-tailwind')).toBe(false)
@@ -151,12 +188,9 @@ describe('the advice line', () => {
 })
 
 describe('housekeeping', () => {
-  it('lets go of its document listeners when destroyed', () => {
+  it('takes itself off the page when destroyed', () => {
     const ui = mount(START)
-    ui.button.click()
     ui.bar.destroy()
-    // Nothing left in the document to receive the event, and no throw.
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     expect(document.querySelector('.atis')).toBeNull()
   })
 })

@@ -642,6 +642,12 @@ nudge.
 
 `sim/atis.ts` and `ui/atisbar.ts`.
 
+**A board, not a menu.** The options menu dismisses itself on an outside click or Escape, which is
+right for a menu and wrong for a readout: one that vanished the moment you touched an aircraft
+would be one you could never use while working. So the ATIS board is toggled only by its button,
+and its shown state is remembered in `localStorage` -- a preference about how the position is
+laid out rather than anything about the session, the same reasoning as the display scheme.
+
 **One authority for which way the field is landing.** The config records what the field was set to
 at load; the ATIS records what it is set to now, and the two part company the moment anybody flips
 it. Everything that needs the answer -- the localisers drawn, the approaches that can be cleared,

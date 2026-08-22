@@ -1293,26 +1293,65 @@ canvas {
   text-decoration: underline;
 }
 
-/* ---- the ATIS ticker -------------------------------------------------- */
+/* ---- the ATIS board --------------------------------------------------- */
 
-/* The broadcast sits on the toolbar and is also the control that changes it:
-   the thing you read and the thing you press are the same subject, and two
-   controls for it would only invite them to disagree. Wider than the other
-   toggles because it carries a whole line of information rather than a word,
-   and the letters are not spaced out for the same reason. */
+/* A button on the toolbar and a small board under it, the way the real thing
+   sits in the corner of a position: readable without opening anything, and
+   out of the way when you would rather have the picture. Unlike the options
+   menu it does not dismiss itself on an outside click -- a readout that
+   vanished the moment you touched an aircraft would be one you could never
+   use while working. */
 .atis {
   position: relative;
 }
 
-.atis-button {
-  min-width: 0;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
+.atis-box {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 220px;
+  padding: 10px 12px 12px;
+  color: var(--accent);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow),
+    3px 3px 0 0 rgba(0, 0, 0, 0.25);
+}
+
+.atis-box[hidden] {
+  display: none;
+}
+
+/* The letter is the headline: it is the thing a pilot reads back, and the
+   thing that tells you the rest of this board has changed. */
+.atis-letter {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--bevel-shadow);
+}
+
+.atis-readout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 0 0 4px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
-.atis-panel {
-  min-width: 260px;
+.atis-readout dt {
+  letter-spacing: 0.12em;
+  opacity: 0.7;
+}
+
+.atis-readout dd {
+  margin: 0;
+  letter-spacing: 0.06em;
 }
 
 .atis-row {
@@ -1381,4 +1420,13 @@ canvas {
 .atis-advice.is-warning {
   color: var(--warn);
   opacity: 1;
+}
+
+/* The toolbar button reads as pressed in while the board is up. */
+.atis-button.is-on {
+  color: var(--title-text);
+  background: var(--title-bar);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
 }
