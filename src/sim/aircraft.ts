@@ -146,8 +146,12 @@ export type Departure = 'landed' | 'left'
  * and outside the CTR is in nobody's airspace, however close to the field
  * it is. See sim/airspace.ts.
  */
-export function isInSector(a: Aircraft, zone: ControlZone): boolean {
-  return isControlled(zone, a.pos, a.altFt)
+export function isInSector(a: Aircraft, zone: ControlZone | null): boolean {
+  // A null zone is a session with the area of responsibility switched off:
+  // there is no boundary, so everything on the display is the controller's.
+  // Threading the absence of a rule as null keeps the rule itself in one
+  // place rather than spreading an "if enforcing" through every caller.
+  return zone === null || isControlled(zone, a.pos, a.altFt)
 }
 
 /**
@@ -166,7 +170,7 @@ export function isInSector(a: Aircraft, zone: ControlZone): boolean {
  */
 export function departureOf(
   a: Aircraft,
-  zone: ControlZone,
+  zone: ControlZone | null,
   outerLimitNM = Number.POSITIVE_INFINITY,
 ): Departure | null {
   if (a.navMode === 'LANDED') return 'landed'
@@ -180,7 +184,7 @@ export function departureOf(
 }
 
 /** Marks an inbound aircraft as the controller's, the first time it is. */
-export function enterSector(a: Aircraft, zone: ControlZone): Aircraft {
+export function enterSector(a: Aircraft, zone: ControlZone | null): Aircraft {
   return !a.entered && isInSector(a, zone) ? { ...a, entered: true } : a
 }
 

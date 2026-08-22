@@ -120,6 +120,11 @@ south-west. And it has a floor -- below 2,500 ft the only controlled airspace is
 descent below the base of the TMA out in the country is refused rather than quietly losing you
 the aircraft.
 
+**Or turn it off.** An **Airspace** checkbox in the logon window, beside the initials. Unticked,
+nothing is dimmed and everything on the display takes a clearance wherever it is. It is a rule
+for the shift rather than a display setting, so it is chosen at logon, remembered between
+sessions, and recorded in a save.
+
 **You see traffic before it is yours.** Arrivals are released outside the boundary and fly in,
 drawn dimmed, listed at the bottom of the strip bay as `INBOUND` with no sequence number. Any
 clearance for one is refused -- *"not in your airspace yet"* -- until it crosses in.

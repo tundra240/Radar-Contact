@@ -526,3 +526,36 @@ describe('traffic outside the area of responsibility', () => {
       .toBe(true)
   })
 })
+
+describe('a session with the airspace rule switched off', () => {
+  /**
+   * The toggle in the logon window arrives here as a null zone. What has to
+   * be true is that the gate stops gating -- everything on the display
+   * takes a clearance, wherever it is and whatever level it is at.
+   */
+  const open: ApplyContext = { ...ctx, controlZone: null }
+  const anywhere = ac({ pos: { x: 300, y: -200 }, altFt: 400, entered: true })
+
+  it('accepts a clearance for traffic that would be outside', () => {
+    expect(applyCommand({ kind: 'heading', callsign: 'BAW178', deg: 270 }, anywhere, open).ok)
+      .toBe(true)
+  })
+
+  it('accepts a level that would be below controlled airspace', () => {
+    // With no airspace there is no below it.
+    expect(applyCommand({ kind: 'altitude', callsign: 'BAW178', ft: 2000 }, anywhere, open).ok)
+      .toBe(true)
+  })
+
+  it('still enforces everything that is not about the boundary', () => {
+    // The sector limits, the envelope and the speed limit are the aircraft
+    // and the procedure, not the airspace, so they all still apply.
+    const why = (c: Command): string => {
+      const r = applyCommand(c, anywhere, open)
+      if (r.ok) throw new Error('expected a refusal')
+      return r.reason
+    }
+    expect(why({ kind: 'altitude', callsign: 'BAW178', ft: 99000 })).toContain('cannot be cleared')
+    expect(why({ kind: 'speed', callsign: 'BAW178', kts: 40 })).toContain('will not fly below')
+  })
+})

@@ -32,6 +32,18 @@ interface Stroke {
   points: { x: number; y: number }[]
 }
 
+/** The canvas state that save() stacks and restore() puts back. */
+const STATEFUL = [
+  'fillStyle',
+  'strokeStyle',
+  'lineWidth',
+  'lineCap',
+  'globalAlpha',
+  'font',
+  'textAlign',
+  'textBaseline',
+] as const
+
 function recorder(): {
   ctx: CanvasRenderingContext2D
   texts: Text[]
@@ -47,6 +59,7 @@ function recorder(): {
   const dashes: number[][] = []
   const fills: string[] = []
   const washes: { style: string; alpha: number }[] = []
+  const saved: unknown[][] = []
   const strokes: Stroke[] = []
   let path: { x: number; y: number }[] = []
   const noop = (): void => {}
@@ -76,8 +89,19 @@ function recorder(): {
     fill: () => {
       washes.push({ style: String(stub['fillStyle']), alpha: Number(stub['globalAlpha']) })
     },
-    save: noop,
-    restore: noop,
+    // Modelled rather than ignored. A no-op save/restore hides a leaked
+    // globalAlpha or stroke style, which is precisely the class of bug that
+    // makes everything drawn afterwards quietly wrong.
+    save: () => {
+      saved.push(STATEFUL.map((k) => stub[k]))
+    },
+    restore: () => {
+      const was = saved.pop()
+      if (was === undefined) return
+      STATEFUL.forEach((k, i) => {
+        stub[k] = was[i]
+      })
+    },
     setLineDash: (d: number[]) => {
       dashes.push(d)
     },
@@ -118,6 +142,7 @@ const STATUS: ScopeStatus = {
   paused: false,
   traffic: { spawned: 0, held: 0, landed: 0, left: 0, points: 0 },
   controller: null,
+  airspaceEnforced: true,
 }
 
 // Most tests assert that a feature draws, so they render everything; the
@@ -795,6 +820,7 @@ describe('the clock and rate readouts', () => {
       paused: false,
       traffic: { spawned: 0, held: 0, landed: 0, left: 0, points: 0 },
   controller: null,
+  airspaceEnforced: true,
     })
     expect(labels).toContain('TIME')
     expect(labels).toContain('13:01:01')
@@ -813,6 +839,7 @@ describe('the clock and rate readouts', () => {
         paused: false,
         traffic: { spawned: 0, held: 0, landed: 0, left: 0, points: 0 },
   controller: null,
+  airspaceEnforced: true,
       })
       expect(labels, `x${speed}`).toContain('RATE')
       expect(labels, `x${speed}`).toContain(shown)
@@ -827,6 +854,7 @@ describe('the clock and rate readouts', () => {
       paused: true,
       traffic: { spawned: 0, held: 0, landed: 0, left: 0, points: 0 },
   controller: null,
+  airspaceEnforced: true,
     })
     expect(labels).toContain('PAUSED')
     expect(labels).not.toContain('x4')
@@ -846,6 +874,7 @@ describe('the traffic readout', () => {
       paused: false,
       traffic: { spawned: 7, held: 3, landed: 2, left: 1, points: 150 },
       controller: null,
+      airspaceEnforced: true,
     })
     const labels = rec.texts.map((t) => t.s)
     expect(labels).toContain('TRAFFIC')
@@ -1292,5 +1321,37 @@ describe('the area of responsibility', () => {
     const wash = draw().washes.find((w) => w.alpha < 1 && w.style === palettes.amber.bg)
     expect(wash).toBeDefined()
     setPalette('beige')
+  })
+})
+
+describe('a session with the airspace rule switched off', () => {
+  const draw = (airspaceEnforced: boolean) => {
+    const cam = new Camera({ x: 0, y: 0 }, 60, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.full, { ...STATUS, airspaceEnforced })
+    return rec
+  }
+
+  const groundWash = (rec: ReturnType<typeof draw>) =>
+    rec.washes.find((w) => w.alpha < 1 && w.style === palettes.beige.bg)
+
+  it('draws the map whole, with nothing dimmed', () => {
+    // There is no boundary to be on the wrong side of, so nothing should
+    // look like it is somebody else's.
+    expect(groundWash(draw(true))).toBeDefined()
+    expect(groundWash(draw(false))).toBeUndefined()
+  })
+
+  it('still draws the boundary, which is useful either way', () => {
+    // Knowing where the airspace is remains worth knowing, even in a
+    // session that does not enforce it.
+    const sizes = new Set(airport.controlFootprint.map((ring) => ring.length))
+    expect(draw(false).strokes.some((s) => sizes.has(s.points.length))).toBe(true)
+  })
+
+  it('hands the canvas back opaque either way', () => {
+    expect(draw(false).alphaAtEnd()).toBe(1)
+    expect(draw(true).alphaAtEnd()).toBe(1)
   })
 })

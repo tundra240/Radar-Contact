@@ -4,6 +4,7 @@ import { loadAirport, outerLimitNM } from './data/airport'
 import egllConfig from './data/egll.json'
 import { departureOf, enterSector, isInSector, stepAircraft } from './sim/aircraft'
 import { NO_SCORE, pointsFor, scoreDeparture, type Score } from './sim/score'
+import type { ControlZone } from './sim/airspace'
 import {
   SAVE_VERSION,
   parseSavedGame,
@@ -483,7 +484,11 @@ function start(
   // clearance can be refused, one readback format, one thing to test.
 
   const applyContext: ApplyContext = {
-    controlZone: airport.controlZone,
+    // A getter, because the answer changes with the session: the context is
+    // built once and the boundary is a choice made at logon.
+    get controlZone(): ControlZone | null {
+      return activeZone()
+    },
     floorFt: airport.sector.floorFt,
     ceilingFt: airport.sector.ceilingFt,
     speedLimitKts: airport.sector.speedLimitKts,
@@ -703,9 +708,20 @@ function start(
   /** Nothing exists beyond this: see data/airport.ts. */
   const outerLimit = outerLimitNM(airport)
 
+  /**
+   * The area of responsibility in force, or null when this session is being
+   * flown without one.
+   *
+   * Derived from the controller rather than kept as a second flag, so there
+   * is one answer and a saved session carries it without being asked to.
+   * Before anyone logs on it reads as enforced, which is the default the
+   * logon window offers.
+   */
+  const activeZone = (): ControlZone | null =>
+    controller === null || controller.enforceAirspace ? airport.controlZone : null
+
   /** Traffic the controller may actually touch. */
-  const mine = (): readonly Aircraft[] =>
-    traffic.filter((a) => isInSector(a, airport.controlZone))
+  const mine = (): readonly Aircraft[] => traffic.filter((a) => isInSector(a, activeZone()))
 
   const signed = (n: number): string => (n > 0 ? `+${n}` : String(n))
 
@@ -729,8 +745,9 @@ function start(
       for (const stepped of traffic.map((x) => stepAircraft(x, dt, clock.elapsedSeconds))) {
         // Crossing in is what makes an aircraft the controller's, and it is
         // the only moment at which that changes.
-        const a = enterSector(stepped, airport.controlZone)
-        const departure = departureOf(a, airport.controlZone, outerLimit)
+        const zone = activeZone()
+        const a = enterSector(stepped, zone)
+        const departure = departureOf(a, zone, outerLimit)
         if (departure === null) {
           flown.push(a)
           continue
@@ -782,6 +799,7 @@ function start(
           left: score.lost,
           points: score.points,
         },
+        airspaceEnforced: activeZone() !== null,
           controller,
         },
         { aircraft: traffic, selected, drag: currentDrag() },
@@ -808,12 +826,22 @@ function start(
   // radar is visibly already running before anyone logs on.
 
   const LOGON_STORAGE = 'radar-contact:initials'
+  const AIRSPACE_STORAGE = 'radar-contact:airspace'
 
   const storedInitials = (): string => {
     try {
       return window.localStorage.getItem(LOGON_STORAGE) ?? ''
     } catch {
       return ''
+    }
+  }
+
+  /** Enforced unless the last session said otherwise: realism is the default. */
+  const storedAirspace = (): boolean => {
+    try {
+      return window.localStorage.getItem(AIRSPACE_STORAGE) !== '0'
+    } catch {
+      return true
     }
   }
 
@@ -838,11 +866,13 @@ function start(
       `Map: ${airport.geography.map((f) => f.label.toLowerCase()).join(', ')}`,
     ],
     initials: storedInitials(),
+    enforceAirspace: storedAirspace(),
     onSettings: () => menu.setOpen(true),
     onLogon: (details) => {
       controller = details
       try {
         window.localStorage.setItem(LOGON_STORAGE, details.initials)
+        window.localStorage.setItem(AIRSPACE_STORAGE, details.enforceAirspace ? '1' : '0')
       } catch {
         /* preference simply will not persist */
       }

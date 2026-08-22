@@ -478,6 +478,20 @@ steer it straight back onto the localiser.
 
 ### The area of responsibility
 
+**It can be switched off, at logon.** A checkbox beside the initials, and the absence of a
+boundary travels as a **null `ControlZone`** -- `isInSector`, `enterSector`, `departureOf` and
+`ApplyContext` all take `ControlZone | null`, and null reads as "no boundary". That keeps the
+rule in one place instead of threading an `if (enforcing)` through every caller, and it makes
+the two behaviours fall out for free: with everything counted as inside, `entered` is true from
+the moment an arrival appears, so the dimming stops and the strip bay's inbound group empties
+without either of them being told about the setting.
+
+It lives at logon rather than in the options menu because it is a rule for the shift, not a
+display choice: changing it half way through would change what the controller is allowed to do
+to traffic they are already working. It is derived from `controller` rather than kept as a
+second flag, so there is one answer and a saved session carries it without being asked to --
+which is what took the save format to version 2.
+
 **It is the published airspace, not a radius.** `sim/airspace.ts` holds closed rings with
 vertical limits; `deriveControlZone` in the loader picks them out of the parsed airspace by a
 rule rather than a list of names: **any controlled volume that is a closed ring in the file and

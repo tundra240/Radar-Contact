@@ -45,8 +45,11 @@ export interface ApplyContext {
   /**
    * The area of responsibility: the published controlled airspace. Nothing
    * outside it takes a clearance, at any level.
+   *
+   * Null for a session flown with the boundary switched off, where the
+   * whole picture is the controller's.
    */
-  readonly controlZone: ControlZone
+  readonly controlZone: ControlZone | null
 }
 
 export type Outcome =
@@ -136,7 +139,7 @@ function altitude(ft: number, a: Aircraft, ctx: ApplyContext): Outcome {
   // is outside. Refusing here rather than accepting and losing the aircraft
   // two minutes later is the same principle as every other refusal in this
   // module: say no rather than do something surprising.
-  if (!isControlled(ctx.controlZone, a.pos, to)) {
+  if (ctx.controlZone !== null && !isControlled(ctx.controlZone, a.pos, to)) {
     return {
       ok: false,
       reason: `${to} ft is below controlled airspace where ${a.callsign} is`,

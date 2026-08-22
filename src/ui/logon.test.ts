@@ -17,7 +17,8 @@ interface Harness {
 
 let live: Logon | null = null
 
-function mountLogon(initials = ''): Harness {
+function mountLogon(over: { initials?: string; enforceAirspace?: boolean } = {}): Harness {
+  const initials = over.initials ?? ''
   document.body.innerHTML = ''
   const mount = document.createElement('div')
   document.body.appendChild(mount)
@@ -36,6 +37,7 @@ function mountLogon(initials = ''): Harness {
     position: 'EGLL_APP',
     facts: ['Sector 40 NM -- 1500 to FL150', '4 holds -- LAM BIG BNN OCK'],
     initials,
+    enforceAirspace: over.enforceAirspace ?? true,
     onLogon: (d) => h.logons.push(d),
     onSettings: () => {
       h.settings += 1
@@ -111,7 +113,7 @@ describe('the main menu', () => {
     // something is being checked, and nothing is.
     const { mount } = mountLogon()
     expect(mount.querySelector('input[type="password"]')).toBeNull()
-    expect(mount.querySelectorAll('input')).toHaveLength(1)
+    expect(mount.querySelectorAll('input[type="text"]')).toHaveLength(1)
     expect(mount.querySelector('.logon-foot')?.textContent).toMatch(/no password/i)
   })
 
@@ -119,7 +121,7 @@ describe('the main menu', () => {
     const h = mountLogon()
     type(input(h.mount), 'NF')
     button(h.mount, '.logon-go').click()
-    expect(h.logons).toEqual([{ initials: 'NF', position: 'EGLL_APP' }])
+    expect(h.logons).toEqual([{ initials: 'NF', position: 'EGLL_APP', enforceAirspace: true }])
   })
 
   it('upper-cases and filters as you type', () => {
@@ -153,21 +155,25 @@ describe('the main menu', () => {
     const h = mountLogon()
     type(input(h.mount), 'ABC')
     input(h.mount).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-    expect(h.logons).toEqual([{ initials: 'ABC', position: 'EGLL_APP' }])
+    expect(h.logons).toEqual([{ initials: 'ABC', position: 'EGLL_APP', enforceAirspace: true }])
   })
 
   it('prefills remembered initials', () => {
-    expect(input(mountLogon('NF').mount).value).toBe('NF')
+    expect(input(mountLogon({ initials: 'NF' }).mount).value).toBe('NF')
   })
 
-  it('hands settings off rather than reimplementing them', () => {
+  it('hands the display settings off rather than reimplementing them', () => {
     // The same options menu the scope uses, so a change made before logging
     // on is the change that applies afterwards.
     const h = mountLogon()
     button(h.mount, '.logon-settings').click()
     expect(h.settings).toBe(1)
-    // And it does not carry its own copies of those controls.
-    expect(h.mount.querySelectorAll('input[type="checkbox"]')).toHaveLength(0)
+    // The one checkbox it does carry is the airspace rule, which is a
+    // decision about the shift rather than about the display -- and cannot
+    // be changed part way through one.
+    const boxes = h.mount.querySelectorAll('input[type="checkbox"]')
+    expect(boxes).toHaveLength(1)
+    expect(boxes[0]?.className).toContain('logon-toggle')
   })
 
   it('stays up until it is dismissed', () => {
@@ -184,5 +190,40 @@ describe('the main menu', () => {
     const el = mountLogon().mount.querySelector('.logon')
     expect(el?.getAttribute('role')).toBe('dialog')
     expect(el?.getAttribute('aria-modal')).toBe('true')
+  })
+})
+
+describe('the airspace rule', () => {
+  const toggle = (mount: HTMLElement): HTMLInputElement => {
+    const box = mount.querySelector<HTMLInputElement>('.logon-toggle')
+    if (!box) throw new Error('no airspace toggle')
+    return box
+  }
+
+  it('starts from what the last session chose', () => {
+    expect(toggle(mountLogon({ enforceAirspace: true }).mount).checked).toBe(true)
+    expect(toggle(mountLogon({ enforceAirspace: false }).mount).checked).toBe(false)
+  })
+
+  it('reports it with the logon, on', () => {
+    const h = mountLogon()
+    type(input(h.mount), 'NF')
+    button(h.mount, '.logon-go').click()
+    expect(h.logons[0]?.enforceAirspace).toBe(true)
+  })
+
+  it('reports it with the logon, off', () => {
+    const h = mountLogon()
+    type(input(h.mount), 'NF')
+    toggle(h.mount).checked = false
+    button(h.mount, '.logon-go').click()
+    expect(h.logons[0]?.enforceAirspace).toBe(false)
+  })
+
+  it('says what it means, since it changes how the game plays', () => {
+    const { mount } = mountLogon()
+    const row = mount.querySelector('.logon-check')
+    expect(row?.getAttribute('title') ?? '').toMatch(/dimmed/i)
+    expect(mount.querySelector('.logon-note')?.textContent ?? '').toMatch(/inside/i)
   })
 })

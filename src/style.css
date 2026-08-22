@@ -671,6 +671,36 @@ canvas {
   color: var(--chrome-dim);
 }
 
+/* A rule for the shift rather than a display setting, so it sits in the
+   logon window with the initials and not in the options menu. */
+.logon-check {
+  cursor: pointer;
+}
+
+.logon-toggle {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--title-bar);
+  cursor: pointer;
+}
+
+.logon-toggle:focus-visible {
+  outline: 1px dotted var(--chrome-text);
+  outline-offset: 2px;
+}
+
+/* Says what the checkbox means, in the same breath as the checkbox. The
+   flex-basis on .logon-field > span would otherwise pad this out to the
+   width of a label column it is not in. */
+.logon-check .logon-note {
+  flex: 1 1 auto;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--chrome-dim);
+}
+
 .logon-input,
 .logon-output {
   flex: 1 1 auto;

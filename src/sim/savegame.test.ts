@@ -54,7 +54,7 @@ function game(over: Partial<SavedGame> = {}): SavedGame {
     savedAt: '2026-08-22T09:41:00.000Z',
     clock: { ticks: 4321, elapsedSeconds: 216.05, timeOfDaySeconds: 43416.05 },
     score: { points: 350, landed: 4, lost: 1 },
-    controller: { initials: 'NF', position: 'EGLL_APP' },
+    controller: { initials: 'NF', position: 'EGLL_APP', enforceAirspace: true },
     selected: 'BAW178',
     traffic: [aircraft()],
     spawner: {
@@ -278,7 +278,7 @@ describe('resuming a real session', () => {
       savedAt: '2026-08-22T09:41:00.000Z',
       clock: clockAt(original.ticks),
       score: { points: 0, landed: 0, lost: 0 },
-      controller: { initials: 'NF', position: 'EGLL_APP' },
+      controller: { initials: 'NF', position: 'EGLL_APP', enforceAirspace: true },
       selected: null,
       traffic: [...original.traffic],
       spawner: original.spawner.snapshot(),
@@ -367,5 +367,39 @@ describe('resuming a real session', () => {
     // A save taken part way through a fifty second gap resumes with what
     // was left of it, not with a fresh one.
     expect(resumed.nextInSeconds()).toBeCloseTo(world.spawner.nextInSeconds(), 9)
+  })
+})
+
+describe('the airspace rule in a save', () => {
+  it('carries whether the session enforced it', () => {
+    for (const enforceAirspace of [true, false]) {
+      const out = read(
+        game({ controller: { initials: 'NF', position: 'EGLL_APP', enforceAirspace } }),
+      )
+      expect(out.ok).toBe(true)
+      if (!out.ok) return
+      expect(out.game.controller?.enforceAirspace, String(enforceAirspace)).toBe(enforceAirspace)
+    }
+  })
+
+  it('refuses a save that predates the setting', () => {
+    // Version 1 had no airspace rule in it, so loading one would have to
+    // guess which way the session was flown. Refusing says so instead.
+    const old = JSON.parse(serialise(game())) as Record<string, unknown>
+    old['version'] = 1
+    delete (old['controller'] as Record<string, unknown>)['enforceAirspace']
+    const out = parseSavedGame(JSON.stringify(old), AT)
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect(out.reason).toContain('version 1')
+  })
+
+  it('refuses a current save that has lost the setting', () => {
+    const broken = JSON.parse(serialise(game())) as Record<string, unknown>
+    delete (broken['controller'] as Record<string, unknown>)['enforceAirspace']
+    const out = parseSavedGame(JSON.stringify(broken), AT)
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect(out.reason).toBe('save.controller.enforceAirspace is not a boolean')
   })
 })

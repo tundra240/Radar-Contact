@@ -24,6 +24,17 @@ export interface LogonDetails {
   readonly initials: string
   /** The position being worked, e.g. EGLL_APP. */
   readonly position: string
+  /**
+   * Whether the area of responsibility is enforced for this session.
+   *
+   * On, the published airspace is the job: the rest of the map is dimmed
+   * and traffic outside the boundary can be watched and not touched. Off,
+   * the whole picture is live and anything on it will take a clearance.
+   *
+   * A rule for the shift rather than a display setting, which is why it is
+   * chosen here and not in the options menu.
+   */
+  readonly enforceAirspace: boolean
 }
 
 export interface LogonOptions {
@@ -36,6 +47,8 @@ export interface LogonOptions {
   readonly facts: readonly string[]
   /** Remembered initials, prefilled. */
   readonly initials: string
+  /** Remembered airspace setting, preselected. */
+  readonly enforceAirspace: boolean
   readonly onLogon: (details: LogonDetails) => void
   readonly onSettings: () => void
 }
@@ -55,6 +68,7 @@ export class Logon {
   private readonly opts: LogonOptions
   private readonly root: HTMLDivElement
   private readonly input: HTMLInputElement
+  private readonly airspace: HTMLInputElement
   private readonly error: HTMLParagraphElement
   private readonly goButton: HTMLButtonElement
   private isVisible = true
@@ -118,6 +132,24 @@ export class Logon {
     this.input.setAttribute('aria-label', 'Operating initials')
     idRow.append(idLabel, this.input)
     fields.appendChild(idRow)
+
+    const airspaceRow = document.createElement('label')
+    airspaceRow.className = 'logon-field logon-check'
+    const airspaceLabel = document.createElement('span')
+    airspaceLabel.textContent = 'Airspace'
+    this.airspace = document.createElement('input')
+    this.airspace.type = 'checkbox'
+    this.airspace.className = 'logon-toggle'
+    this.airspace.checked = opts.enforceAirspace
+    this.airspace.setAttribute('aria-label', 'Enforce the area of responsibility')
+    const airspaceNote = document.createElement('span')
+    airspaceNote.className = 'logon-note'
+    airspaceNote.textContent = 'Only control traffic inside it'
+    airspaceRow.append(airspaceLabel, this.airspace, airspaceNote)
+    airspaceRow.title =
+      'On: the map outside your airspace is dimmed and traffic is not yours until it crosses in. ' +
+      'Off: the whole picture is live and anything on it takes a clearance.'
+    fields.appendChild(airspaceRow)
 
     const posRow = document.createElement('div')
     posRow.className = 'logon-field'
@@ -221,7 +253,11 @@ export class Logon {
       return
     }
     this.clearError()
-    this.opts.onLogon({ initials, position: this.opts.position })
+    this.opts.onLogon({
+      initials,
+      position: this.opts.position,
+      enforceAirspace: this.airspace.checked,
+    })
   }
 
   private showError(message: string): void {

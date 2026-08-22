@@ -10,6 +10,7 @@ import {
   advancePosition,
   departureOf,
   enterSector,
+  isInSector,
   distanceFlownNM,
   stepAircraft,
   stepTrail,
@@ -502,5 +503,41 @@ describe('enterSector', () => {
   it('leaves an aircraft alone once it has entered', () => {
     const inside = ac({ pos: { x: 10, y: 0 }, entered: true })
     expect(enterSector(inside, ZONE)).toBe(inside)
+  })
+})
+
+describe('a session with no area of responsibility', () => {
+  /**
+   * The airspace rule can be switched off at logon, and the absence of a
+   * boundary travels as a null zone. That keeps the rule in one place
+   * rather than spreading an "if enforcing" through every caller -- so what
+   * has to be true is that null behaves as no boundary everywhere.
+   */
+  const ac = (over: Partial<Aircraft>): Aircraft => ({ ...base, ...over })
+
+  it('counts every aircraft as controllable', () => {
+    const far = ac({ pos: { x: 500, y: 500 }, altFt: 40000 })
+    expect(isInSector(far, null)).toBe(true)
+  })
+
+  it('marks an arrival as entered the moment it appears', () => {
+    const coming = ac({ pos: { x: 500, y: 0 }, entered: false })
+    expect(enterSector(coming, null).entered).toBe(true)
+  })
+
+  it('never reports one as having left the airspace', () => {
+    const far = ac({ pos: { x: 500, y: 0 }, entered: true })
+    expect(departureOf(far, null)).toBeNull()
+  })
+
+  it('still reports a landing', () => {
+    expect(departureOf(ac({ navMode: 'LANDED' }), null)).toBe('landed')
+  })
+
+  it('still lets go at the outer limit, or nothing would ever leave', () => {
+    // Without a boundary the outer limit is the only thing that bounds the
+    // world, so it has to keep working.
+    const far = ac({ pos: { x: 500, y: 0 }, entered: true })
+    expect(departureOf(far, null, 100)).toBe('left')
   })
 })

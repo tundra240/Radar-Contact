@@ -57,6 +57,11 @@ export interface ScopeStatus {
   }
   /** Who is working the position, or null before anyone has logged on. */
   readonly controller: { readonly initials: string; readonly position: string } | null
+  /**
+   * Whether this session enforces the area of responsibility. Off, the map
+   * is drawn whole: there is no boundary to be on the wrong side of.
+   */
+  readonly airspaceEnforced: boolean
 }
 
 /** The traffic picture: everything on frequency, and which one is selected. */
@@ -133,8 +138,8 @@ export function drawScope(
 
   // Everything the controller does not own, dimmed -- drawn after the whole
   // map so that all of it is covered, and before the traffic so that none of
-  // the traffic is.
-  drawOutside(g, cam, airport)
+  // the traffic is. Nothing to dim in a session without a boundary.
+  if (status.airspaceEnforced) drawOutside(g, cam, airport)
 
   // The edge of the area of responsibility is not optional: it is the
   // boundary of the job, not decoration. Drawn over the wash so that the

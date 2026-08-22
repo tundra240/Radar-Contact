@@ -36,11 +36,18 @@ import type { WakeCategory } from '../data/airport'
  * Bumped whenever the shape changes. An older save is refused rather than
  * guessed at -- there is no migration path worth the bugs it would carry.
  */
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 export interface SavedController {
   readonly initials: string
   readonly position: string
+  /**
+   * Whether that session was flown with the area of responsibility
+   * enforced. Part of who is on position rather than a separate setting,
+   * because it is a rule for the shift and it was chosen at logon with the
+   * initials.
+   */
+  readonly enforceAirspace: boolean
 }
 
 export interface SavedGame {
@@ -173,6 +180,16 @@ function parseAircraft(v: unknown, path: string): Aircraft {
   }
 }
 
+function parseController(v: unknown): SavedController | null {
+  if (v === null) return null
+  const o = obj(v, 'save.controller')
+  return {
+    initials: str(o['initials'], 'save.controller.initials'),
+    position: str(o['position'], 'save.controller.position'),
+    enforceAirspace: bool(o['enforceAirspace'], 'save.controller.enforceAirspace'),
+  }
+}
+
 function parseSpawner(v: unknown, path: string): SpawnerState {
   const o = obj(v, path)
   return {
@@ -254,13 +271,7 @@ export function parseSavedGame(text: string, at: { readonly airport: string }): 
           landed: num(score['landed'], 'save.score.landed'),
           lost: num(score['lost'], 'save.score.lost'),
         },
-        controller:
-          controller === null
-            ? null
-            : {
-                initials: str(obj(controller, 'save.controller')['initials'], 'save.controller.initials'),
-                position: str(obj(controller, 'save.controller')['position'], 'save.controller.position'),
-              },
+        controller: parseController(controller),
         selected: nullableStr(o['selected'], 'save.selected'),
         traffic: arr(o['traffic'], 'save.traffic').map((a, i) =>
           parseAircraft(a, `save.traffic[${i}]`),

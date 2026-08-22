@@ -43,6 +43,17 @@ around the field. Try to descend an aircraft below the base of the TMA further o
 the clearance is refused: *"below controlled airspace where it is"*. That is not the game being
 awkward, it is where the airspace stops.
 
+**You can turn all of that off.** There is an **Airspace** checkbox in the logon window, next to
+your initials. Leave it ticked and the above is how it works. Untick it and the whole picture is
+yours: nothing is dimmed, and every aircraft on the display will take a clearance wherever it is
+and whatever level it is at. Traffic still appears out beyond the boundary and still flies in --
+you simply do not have to wait for it.
+
+It is a decision about the shift rather than a display setting, which is why it lives at logon
+and not in the options menu: switching it half way through would change what you are allowed to
+do to traffic you are already working. Whichever way you set it is remembered for next time, and
+a saved session remembers which way it was flown.
+
 Arrivals appear **outside** that circle and fly in. You can see them coming for a couple of
 minutes, read their callsign and type off the tag, and start planning where they fit. What you
 cannot do is touch them: any clearance for an aircraft outside the boundary is refused with
