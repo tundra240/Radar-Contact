@@ -55,6 +55,12 @@ function game(over: Partial<SavedGame> = {}): SavedGame {
     savedAt: '2026-08-22T09:41:00.000Z',
     clock: { ticks: 4321, elapsedSeconds: 216.05, timeOfDaySeconds: 43416.05 },
     score: { points: 350, landed: 4, lost: 1 },
+    atis: {
+      letterIndex: 0,
+      arrivals: ['27R', '27L'],
+      departures: ['27R'],
+      wind: { fromDeg: 250, speedKts: 18 },
+    },
     controller: { initials: 'NF', position: 'EGLL_APP', enforceAirspace: true },
     selected: 'BAW178',
     traffic: [aircraft()],
@@ -275,6 +281,12 @@ describe('resuming a real session', () => {
 
     const saved = serialise({
       version: SAVE_VERSION,
+      atis: {
+        letterIndex: 1,
+        arrivals: ['09L', '09R'],
+        departures: ['09R'],
+        wind: { fromDeg: 70, speedKts: 12 },
+      },
       airport: airport.icao,
       savedAt: '2026-08-22T09:41:00.000Z',
       clock: clockAt(original.ticks),

@@ -1,10 +1,21 @@
 import './style.css'
 import { Camera } from './core/camera'
-import { loadAirport, outerLimitNM } from './data/airport'
+import { loadAirport, outerLimitNM, type Runway } from './data/airport'
 import egllConfig from './data/egll.json'
 import { departureOf, enterSector, isInSector, stepAircraft } from './sim/aircraft'
 import { NO_SCORE, pointsFor, scoreDeparture, type Score } from './sim/score'
+import type { Vec2NM } from './core/geo'
 import { intensityAt, isAvoidable, makeWeather, windVector } from './sim/weather'
+import {
+  amend,
+  feedPlan,
+  letterOf,
+  makeAtis,
+  windString,
+  type Atis,
+  type RunwayFace,
+} from './sim/atis'
+import { AtisBar } from './ui/atisbar'
 import { makeRng } from './core/rng'
 import type { ControlZone } from './sim/airspace'
 import {
@@ -386,6 +397,20 @@ function start(
   })
   controls.appendChild(wxButton)
 
+  /**
+   * The ATIS ticker, left of the menu: what the field is doing, always on
+   * screen. Pressing it opens the runway selection, because the thing you
+   * read and the thing you change are the same subject and splitting them
+   * across two controls would only invite them to disagree.
+   *
+   * `setAtis` is declared further down; the closure resolves at click time,
+   * by which point it exists.
+   */
+  const atisBar = new AtisBar({
+    mount: controls,
+    onChange: (next) => setAtis(next),
+  })
+
   const menu = new Menu({
     mount: controls,
     onOverlays: (next) => setOverlays(next),
@@ -421,6 +446,11 @@ function start(
     title: `${airport.icao} approach -- how to play`,
     note: 'This guide is TUTORIAL.md, rendered as it stands. Edit that file to change it.',
   })
+
+  /** The ticker, and the runway buttons behind it. */
+  const paintAtis = (): void => {
+    atisBar.paint({ atis, runways: runwayFaces })
+  }
 
   /** The button reads as pressed in while the layer is on. */
   const paintWx = (): void => {
@@ -528,7 +558,10 @@ function start(
     },
     approachFor: (runway) => {
       const wanted = runway.trim().toUpperCase()
-      const rwy = airport.arrivalRunways.find((r) => r.id.toUpperCase() === wanted)
+      // The runways in use, not the ones the config opened with: clearing
+      // an approach for a runway the field has stopped landing on has to be
+      // refused, exactly as it would be on frequency.
+      const rwy = landingRunways().find((r) => r.id.toUpperCase() === wanted)
       if (rwy === undefined || !rwy.ils.available) return null
       // The whole geometry travels with the clearance, so the flight model
       // never has to reach back into the airport for it.
@@ -625,7 +658,7 @@ function start(
       speedLimitKts: airport.sector.speedLimitKts,
       speedLimitBelowFt: airport.sector.speedLimitBelowFt,
     },
-    runways: airport.arrivalRunways.map((r) => r.id),
+    runways: () => atis.arrivals,
     holdFixes: airport.navaids.filter((n) => n.hold !== null).map((n) => n.name),
     envelopeFor: applyContext.envelopeFor,
   })
@@ -648,6 +681,7 @@ function start(
       savedAt: new Date().toISOString(),
       clock: loop.clock,
       score,
+      atis,
       controller,
       selected,
       traffic: [...traffic],
@@ -691,6 +725,9 @@ function start(
     const game = read.game
     traffic = game.traffic
     score = game.score
+    // Restored wholesale rather than amended: this is not a new broadcast,
+    // it is the one that was in force, letter included.
+    atis = game.atis
     selected = game.selected
     controller = game.controller
     spawner.restore(game.spawner)
@@ -710,6 +747,7 @@ function start(
     tagMenu.close()
     menu.setOpen(false)
     syncStrips()
+    paintAtis()
     paintMenu()
     requestDraw()
 
@@ -731,6 +769,42 @@ function start(
    * loose counters, so what a session came to is a single thing.
    */
   /**
+   * The ATIS: what the field is doing now.
+   *
+   * The config's active runways are only the opening position. From here on
+   * this value is the authority -- the localisers drawn, the approaches that
+   * can be cleared, the runway each entry fix feeds and the wind the
+   * aircraft fly in all read off it, so there is one answer to "which way is
+   * the field landing" rather than four that can drift apart.
+   */
+  let atis: Atis = makeAtis({
+    arrivals: airport.arrivalRunways.map((r) => r.id),
+    // No departures are modelled yet, so the field departs off the same
+    // direction it lands on. Carried and broadcast because a controller
+    // reads it, and because departures will need somewhere to look.
+    departures: airport.arrivalRunways.map((r) => r.id),
+    wind: airport.weather.wind,
+  })
+
+  /** Every runway the field has, in the shape the ATIS reasons about. */
+  const runwayFaces: readonly RunwayFace[] = airport.runways.map((r) => ({
+    id: r.id,
+    bearingTrue: r.bearingTrue,
+    thresholdNM: r.thresholdNM,
+  }))
+
+  /** The full runway records for the ones currently landing. */
+  const landingRunways = (): Runway[] =>
+    airport.runways.filter((r) => atis.arrivals.includes(r.id))
+
+  /** Which runway each entry fix is feeding, under the current ATIS. */
+  const feeds = (): Map<string, string> =>
+    feedPlan(
+      airport.holdingFixes.map((n) => ({ name: n.name, posNM: n.posNM })),
+      runwayFaces.filter((r) => atis.arrivals.includes(r.id)),
+    )
+
+  /**
    * The weather, from the session seed.
    *
    * A separate stream from the traffic, so the two are not correlated -- a
@@ -745,8 +819,65 @@ function start(
   /**
    * The wind the aircraft feel: a fraction of the reported wind. See
    * windEffect in data/airport.ts for why it is not all of it.
+   *
+   * Read off the ATIS rather than the config, so that amending the
+   * broadcast is the one way the wind ever changes.
    */
-  const windKts = windVector(airport.weather.wind, airport.weather.windEffect)
+  const windKts = (): Vec2NM => windVector(atis.wind, airport.weather.windEffect)
+
+  /**
+   * Amend the ATIS, and deal with what that means for traffic already
+   * flying.
+   *
+   * An approach clearance carries its own geometry, so an aircraft cleared
+   * for 27R would happily keep flying 27R after the field turned round --
+   * straight at everything now departing the other way. So a clearance for
+   * a runway that is no longer in use is withdrawn, and the aircraft holds
+   * the heading it had. That is what would happen on frequency, and it is
+   * the controller's problem to re-sequence, which is the point.
+   */
+  const setAtis = (next: {
+    readonly arrivals: readonly string[]
+    readonly departures: readonly string[]
+  }): void => {
+    const before = atis
+    atis = amend(atis, next)
+    // Reference equality: `amend` returns the same value when nothing
+    // changed, and an ATIS that did not change should not be announced.
+    if (atis === before) return
+
+    const stale = traffic.filter(
+      (a) => a.clearedApproach !== null && !atis.arrivals.includes(a.clearedApproach.runway),
+    )
+    if (stale.length > 0) {
+      traffic = traffic.map((a) =>
+        a.clearedApproach !== null && !atis.arrivals.includes(a.clearedApproach.runway)
+          ? { ...a, clearedApproach: null, navMode: 'VECTOR' as const, clearedHdg: a.hdg }
+          : a,
+      )
+      for (const a of stale) {
+        commandConsole.write(
+          `${a.callsign} approach cancelled, runway change, maintain heading`,
+          'reject',
+        )
+      }
+    }
+
+    commandConsole.write(
+      `ATIS Information ${letterOf(atis)}. Landing ${atis.arrivals.join(' and ') || 'nothing'}` +
+        `, wind ${windString(atis.wind)}.`,
+    )
+    const plan = feeds()
+    if (plan.size > 0) {
+      commandConsole.write(
+        'Feeds: ' +
+          [...plan.entries()].map(([fix, runway]) => `${fix} to ${runway}`).join(', '),
+      )
+    }
+
+    paintAtis()
+    requestDraw()
+  }
 
   /** Callsigns in weather bad enough that the crew would ask to leave it. */
   const inWeather = (): ReadonlySet<string> => {
@@ -801,7 +932,7 @@ function start(
       // miles outside the only boundary the scope draws.
       const flown: Aircraft[] = []
       for (const stepped of traffic.map((x) =>
-        stepAircraft(x, dt, clock.elapsedSeconds, windKts),
+        stepAircraft(x, dt, clock.elapsedSeconds, windKts()),
       )) {
         // Crossing in is what makes an aircraft the controller's, and it is
         // the only moment at which that changes.
@@ -860,6 +991,7 @@ function start(
         overlays,
         {
           clock: loop.clock,
+          arrivalRunways: landingRunways(),
           speed: loop.speed,
           paused: loop.paused,
           traffic: {
@@ -968,6 +1100,7 @@ function start(
 
   syncStrips()
   paintWx()
+  paintAtis()
   paintMenu()
   resize()
   // Stopped until someone logs on, so the shift starts when the controller

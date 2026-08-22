@@ -1292,3 +1292,93 @@ canvas {
   color: var(--title-text);
   text-decoration: underline;
 }
+
+/* ---- the ATIS ticker -------------------------------------------------- */
+
+/* The broadcast sits on the toolbar and is also the control that changes it:
+   the thing you read and the thing you press are the same subject, and two
+   controls for it would only invite them to disagree. Wider than the other
+   toggles because it carries a whole line of information rather than a word,
+   and the letters are not spaced out for the same reason. */
+.atis {
+  position: relative;
+}
+
+.atis-button {
+  min-width: 0;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.atis-panel {
+  min-width: 260px;
+}
+
+.atis-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Each direction the field can land in, with the wind on it, so the choice
+   is informed rather than a guess at which way is into wind today. */
+.atis-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  text-align: left;
+  color: var(--accent);
+  background: var(--face);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+  cursor: pointer;
+}
+
+.atis-choice-name {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.atis-choice-wind {
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pressed in, the same affordance as the WX button. */
+.atis-choice.is-on {
+  color: var(--title-text);
+  background: var(--title-bar);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+/* A direction you would be landing downwind on. Marked on the button rather
+   than only in the advice line, because the button is where the mistake
+   would be made. */
+.atis-choice.is-tailwind .atis-choice-wind {
+  color: var(--warn);
+  opacity: 1;
+}
+
+.atis-advice {
+  margin: 8px 0 0;
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
+.atis-advice.is-warning {
+  color: var(--warn);
+  opacity: 1;
+}

@@ -638,6 +638,41 @@ becomes an exercise in anticipating the wind. A third gives a twelve-knot spread
 and downwind legs and about two degrees of drift -- visible on the readouts, correctable with a
 nudge.
 
+### The ATIS
+
+`sim/atis.ts` and `ui/atisbar.ts`.
+
+**One authority for which way the field is landing.** The config records what the field was set to
+at load; the ATIS records what it is set to now, and the two part company the moment anybody flips
+it. Everything that needs the answer -- the localisers drawn, the approaches that can be cleared,
+the runway each entry fix feeds, the wind the aircraft fly in -- reads the ATIS, so there is one
+answer rather than four that can drift apart. That is why `ScopeStatus` carries
+`arrivalRunways` rather than the renderer reaching into `airport.arrivalRunways`, and why the
+tag menu's runway list became a function: it is asked at the moment the menu opens, so it cannot
+offer a clearance that is now refused.
+
+**A value, not a controller object.** `amend` returns a new ATIS, and returns *the same one* when
+nothing actually changed -- so the letter never advances on a non-change, and callers can test by
+reference whether a broadcast happened. The letter exists to tell a pilot their information is
+stale; moving it for an amendment that amended nothing would be a lie.
+
+**Hysteresis on the flip.** `shouldFlip` asks whether the tailwind has passed
+`TAILWIND_LIMIT_KTS`, not whether some other direction is better. Asking the second question
+would set the field flipping every time the wind wandered across the beam.
+
+**The feed is geometric, not a table.** `feedRunway` gives a fix the active runway whose extended
+centreline it lies closest to. For a pair of parallels that is simply the one on its side of the
+field, which at Heathrow reproduces the real pairing -- BNN and LAM north, BIG and OCK south --
+and turns itself over when the field flips, because 27R and 09L are one strip and 27L and 09R the
+other. A lookup table would have to be written per airport and would go stale; this needs no
+configuration at all.
+
+**Withdrawing a clearance.** An approach clearance carries its own geometry, so an aircraft cleared
+for 27R would keep flying 27R after the field turned round -- into everything now going the other
+way. So a clearance for a runway no longer in use is withdrawn and the aircraft holds its heading.
+The save format went to version 4 to carry the ATIS: which way the field was landing is a decision
+the controller made, not something derivable from the rest of the save.
+
 ### Weather on the scope
 
 `sim/weather.ts` and `render/layers/weather.ts`.

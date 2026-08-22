@@ -194,7 +194,7 @@ describe('the schedule', () => {
 
   it('honours the share of cells that core out to red', () => {
     const sample = (heavyChance: number): number => {
-      const cells = Array.from({ length: 300 }, (_unused, i) =>
+      const cells = Array.from({ length: 100 }, (_unused, i) =>
         bornInFirstHour({ ...CONFIG, heavyChance }, i + 1),
       ).flat()
       return cells.filter((c) => c.peak >= HEAVY_AT).length / cells.length

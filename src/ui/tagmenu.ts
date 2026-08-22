@@ -41,8 +41,15 @@ export interface TagMenuOptions {
   readonly mount: HTMLElement
   readonly onCommand: CommandSink
   readonly limits: TagLimits
-  /** Runways an approach can be cleared for. */
-  readonly runways: readonly string[]
+  /**
+   * Runways an approach can be cleared for.
+   *
+   * Asked for each time the menu is opened rather than fixed at
+   * construction, because the ATIS can flip the field mid-session and a
+   * menu still offering the old direction would be offering a clearance
+   * that is now refused.
+   */
+  readonly runways: () => readonly string[]
   /** Fixes with a published hold. */
   readonly holdFixes: readonly string[]
   /** Null for a type the config does not carry, which widens the choices. */
@@ -339,7 +346,7 @@ export class TagMenu {
       case 'approach':
         return [
           this.back(),
-          ...this.opts.runways.map((runway) =>
+          ...this.opts.runways().map((runway) =>
             this.row(`ILS ${runway}`, () =>
               this.issue({ kind: 'approach', callsign: a.callsign, runway }),
             ),

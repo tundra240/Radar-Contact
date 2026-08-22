@@ -51,6 +51,22 @@ const OUTSIDE_VEIL = 0.55
  */
 export interface ScopeStatus {
   readonly clock: Clock
+  /**
+   * The runways arrivals are landing on, per the ATIS -- not the ones the
+   * config was loaded with.
+   *
+   * The config records what the field was set to at load; the ATIS records
+   * what it is set to now, and the two differ the moment anybody flips it.
+   * Drawing a localiser for a runway nobody is landing on is how a
+   * controller ends up vectoring to the wrong one.
+   */
+  readonly arrivalRunways: readonly Runway[]
+  /**
+   * Note what is NOT here: the information letter. It is on the ATIS ticker
+   * in the toolbar, and this bar drops cells from the right when it runs out
+   * of room -- so adding one costs a readout that was already earning its
+   * place. The letter would have pushed the airspace provenance off.
+   */
   readonly speed: Speed
   readonly paused: boolean
   readonly traffic: {
@@ -155,7 +171,7 @@ export function drawScope(
     )
   }
   if (overlays.centrelines) {
-    for (const rwy of airport.arrivalRunways) {
+    for (const rwy of status.arrivalRunways) {
       drawExtendedCentreline(g, cam, rwy)
     }
   }
@@ -1112,7 +1128,7 @@ function drawStatusBar(
       value: status.paused ? 'PAUSED' : formatSpeed(status.speed),
     },
     { label: 'RANGE', value: `${cam.rangeNM.toFixed(0)} NM` },
-    { label: 'ARR', value: airport.arrivalRunways.map((r) => r.id).join('/') },
+    { label: 'ARR', value: status.arrivalRunways.map((r) => r.id).join('/') || '--' },
     { label: 'RWY', value: `x${scale.toFixed(1)}` },
     {
       label: 'TRAFFIC',

@@ -135,6 +135,14 @@ how far through the current gap the spawner is -- and a load puts it back and pa
 read the picture first. One slot; a save from another airport or another version is refused
 rather than loaded.
 
+**There is an ATIS, and you can turn the field round.** The broadcast sits on the toolbar --
+information letter, runways in use, wind -- and pressing it opens the runway selection, with the
+headwind and crosswind on each direction so the choice is informed. Change the direction and the
+scope follows: the localisers move to the runways now being landed on, an approach for a runway
+nobody is using is refused, the entry fixes re-pair to the runway on their side of the field, and
+the letter steps on to the next one. Anything already cleared for a runway that has gone out of
+use has its approach cancelled and holds its heading, which is your problem to re-sequence.
+
 **The weather is alive.** A cell forms every fifteen minutes or so, grows, drifts, reshapes
 itself and collapses inside a quarter of an hour. Most of it is a green shower; a **red core is in
 front of you when you log on about one session in twenty-seven**, which is what makes one worth

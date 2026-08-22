@@ -156,6 +156,7 @@ const CALM = makeWeather(makeRng(1), {
 
 const STATUS: ScopeStatus = {
   clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 12 * 3600 },
+  arrivalRunways: airport.arrivalRunways,
   speed: 1,
   paused: false,
   traffic: { spawned: 0, held: 0, landed: 0, left: 0, points: 0 },
@@ -834,6 +835,7 @@ describe('the clock and rate readouts', () => {
 
   it('shows simulated time of day, not the wall clock', () => {
     const labels = withStatus({
+      ...STATUS,
       clock: { ticks: 1200, elapsedSeconds: 60, timeOfDaySeconds: 13 * 3600 + 61 },
       speed: 1,
       paused: false,
@@ -854,6 +856,7 @@ describe('the clock and rate readouts', () => {
       [4, 'x4'],
     ] as const) {
       const labels = withStatus({
+      ...STATUS,
         clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
         speed,
         paused: false,
@@ -870,6 +873,7 @@ describe('the clock and rate readouts', () => {
   it('says PAUSED rather than a rate when stopped', () => {
     // Otherwise a paused scope showing x4 invites the obvious mistake.
     const labels = withStatus({
+      ...STATUS,
       clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
       speed: 4,
       paused: true,
@@ -891,6 +895,7 @@ describe('the traffic readout', () => {
     cam.setViewport(1200, 700)
     const rec = recorder()
     drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.full, {
+      ...STATUS,
       clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 0 },
       speed: 1,
       paused: false,
@@ -1426,5 +1431,50 @@ describe('the weather layer', () => {
 
   it('hands the canvas back opaque with the cells drawn', () => {
     expect(draw().alphaAtEnd()).toBe(1)
+  })
+})
+
+describe('the runway configuration', () => {
+  const draw = (ids: readonly string[]) => {
+    const cam = new Camera({ x: 0, y: 0 }, 30, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.full, {
+      ...STATUS,
+      arrivalRunways: airport.runways.filter((r) => ids.includes(r.id)),
+    })
+    return rec.texts.map((t) => t.s)
+  }
+
+  it('draws a localiser for each runway being landed on', () => {
+    const labels = draw(['27R', '27L'])
+    expect(labels).toContain('FAF 27R')
+    expect(labels).toContain('FAF 27L')
+  })
+
+  it('moves the localisers when the field turns round', () => {
+    // The whole point of the ATIS being the authority rather than the
+    // config: a beam left drawn on a runway nobody is landing on is how a
+    // controller ends up vectoring to the wrong end of the field.
+    const labels = draw(['09L', '09R'])
+    expect(labels).toContain('FAF 09L')
+    expect(labels).toContain('FAF 09R')
+    expect(labels).not.toContain('FAF 27R')
+    expect(labels).not.toContain('FAF 27L')
+  })
+
+  it('draws none at all when nothing is landing', () => {
+    const labels = draw([])
+    expect(labels.some((s) => s.startsWith('FAF'))).toBe(false)
+  })
+
+  it('names the runways in use on the status bar', () => {
+    expect(draw(['09L', '09R'])).toContain('09L/09R')
+    expect(draw(['27R', '27L'])).toContain('27R/27L')
+  })
+
+  it('says so on the status bar when the field is landing nothing', () => {
+    // Rather than an empty cell, which reads as a display fault.
+    expect(draw([])).toContain('--')
   })
 })

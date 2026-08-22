@@ -76,6 +76,28 @@ There is one slot, and saving overwrites it. A save is tied to the airport it wa
 to this version of the game; anything else is refused with a reason rather than loaded into a
 world it does not fit.
 
+### The ATIS
+
+The strip on the toolbar reading **INFO A  ARR 27R/27L  DEP 27R  250/18** is the ATIS: the
+information letter, what is landing, what is departing, and the wind. Press it to change the
+runway configuration.
+
+Each direction is offered with the wind on it -- `head 16  cross 8` -- so you can see which way
+is into wind rather than working it out. A direction you would be landing downwind on marks its
+tailwind in red, and the line underneath tells you when the tailwind has passed the 5 kt limit and
+which direction to go to instead.
+
+**Turning the field round changes the scope, not just the sign.** The extended centrelines move to
+the runways now in use. An approach for a runway nobody is landing on is refused. Each entry fix
+re-pairs to the runway on its side of the field -- BNN and LAM to the northern one, BIG and OCK to
+the southern -- so with 27s in use BNN feeds 27R, and with 09s it feeds 09L, which is the same
+strip from the other end. And the letter steps on: Information Alpha becomes Bravo, because a
+pilot needs to know the information they have is stale.
+
+**It is not free.** Anything already cleared for an approach on a runway that has gone out of use
+has that clearance cancelled and holds its present heading. The console names each one. Flipping
+the field with six aircraft on final is a decision, not a button.
+
 ### Weather
 
 **Weather comes and goes all shift.** A cell forms every fifteen minutes or so, builds, drifts,

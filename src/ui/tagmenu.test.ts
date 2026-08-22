@@ -260,7 +260,7 @@ describe('TagMenu', () => {
       mount,
       onCommand: (c) => issued.push(c),
       limits: LIMITS,
-      runways: ['27R', '27L'],
+      runways: () => ['27R', '27L'],
       holdFixes: ['LAM', 'BIG', 'BNN', 'OCK'],
       envelopeFor,
     })
@@ -328,7 +328,7 @@ describe('TagMenu pages', () => {
       mount,
       onCommand: (c) => issued.push(c),
       limits: LIMITS,
-      runways: ['27R', '27L'],
+      runways: () => ['27R', '27L'],
       holdFixes: ['LAM', 'BIG'],
       envelopeFor,
     })
@@ -421,7 +421,7 @@ describe('TagMenu dismissal and placement', () => {
       mount,
       onCommand: (c) => issued.push(c),
       limits: LIMITS,
-      runways: ['27R'],
+      runways: () => ['27R'],
       holdFixes: ['LAM'],
       envelopeFor,
     })

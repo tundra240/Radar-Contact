@@ -1,5 +1,6 @@
 import type { Clock } from '../core/loop'
 import type { Vec2NM } from '../core/geo'
+import type { Atis } from './atis'
 import type { Score } from './score'
 import type { SpawnerState } from './spawner'
 import type {
@@ -36,7 +37,7 @@ import type { WakeCategory } from '../data/airport'
  * Bumped whenever the shape changes. An older save is refused rather than
  * guessed at -- there is no migration path worth the bugs it would carry.
  */
-export const SAVE_VERSION = 3
+export const SAVE_VERSION = 4
 
 export interface SavedController {
   readonly initials: string
@@ -58,6 +59,15 @@ export interface SavedGame {
   readonly savedAt: string
   readonly clock: Clock
   readonly score: Score
+  /**
+   * What the field was doing: the runways in use, the wind and the letter.
+   *
+   * Saved because it is a decision the controller made, not something
+   * derivable. Reload a session flown on 09s and getting 27s back -- with
+   * every aircraft positioned for the other end -- would be a different
+   * session from the one that was saved.
+   */
+  readonly atis: Atis
   readonly controller: SavedController | null
   readonly selected: string | null
   readonly traffic: readonly Aircraft[]
@@ -181,6 +191,24 @@ function parseAircraft(v: unknown, path: string): Aircraft {
   }
 }
 
+function parseAtis(v: unknown, path: string): Atis {
+  const o = obj(v, path)
+  const wind = obj(o['wind'], `${path}.wind`)
+  return {
+    letterIndex: num(o['letterIndex'], `${path}.letterIndex`),
+    arrivals: arr(o['arrivals'], `${path}.arrivals`).map((r, i) =>
+      str(r, `${path}.arrivals[${i}]`),
+    ),
+    departures: arr(o['departures'], `${path}.departures`).map((r, i) =>
+      str(r, `${path}.departures[${i}]`),
+    ),
+    wind: {
+      fromDeg: num(wind['fromDeg'], `${path}.wind.fromDeg`),
+      speedKts: num(wind['speedKts'], `${path}.wind.speedKts`),
+    },
+  }
+}
+
 function parseController(v: unknown): SavedController | null {
   if (v === null) return null
   const o = obj(v, 'save.controller')
@@ -272,6 +300,7 @@ export function parseSavedGame(text: string, at: { readonly airport: string }): 
           landed: num(score['landed'], 'save.score.landed'),
           lost: num(score['lost'], 'save.score.lost'),
         },
+        atis: parseAtis(o['atis'], 'save.atis'),
         controller: parseController(controller),
         selected: nullableStr(o['selected'], 'save.selected'),
         traffic: arr(o['traffic'], 'save.traffic').map((a, i) =>
