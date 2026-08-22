@@ -63,6 +63,7 @@ export interface MenuOptions {
  * silently unlabelled button.
  */
 const SCHEME_NOTE: Record<PaletteName, string> = {
+  tracon: 'A present-day terminal radar position',
   beige: 'A Windows-2000-era desktop with a tan tube',
   dark: 'A colour CRT',
   amber: 'A monochrome amber phosphor tube',

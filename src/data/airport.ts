@@ -1342,6 +1342,11 @@ const CONTROLLED_CLASSES = new Set(['A', 'B', 'C', 'D', 'E'])
    anything.                                                             */
 const NOMINAL_LEG_NM = 4.2
 const NOMINAL_WIDTH_NM = 2.6
+/**
+ * How far to the wrong side of the inbound track joining the pattern takes
+ * an aeroplane. Measured off the flight model rather than guessed.
+ */
+const ENTRY_SWING_NM = 2
 /** Candidate inbound tracks, in degrees. Five is finer than the question. */
 const ORIENTATION_STEP_DEG = 5
 
@@ -1354,15 +1359,46 @@ function patternFits(
 ): boolean {
   const outbound = normalizeHeading(inboundTrue + 180)
   const across = normalizeHeading(inboundTrue + (turns === 'right' ? 90 : -90))
-  // The corners and the middles of the racetrack, plus a mile of slack at
-  // the far end for the reversal itself.
-  for (const along of [0, NOMINAL_LEG_NM / 2, NOMINAL_LEG_NM, NOMINAL_LEG_NM + 1]) {
-    for (const side of [0, NOMINAL_WIDTH_NM / 2, NOMINAL_WIDTH_NM]) {
-      const at = advance(advance(posNM, outbound, along), across, side)
-      if (!isWithinFootprint(zone, at)) return false
-    }
+  for (const [along, side] of patternSamples()) {
+    const at = advance(advance(posNM, outbound, along), across, side)
+    if (!isWithinFootprint(zone, at)) return false
   }
   return true
+}
+
+/**
+ * Points on the flown pattern, as offsets from the fix: along the outbound
+ * track, and across it towards the turn.
+ *
+ * A racetrack is not a rectangle and this used to sample one -- along from
+ * the fix outwards, across on the turn side only. Everything an aeroplane
+ * does outside that box went unchecked, so orientations whose flown path
+ * left the airspace passed the test. At Bovingdon the worst of it was half a
+ * mile beyond the fix and nearly two miles to the wrong side, both of them
+ * places the old sample set never looked.
+ *
+ * So the shape sampled is the one that is actually flown: the two legs, the
+ * half-width bulge of each reversal past the end it turns at, and the swing
+ * to the far side that joining the pattern costs. Deliberately not a
+ * bounding box round all of that -- the corners of one are places no
+ * aeroplane ever reaches, and rejecting orientations for them cost Lambourne
+ * a perfectly good hold.
+ */
+function patternSamples(): readonly (readonly [number, number])[] {
+  const L = NOMINAL_LEG_NM
+  const W = NOMINAL_WIDTH_NM
+  const turn = W / 2
+
+  const samples: (readonly [number, number])[] = []
+  // The rectangle between the two legs.
+  for (const along of [0, L / 2, L]) {
+    for (const side of [0, W / 2, W]) samples.push([along, side])
+  }
+  // The reversals, which bulge a turn radius past the end they happen at.
+  samples.push([-turn, turn], [L + turn, turn])
+  // And the swing to the far side on the way in, which happens at the fix.
+  samples.push([0, -ENTRY_SWING_NM], [-turn / 2, -ENTRY_SWING_NM])
+  return samples
 }
 
 /**

@@ -209,6 +209,18 @@ export function drawScope(
 function drawScreenFrame(g: CanvasRenderingContext2D, cam: Camera): void {
   const w = cam.width
   const h = cam.height
+
+  if (theme.chromeStyle === 'flat') {
+    // One hairline all the way round. A modern display is a rectangle of
+    // glass in a bezel, not a window recessed into a desktop.
+    g.fillStyle = theme.chromeLight
+    g.fillRect(0, 0, w, 1)
+    g.fillRect(0, h - 1, w, 1)
+    g.fillRect(0, 0, 1, h)
+    g.fillRect(w - 1, 0, 1, h)
+    return
+  }
+
   g.fillStyle = theme.chromeShadow
   g.fillRect(0, 0, w, 2)
   g.fillRect(0, 0, 2, h)
@@ -1022,9 +1034,17 @@ function drawExtendedCentreline(
 const charW = (px: number): number => px * 0.6
 
 /**
- * A raised or sunken panel face, the way interfaces of this era drew
- * every control: a one-pixel light edge along the top and left, a shadow
- * edge along the bottom and right, and the two swapped to read as sunken.
+ * A panel face, drawn in whichever idiom the active scheme declares.
+ *
+ * Under `bevel` it is the turn-of-the-century control: a one-pixel light
+ * edge along the top and left, a shadow edge along the bottom and right,
+ * the two swapped to read as sunken.
+ *
+ * Under `flat` it is a fill and a single hairline border, which is what
+ * every screen in a modern control room does -- there is no raised and no
+ * sunken, only a panel and a well, told apart by how dark the fill is.
+ * Drawing a bevel there would be the one detail that gave the whole thing
+ * away.
  */
 function bevel(
   g: CanvasRenderingContext2D,
@@ -1036,6 +1056,15 @@ function bevel(
 ): void {
   g.fillStyle = sunken ? theme.chromeWell : theme.chromeFace
   g.fillRect(x, y, w, h)
+
+  if (theme.chromeStyle === 'flat') {
+    g.fillStyle = theme.chromeLight
+    g.fillRect(x, y, w, 1)
+    g.fillRect(x, y + h - 1, w, 1)
+    g.fillRect(x, y, 1, h)
+    g.fillRect(x + w - 1, y, 1, h)
+    return
+  }
 
   const topLeft = sunken ? theme.chromeShadow : theme.chromeLight
   const bottomRight = sunken ? theme.chromeLight : theme.chromeShadow
@@ -1060,8 +1089,123 @@ function drawHud(
   overlays: Overlays,
   status: ScopeStatus,
 ): void {
+  if (theme.chromeStyle === 'flat') {
+    drawPositionStrip(g, airport, status)
+    drawDataTable(g, cam, statusCells(cam, airport, overlays, status))
+    return
+  }
   drawTitleBlock(g, airport, status)
   drawStatusBar(g, cam, airport, overlays, status)
+}
+
+/* ----------------------------------------------------- the flat idiom
+
+   A modern position does not float bevelled panels over the picture with a
+   margin round them. Its furniture is flush to the edges of the glass, in
+   as little height as the type will allow, and its readouts are a ruled
+   table with a header row -- which is the single most recognisable thing
+   about the photographs this is modelled on.                            */
+
+/**
+ * Who is working, top left, hard against the frame.
+ *
+ * Two lines and no margin. The period version is a raised panel inset ten
+ * pixels from the corner; this is flush, because a modern display gives its
+ * whole area to the picture and lets the furniture sit on the edge of it.
+ */
+function drawPositionStrip(
+  g: CanvasRenderingContext2D,
+  airport: Airport,
+  status: ScopeStatus,
+): void {
+  const title = `${airport.icao} APPROACH`
+  const under = status.controller
+    ? `${status.controller.position}  ${status.controller.initials}`
+    : airport.name.toUpperCase()
+
+  const titleSize = 11
+  const underSize = 9
+  const w =
+    Math.ceil(
+      Math.max(charW(titleSize) * title.length, charW(underSize) * under.length),
+    ) + 16
+  const h = 28
+
+  g.fillStyle = theme.chromeFace
+  g.fillRect(1, 1, w, h)
+  g.fillStyle = theme.chromeLight
+  g.fillRect(1, 1 + h, w + 1, 1)
+  g.fillRect(1 + w, 1, 1, h)
+
+  g.textAlign = 'left'
+  g.textBaseline = 'top'
+  g.font = fonts.bold(titleSize)
+  g.fillStyle = theme.accent
+  g.fillText(title, 8, 4)
+  g.font = fonts.label(underSize)
+  g.fillStyle = theme.chromeDim
+  g.fillText(under, 8, 17)
+}
+
+/**
+ * The readouts as a ruled table: a row of column headings over a row of
+ * values, full width along the bottom of the glass.
+ *
+ * The period version puts each readout in its own sunken cell with a gap
+ * between them. This is one continuous table with hairline dividers, which
+ * is both denser and what the real thing does -- and it means a value can
+ * be read straight down from the word that names it rather than sideways
+ * from a label beside it.
+ */
+function drawDataTable(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  cells: readonly Cell[],
+): void {
+  const headSize = 8
+  const valueSize = 10
+  const padX = 7
+  const headTop = 4
+  const valueTop = 15
+  const h = 29
+
+  const left = 1
+  const right = cam.width - 1
+  const top = cam.height - h - 1
+
+  g.fillStyle = theme.chromeFace
+  g.fillRect(left, top, right - left, h)
+  g.fillStyle = theme.chromeLight
+  g.fillRect(left, top, right - left, 1)
+
+  g.textAlign = 'left'
+  g.textBaseline = 'top'
+
+  let x = left
+  for (const cell of cells) {
+    const w =
+      Math.ceil(
+        Math.max(charW(headSize) * cell.label.length, charW(valueSize) * cell.value.length),
+      ) +
+      padX * 2
+    // Columns are dropped from the right rather than allowed to spill, so
+    // the ones that matter most survive a narrow window.
+    if (x + w > right) break
+
+    if (x > left) {
+      g.fillStyle = theme.chromeLight
+      g.fillRect(x, top + 1, 1, h - 1)
+    }
+
+    g.font = fonts.label(headSize)
+    g.fillStyle = theme.chromeDim
+    g.fillText(cell.label, x + padX, top + headTop)
+    g.font = fonts.label(valueSize)
+    g.fillStyle = theme.accent
+    g.fillText(cell.value, x + padX, top + valueTop)
+
+    x += w
+  }
 }
 
 function drawTitleBlock(
@@ -1099,13 +1243,16 @@ function drawTitleBlock(
   }
 }
 
-function drawStatusBar(
-  g: CanvasRenderingContext2D,
+/**
+ * What the readouts say. Shared by both idioms, so the period bar and the
+ * modern table can never end up showing different things.
+ */
+function statusCells(
   cam: Camera,
   airport: Airport,
   overlays: Overlays,
   status: ScopeStatus,
-): void {
+): readonly Cell[] {
   const shown = airport.airspace.filter((v) =>
     v.airspaceClass === 'G' ? overlays.trafficZones : overlays.airspace,
   )
@@ -1116,7 +1263,7 @@ function drawStatusBar(
   // Ordered by what a controller needs when the window is too narrow to
   // hold them all: cells are dropped from the right, so the ones that
   // matter most come first.
-  const cells: Cell[] = [
+  return [
     // Simulated time, not wall clock: it runs at whatever rate the loop is
     // set to, and stops when the loop is paused.
     { label: 'TIME', value: formatClock(status.clock.timeOfDaySeconds) },
@@ -1148,6 +1295,16 @@ function drawStatusBar(
     },
     { label: 'AIRSPACE', value: `${published} PUBLISHED / ${ruled} RULE-DERIVED` },
   ]
+}
+
+function drawStatusBar(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  airport: Airport,
+  overlays: Overlays,
+  status: ScopeStatus,
+): void {
+  const cells = statusCells(cam, airport, overlays, status)
 
   const barH = 24
   const top = cam.height - barH - 8

@@ -10,7 +10,7 @@ import {
   type Navaid,
   type Runway,
 } from './airport'
-import { advance, angleDelta, bearingDeg, distanceNM, type Vec2NM } from '../core/geo'
+import { angleDelta, bearingDeg, distanceNM, type Vec2NM } from '../core/geo'
 
 const egll: Airport = loadAirport(raw)
 
@@ -163,8 +163,11 @@ describe('feeder fixes', () => {
       expect(f.hold.inboundIsDerived, f.name).toBe(true)
       expect(f.hold.turns).toBe('right')
     }
-    // Three of the four stacks have room to face the field exactly.
-    for (const name of ['BIG', 'OCK']) {
+    // Three of the four stacks have room to face the field exactly, and do.
+    // Lambourne is in this list deliberately: it used to be turned five
+    // degrees off by a fit test that rejected it for a corner no aeroplane
+    // reaches.
+    for (const name of ['LAM', 'BIG', 'OCK']) {
       const fix = egll.holdingFixes.find((x) => x.name === name)
       const towardField = bearingDeg(fix?.posNM ?? { x: 0, y: 0 }, { x: 0, y: 0 })
       expect(Math.abs(angleDelta(fix?.hold?.inboundTrue ?? 0, towardField)), name)
@@ -185,19 +188,23 @@ describe('feeder fixes', () => {
   it('keeps every hold pattern inside the airspace', () => {
     // The regression that matters: an aircraft holding where it was sent
     // must not drift out of controlled airspace and be lost for nothing.
-    const NOMINAL_LEG_NM = 4.2
-    const NOMINAL_WIDTH_NM = 2.6
+    //
+    // Checked against the racetrack that is actually flown and drawn, point
+    // by point, rather than against a rectangle around it. A rectangle has
+    // corners a mile beyond the reversal that no aeroplane ever reaches, and
+    // rejecting an orientation for one of those cost Lambourne a hold that
+    // was perfectly good.
     for (const fix of egll.holdingFixes) {
       const hold = fix.hold
       if (!hold) continue
-      const outbound = (hold.inboundTrue + 180) % 360
-      const across = (hold.inboundTrue + (hold.turns === 'right' ? 90 : -90) + 360) % 360
-      for (const along of [0, NOMINAL_LEG_NM, NOMINAL_LEG_NM + 1]) {
-        for (const side of [0, NOMINAL_WIDTH_NM]) {
-          const at = advance(advance(fix.posNM, outbound, along), across, side)
-          expect(isWithinFootprint(egll.controlZone, at), `${fix.name} at ${along}/${side}`)
-            .toBe(true)
-        }
+      const ring = holdRacetrack(fix.posNM, hold, {
+        speedKts: egll.render.holdSpeedKts,
+      })
+      for (const at of ring) {
+        expect(
+          isWithinFootprint(egll.controlZone, at),
+          `${fix.name} inbound ${hold.inboundTrue.toFixed(0)}`,
+        ).toBe(true)
       }
     }
   })

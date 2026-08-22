@@ -3,8 +3,10 @@
    question 1 -- the background shade is not settled yet). */
 
 :root {
-  --bg-page: #c3bda9;
-  --fg-page: #1c1a14;
+  /* First-paint fallbacks, matching the shipped scheme so the page does not
+     flash a different colour before main.ts applies the palette. */
+  --bg-page: #0b171c;
+  --fg-page: #cfe6e2;
   font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace;
 }
 
@@ -67,20 +69,20 @@ canvas {
 
 :root {
   /* Fallbacks only: main.ts overwrites these from the active palette on
-     start-up. They match the beige scheme so the first paint is not a
+     start-up. They match the shipped scheme so the first paint is not a
      different colour from the second. */
-  --face: #d4d0c8;
-  --well: #aeaaa2;
-  --bevel-light: #ffffff;
-  --bevel-shadow: #808080;
-  --chrome-text: #1c1a14;
-  --chrome-dim: #565246;
-  --accent: #006e74;
-  --title-bar: #000080;
-  --title-text: #ffffff;
-  --hold: #8a4e00;
-  --established: #006e74;
-  --warn: #a00000;
+  --face: #132229;
+  --well: #081216;
+  --bevel-light: #2f5560;
+  --bevel-shadow: #04090b;
+  --chrome-text: #cfe6e2;
+  --chrome-dim: #8fb0ac;
+  --accent: #4fe3ab;
+  --title-bar: #1b4a4a;
+  --title-text: #a8f0d4;
+  --hold: #f0b45c;
+  --established: #7fe8d0;
+  --warn: #ff5b5b;
 }
 
 /* The corner of the scope: the guide and the menu, each a button with its
@@ -1429,4 +1431,202 @@ canvas {
   box-shadow:
     inset 1px 1px 0 0 var(--bevel-shadow),
     inset -1px -1px 0 0 var(--bevel-light);
+/* ------------------------------------------------- flat chrome (tracon)
+
+   The modern control-room look. Everything above draws its edges as a
+   two-tone bevel; under [data-chrome="flat"] every one of those becomes a
+   single hairline in --bevel-light and a change of fill, which is the one
+   structural difference between a 1999 desktop and a 2015 radar position.
+
+   Written as overrides rather than as a second set of rules so the layout,
+   spacing and type stay in exactly one place: only the edges change.     */
+
+:root[data-chrome='flat'] .mode-toggle,
+:root[data-chrome='flat'] .menu-panel,
+:root[data-chrome='flat'] .menu-key,
+:root[data-chrome='flat'] .menu-preset,
+:root[data-chrome='flat'] .logon-window,
+:root[data-chrome='flat'] .logon-button,
+:root[data-chrome='flat'] .logon-input,
+:root[data-chrome='flat'] .logon-output,
+:root[data-chrome='flat'] .logon-facts,
+:root[data-chrome='flat'] .guide-window,
+:root[data-chrome='flat'] .guide-close,
+:root[data-chrome='flat'] .guide-body,
+:root[data-chrome='flat'] .guide-note,
+:root[data-chrome='flat'] .guide-body pre,
+:root[data-chrome='flat'] .guide-body blockquote,
+:root[data-chrome='flat'] .console,
+:root[data-chrome='flat'] .console-log,
+:root[data-chrome='flat'] .console-input,
+:root[data-chrome='flat'] .strip-bay,
+:root[data-chrome='flat'] .strip-list,
+:root[data-chrome='flat'] .strip,
+:root[data-chrome='flat'] .strip-action,
+:root[data-chrome='flat'] .strip-collapse,
+:root[data-chrome='flat'] .menu-row input,
+:root[data-chrome='flat'] .logon-toggle,
+:root[data-chrome='flat'] .tagmenu,
+:root[data-chrome='flat'] .tagmenu-key,
+:root[data-chrome='flat'] .tagmenu-readout,
+:root[data-chrome='flat'] .strip-count,
+:root[data-chrome='flat'] .strip-empty {
+  box-shadow: none;
+  border: 1px solid var(--bevel-light);
+}
+
+/* Pressing something in this idiom moves the fill, not the edges. */
+:root[data-chrome='flat'] .mode-toggle:active,
+:root[data-chrome='flat'] .menu-key:active,
+:root[data-chrome='flat'] .menu-preset:active,
+:root[data-chrome='flat'] .logon-button:active,
+:root[data-chrome='flat'] .guide-close:active,
+:root[data-chrome='flat'] .strip-action:active,
+:root[data-chrome='flat'] .tagmenu-key:active,
+:root[data-chrome='flat'] .strip-collapse:active {
+  box-shadow: none;
+  background: var(--well);
+}
+
+:root[data-chrome='flat'] .mode-toggle:active {
+  /* The bevel version nudges the label to fake the press; flat does not. */
+  padding: 6px 12px;
+}
+
+/* The selected rate and scheme: filled, not pressed in. */
+:root[data-chrome='flat'] .menu-key.is-active {
+  box-shadow: none;
+  border-color: var(--accent);
+  color: var(--title-text);
+  background: var(--title-bar);
+}
+
+/* A groove between sections becomes one line. */
+:root[data-chrome='flat'] .menu-section + .menu-section {
+  box-shadow: none;
+  border-top: 1px solid var(--bevel-light);
+}
+
+:root[data-chrome='flat'] .guide-body hr {
+  box-shadow: none;
+}
+
+/* Indicators: a filled square inside a hairline box rather than a well. */
+:root[data-chrome='flat'] .menu-row input:checked,
+:root[data-chrome='flat'] .logon-toggle:checked {
+  background:
+    linear-gradient(var(--accent), var(--accent)) center / 8px 8px no-repeat,
+    transparent;
+}
+
+/* Caption strips lose the saturated fill and become a ruled heading, which
+   is how a modern panel titles itself. */
+:root[data-chrome='flat'] .menu-title,
+:root[data-chrome='flat'] .logon-caption,
+:root[data-chrome='flat'] .guide-caption,
+:root[data-chrome='flat'] .strip-bay-title {
+  color: var(--accent);
+  background: transparent;
+  border-bottom: 1px solid var(--bevel-light);
+}
+
+/* Toolbar toggles that stay pressed while their panel is open: in the flat
+   idiom the fill carries that, not an inverted bevel. */
+:root[data-chrome='flat'] .menu-button.is-open,
+:root[data-chrome='flat'] .guide-button.is-open,
+:root[data-chrome='flat'] .wx-button.is-on {
+  box-shadow: none;
+  border-color: var(--accent);
+  color: var(--title-text);
+  background: var(--title-bar);
+}
+
+/* -------------------------------------------- flat idiom: the furniture
+
+   Colour and edges are only half of it. A modern position also arranges
+   its controls differently: a narrow rail of small square buttons down the
+   left of the glass rather than a row of wide labelled buttons floating in
+   the top-right corner, panels flush to the rail instead of hanging under
+   it, and less padding everywhere.                                       */
+
+:root[data-chrome='flat'] .controls {
+  top: 36px;
+  right: auto;
+  left: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+}
+
+/* Square, dense, and no letter-spaced caption -- a tool button, not a
+   dialog button. */
+:root[data-chrome='flat'] .mode-toggle {
+  min-width: 0;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  font-size: 8px;
+  letter-spacing: 0.02em;
+  /* One shared edge down the rail rather than four round every button. */
+  border-width: 1px 1px 0 0;
+}
+
+:root[data-chrome='flat'] .controls > :last-child .mode-toggle {
+  border-bottom-width: 1px;
+}
+
+:root[data-chrome='flat'] .guide-button {
+  width: 30px;
+  font-size: 13px;
+}
+
+/* Panels open beside the rail, not under it. */
+:root[data-chrome='flat'] .menu-panel {
+  top: 0;
+  right: auto;
+  left: calc(100% + 1px);
+  width: 196px;
+}
+
+:root[data-chrome='flat'] .guide-window {
+  right: auto;
+  left: 32px;
+  top: 36px;
+}
+
+/* Tighter type and spacing throughout the panels: a modern readout fits
+   more in less, and the period generosity is what reads as old. */
+:root[data-chrome='flat'] .menu-title,
+:root[data-chrome='flat'] .logon-caption,
+:root[data-chrome='flat'] .guide-caption,
+:root[data-chrome='flat'] .strip-bay-title {
+  margin: 0;
+  padding: 4px 7px;
+  font-weight: normal;
+  letter-spacing: 0.14em;
+}
+
+:root[data-chrome='flat'] .menu-section {
+  padding: 6px 6px 0;
+}
+
+:root[data-chrome='flat'] .menu-row,
+:root[data-chrome='flat'] .logon-field {
+  letter-spacing: 0.02em;
+}
+
+/* The strip bay as a dense ruled list rather than a stack of raised cards,
+   which is how a modern flight list is drawn. */
+:root[data-chrome='flat'] .strip {
+  border-width: 0 0 1px 0;
+}
+
+:root[data-chrome='flat'] .strip-list {
+  border-width: 0;
+}
+
+/* The console sits flush under the picture with one rule between them. */
+:root[data-chrome='flat'] .console {
+  border-width: 1px 0 0 0;
+  padding: 5px 6px 6px;
 }
