@@ -5,6 +5,11 @@ node_modules/
 dist/
 dist-ssr/
 
+# Claude Code session state and its worktrees. The worktrees in here are
+# whole checkouts with their own .git, so git records one as a gitlink if it
+# is ever staged -- which then fights any merge that touches the path.
+.claude/
+
 # vite / vitest caches
 .vite/
 coverage/
