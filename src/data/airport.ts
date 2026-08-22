@@ -346,6 +346,15 @@ export interface Sector {
   readonly rangeRingsNM: readonly number[]
   readonly defaultRangeNM: number
   readonly activeArrivalRunways: readonly string[]
+  /**
+   * Runways departures use.
+   *
+   * Separate from the arrival runways because at most real fields they are
+   * different ones: Heathrow runs segregated, landing on one and departing
+   * off the other, and swaps them at three in the afternoon so the same
+   * neighbourhoods are not overflown all day.
+   */
+  readonly activeDepartureRunways: readonly string[]
 }
 
 export interface AircraftType {
@@ -398,6 +407,7 @@ export interface Airport {
   readonly holdingFixes: readonly Navaid[]
   /** Runways currently accepting arrivals, in config order. */
   readonly arrivalRunways: readonly Runway[]
+  readonly departureRunways: readonly Runway[]
   /** Every notable world-space point, for an initial camera fit. */
   readonly extentNM: readonly Vec2NM[]
 }
@@ -580,16 +590,18 @@ export function loadAirport(raw: unknown): Airport {
   const mapBoundsNM = boundsOfGeography(geography)
 
   const byId = new Map(runways.map((r) => [r.id, r]))
-  const arrivalRunways = sector.activeArrivalRunways.map((id) => {
-    const rwy = byId.get(id)
-    if (!rwy) {
-      throw new ConfigError(
-        'sector.activeArrivalRunways',
-        `references unknown runway "${id}"`,
-      )
-    }
-    return rwy
-  })
+  const resolve = (ids: readonly string[], field: string): Runway[] =>
+    ids.map((id) => {
+      const rwy = byId.get(id)
+      if (!rwy) throw new ConfigError(field, `references unknown runway "${id}"`)
+      return rwy
+    })
+
+  const arrivalRunways = resolve(sector.activeArrivalRunways, 'sector.activeArrivalRunways')
+  const departureRunways = resolve(
+    sector.activeDepartureRunways,
+    'sector.activeDepartureRunways',
+  )
 
   // Note what is NOT here: the geography. The extent drives the initial
   // camera fit, and a coastline reaching 200 NM out would open the scope to
@@ -622,6 +634,7 @@ export function loadAirport(raw: unknown): Airport {
     aircraftTypes,
     holdingFixes: navaids.filter((n) => n.hold !== null),
     arrivalRunways,
+    departureRunways,
     extentNM,
   }
 }
@@ -634,6 +647,15 @@ function parseSector(raw: unknown): Sector {
   const active = arr(o['activeArrivalRunways'], 'sector.activeArrivalRunways').map((v, i) =>
     str(v, `sector.activeArrivalRunways[${i}]`),
   )
+  // Optional, and empty is a legitimate answer: a field with nothing
+  // departing is an arrivals-only position, which is what this was before
+  // departure runways existed at all.
+  const departing =
+    o['activeDepartureRunways'] === undefined
+      ? []
+      : arr(o['activeDepartureRunways'], 'sector.activeDepartureRunways').map((v, i) =>
+          str(v, `sector.activeDepartureRunways[${i}]`),
+        )
 
   const ceilingFt = num(o['ceilingFt'], 'sector.ceilingFt')
   const floorFt = num(o['floorFt'], 'sector.floorFt')
@@ -651,6 +673,7 @@ function parseSector(raw: unknown): Sector {
     rangeRingsNM: rings,
     defaultRangeNM: num(o['defaultRangeNM'], 'sector.defaultRangeNM'),
     activeArrivalRunways: active,
+    activeDepartureRunways: departing,
   }
 }
 

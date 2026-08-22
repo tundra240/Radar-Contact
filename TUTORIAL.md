@@ -91,7 +91,20 @@ WIND  250/18
 It is a board rather than a menu, so it stays up while you work -- clicking on the scope does not
 dismiss it. Press ATIS again to put it away, and it will be however you left it next time.
 
-The runway selection is on the board. Each direction is offered with the wind on it -- `head 16  cross 8` -- so you can see which way
+**The field runs segregated**, which is what Heathrow does: one runway lands and the other
+departs, so an arrival is never waiting on a departure rolling down the same strip. Out of the box
+that is **27R landing, 27L departing** -- so everything you sequence is going to one runway, and
+the whole stream has to fit through it.
+
+The board has two rows. **Direction** turns the field round; **Operation** picks what it does in
+that direction -- `27R lands`, `27L lands`, or `Both land` for mixed mode, which doubles your
+landing capacity and is the exception rather than the norm.
+
+Turning the field round **keeps the operation**. If 27R is landing and 27L departing and you go to
+09s, you get 09L landing and 09R departing: the same two strips, from the other end. It does not
+quietly revert to everything landing.
+
+Each direction is offered with the wind on it -- `head 16  cross 8` -- so you can see which way
 is into wind rather than working it out. A direction you would be landing downwind on marks its
 tailwind in red, and the line underneath tells you when the tailwind has passed the 5 kt limit and
 which direction to go to instead.

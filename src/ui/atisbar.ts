@@ -1,13 +1,16 @@
 import {
   TAILWIND_LIMIT_KTS,
   bestDirection,
+  configurationsFor,
   crosswindKts,
   directionsOf,
+  flipTo,
   headwindKts,
   letterOf,
   shouldFlip,
   windString,
   type Atis,
+  type Configuration,
   type RunwayFace,
 } from '../sim/atis'
 
@@ -60,8 +63,8 @@ export class AtisBar {
   private readonly box: HTMLDivElement
   private readonly letterLine: HTMLDivElement
   private readonly values = new Map<string, HTMLSpanElement>()
-  private readonly arrivalRow: HTMLDivElement
-  private readonly departureRow: HTMLDivElement
+  private readonly directionRow: HTMLDivElement
+  private readonly configRow: HTMLDivElement
   private readonly advice: HTMLParagraphElement
 
   private isOpen: boolean
@@ -105,8 +108,8 @@ export class AtisBar {
     }
     this.box.appendChild(readout)
 
-    this.arrivalRow = this.section('Landing')
-    this.departureRow = this.section('Departing')
+    this.directionRow = this.section('Direction')
+    this.configRow = this.section('Operation')
 
     this.advice = document.createElement('p')
     this.advice.className = 'atis-advice'
@@ -153,20 +156,69 @@ export class AtisBar {
     this.values.get('DEP')!.textContent = atis.departures.join(' / ') || '--'
     this.values.get('WIND')!.textContent = windString(atis.wind)
 
-    const choices: Choice[] = directionsOf(state.runways).map((group) => ({
+    const groups = directionsOf(state.runways)
+    const choices: Choice[] = groups.map((group) => ({
       ids: group.map((r) => r.id),
       label: group.map((r) => r.id).join('/'),
       bearingTrue: group[0]!.bearingTrue,
     }))
 
-    this.fill(this.arrivalRow, choices, atis.arrivals, (ids) =>
-      this.opts.onChange({ arrivals: ids, departures: atis.departures }),
-    )
-    this.fill(this.departureRow, choices, atis.departures, (ids) =>
-      this.opts.onChange({ arrivals: atis.arrivals, departures: ids }),
-    )
+    // Which way the field faces. Turning it round keeps the operation --
+    // the same strips landing and departing, under the names they have from
+    // the other end -- rather than quietly reverting to everything landing.
+    this.fillDirections(choices, groups, state)
+
+    // And what it is doing in that direction: which runway lands, or both.
+    const inUse = groups.find((g) => g.some((r) => atis.arrivals.includes(r.id))) ?? []
+    this.fillConfigurations(configurationsFor(inUse), atis)
 
     this.paintAdvice(state, choices)
+  }
+
+  /** A button per band of the panel, sharing the bevelled look. */
+  private choiceButton(label: string, note: string, on: boolean): HTMLButtonElement {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'atis-choice'
+
+    const name = document.createElement('span')
+    name.className = 'atis-choice-name'
+    name.textContent = label
+    const detail = document.createElement('span')
+    detail.className = 'atis-choice-wind'
+    detail.textContent = note
+    button.append(name, detail)
+
+    button.classList.toggle('is-on', on)
+    button.setAttribute('aria-pressed', String(on))
+    return button
+  }
+
+  private fillConfigurations(configs: readonly Configuration[], atis: Atis): void {
+    this.configRow.replaceChildren()
+    for (const config of configs) {
+      const on =
+        config.arrivals.length === atis.arrivals.length &&
+        config.arrivals.every((id) => atis.arrivals.includes(id)) &&
+        config.departures.every((id) => atis.departures.includes(id))
+      const button = this.choiceButton(config.label, config.note, on)
+      button.addEventListener('click', () =>
+        this.opts.onChange({ arrivals: config.arrivals, departures: config.departures }),
+      )
+      this.configRow.appendChild(button)
+    }
+  }
+
+  private fillDirections(
+    choices: readonly Choice[],
+    groups: readonly (readonly RunwayFace[])[],
+    state: AtisBarState,
+  ): void {
+    this.fill(this.directionRow, choices, state.atis.arrivals, (ids) => {
+      const group = groups.find((g) => g.every((r) => ids.includes(r.id)))
+      if (group === undefined) return
+      this.opts.onChange(flipTo(state.atis, group, state.runways))
+    })
   }
 
   private fill(
@@ -197,7 +249,7 @@ export class AtisBar {
         `  cross ${cross.toFixed(0)}`
       button.append(name, detail)
 
-      const on = choice.ids.every((id) => active.includes(id)) && active.length > 0
+      const on = choice.ids.some((id) => active.includes(id)) && active.length > 0
       button.classList.toggle('is-on', on)
       button.setAttribute('aria-pressed', String(on))
       if (head < 0) button.classList.add('is-tailwind')

@@ -235,6 +235,132 @@ export function shouldFlip(
   return better.length > 0 && !better.every((id) => atis.arrivals.includes(id))
 }
 
+/* --------------------------------------------------- how the field runs */
+
+/**
+ * One way the field can be run in a given direction.
+ *
+ * Segregated -- one runway landing, another departing -- is what most large
+ * fields do and what Heathrow does all day: an arrival and a departure on
+ * the same strip have to be separated in time, and splitting them across two
+ * runways is most of where the capacity comes from. Mixed mode, everything
+ * landing on everything, is the exception rather than the default, so it is
+ * offered rather than assumed.
+ */
+export interface Configuration {
+  readonly arrivals: readonly string[]
+  readonly departures: readonly string[]
+  readonly label: string
+  readonly note: string
+  readonly segregated: boolean
+}
+
+/** The ways one direction of the field can be run, segregated first. */
+export function configurationsFor(direction: readonly RunwayFace[]): Configuration[] {
+  const ids = direction.map((r) => r.id)
+  if (ids.length === 0) return []
+  if (ids.length === 1) {
+    // A single strip has no choice to make: it does both, and everything
+    // waits its turn.
+    return [
+      {
+        arrivals: ids,
+        departures: ids,
+        label: `${ids[0]} both`,
+        note: 'single runway',
+        segregated: false,
+      },
+    ]
+  }
+
+  const out: Configuration[] = ids.map((id) => ({
+    arrivals: [id],
+    departures: ids.filter((other) => other !== id),
+    label: `${id} lands`,
+    note: `dep ${ids.filter((other) => other !== id).join('/')}`,
+    segregated: true,
+  }))
+
+  out.push({
+    arrivals: [...ids],
+    departures: [...ids],
+    label: 'Both land',
+    note: 'mixed mode',
+    segregated: false,
+  })
+  return out
+}
+
+/**
+ * The same strip, from the other end.
+ *
+ * Found by geometry rather than by naming convention: the face pointing
+ * roughly the opposite way whose centreline this one lies on. 27R and 09L
+ * are one piece of concrete, and a field that turns round keeps using the
+ * same concrete -- so an operation landing on the northern runway goes on
+ * landing on the northern runway, under its other name.
+ *
+ * Parsing "27R" into "09L" would work at Heathrow and break the first time
+ * an airport numbered its parallels differently at each end, which they do.
+ */
+export function reciprocalOf(
+  face: RunwayFace,
+  runways: readonly RunwayFace[],
+): RunwayFace | null {
+  let best: RunwayFace | null = null
+  let bestOff = Infinity
+  for (const other of runways) {
+    if (other.id === face.id) continue
+    // Facing back the other way, within a generous tolerance.
+    if (Math.abs(Math.abs(angleDelta(face.bearingTrue, other.bearingTrue)) - 180) > 20) continue
+    const off = crossTrackNM(other.thresholdNM, face)
+    if (off < bestOff) {
+      bestOff = off
+      best = other
+    }
+  }
+  return best
+}
+
+/**
+ * The same operation, run in a different direction.
+ *
+ * Keeps which strips are landing and departing and swaps the ends, so
+ * turning the field round does not silently change a segregated operation
+ * into a mixed one, or move the arrivals onto the other side of the field.
+ * Anything that cannot be mapped falls back to the whole direction landing,
+ * which is safe rather than clever.
+ */
+export function flipTo(
+  atis: Atis,
+  direction: readonly RunwayFace[],
+  runways: readonly RunwayFace[],
+): { readonly arrivals: readonly string[]; readonly departures: readonly string[] } {
+  const wanted = new Set(direction.map((r) => r.id))
+  const carry = (ids: readonly string[]): string[] | null => {
+    const out: string[] = []
+    for (const id of ids) {
+      // Already facing the right way: keep it.
+      if (wanted.has(id)) {
+        out.push(id)
+        continue
+      }
+      const face = runways.find((r) => r.id === id)
+      const other = face === undefined ? null : reciprocalOf(face, runways)
+      if (other === null || !wanted.has(other.id)) return null
+      out.push(other.id)
+    }
+    return out
+  }
+
+  const arrivals = carry(atis.arrivals)
+  const departures = carry(atis.departures)
+  if (arrivals === null || departures === null || arrivals.length === 0) {
+    return { arrivals: direction.map((r) => r.id), departures: direction.map((r) => r.id) }
+  }
+  return { arrivals, departures }
+}
+
 /* ------------------------------------------------------------ the feed */
 
 /**

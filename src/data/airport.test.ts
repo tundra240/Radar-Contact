@@ -39,8 +39,11 @@ describe('EGLL config loads', () => {
     expect(o.y).toBeCloseTo(0, 12)
   })
 
-  it('resolves the active arrival runways', () => {
-    expect(egll.arrivalRunways.map((r) => r.id)).toEqual(['27R', '27L'])
+  it('resolves the active arrival and departure runways', () => {
+    // Segregated, which is how the field is run: one strip lands, the other
+    // departs. Both land was the opening position and is now the exception.
+    expect(egll.arrivalRunways.map((r) => r.id)).toEqual(['27R'])
+    expect(egll.departureRunways.map((r) => r.id)).toEqual(['27L'])
   })
 })
 

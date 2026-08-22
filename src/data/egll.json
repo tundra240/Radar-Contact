@@ -22,7 +22,9 @@
     ],
     "defaultRangeNM": 45,
     "activeArrivalRunways": [
-      "27R",
+      "27R"
+    ],
+    "activeDepartureRunways": [
       "27L"
     ]
   },

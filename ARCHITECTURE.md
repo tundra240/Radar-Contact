@@ -666,6 +666,23 @@ stale; moving it for an amendment that amended nothing would be a lie.
 `TAILWIND_LIMIT_KTS`, not whether some other direction is better. Asking the second question
 would set the field flipping every time the wind wandered across the beam.
 
+**Segregated by default, and the model already had room for it.** One runway landing and another
+departing needed no new field on the ATIS -- it is just `arrivals: ['27R'], departures: ['27L']`,
+where mixed mode is both lists holding both runways. What it needed was the config to carry
+`activeDepartureRunways` and the board to offer the choice.
+
+**Turning the field round keeps the operation.** `flipTo` maps each runway in use to the same
+strip from the other end, so a segregated operation stays segregated and the arrivals stay on the
+same side of the field. The pairing comes from `reciprocalOf`, which finds the face pointing back
+the other way whose centreline this one lies on -- geometry rather than parsing "27R" into "09L",
+which would work here and break at the first airport that numbers its parallels differently at
+each end. Anything that cannot be mapped falls back to the whole direction landing: safe rather
+than clever.
+
+Note what this does to the feed: with one arrival runway, every entry fix feeds it, and
+`feedRunway` says so without being told. The fix-to-runway pairing only has work to do in mixed
+mode. That is the argument for computing it rather than configuring it.
+
 **The feed is geometric, not a table.** `feedRunway` gives a fix the active runway whose extended
 centreline it lies closest to. For a pair of parallels that is simply the one on its side of the
 field, which at Heathrow reproduces the real pairing -- BNN and LAM north, BIG and OCK south --

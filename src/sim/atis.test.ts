@@ -8,14 +8,17 @@ import {
   bestDirection,
   broadcast,
   codeOf,
+  configurationsFor,
   crossTrackNM,
   crosswindKts,
   directionsOf,
   feedPlan,
   feedRunway,
+  flipTo,
   headwindKts,
   letterOf,
   makeAtis,
+  reciprocalOf,
   shouldFlip,
   windString,
   type RunwayFace,
@@ -228,3 +231,129 @@ function fixAt(name: string) {
   if (fix === undefined) throw new Error(`no holding fix ${name}`)
   return fix.posNM
 }
+
+describe('how the field is run', () => {
+  const west = facesFor(['27R', '27L'])
+
+  it('offers a segregated operation each way round, and mixed as well', () => {
+    const configs = configurationsFor(west)
+    expect(configs.map((c) => c.label)).toEqual(['27R lands', '27L lands', 'Both land'])
+  })
+
+  it('puts the departures on the other runway when segregated', () => {
+    // The point of segregation: an arrival and a departure off the same
+    // strip have to be separated in time, and splitting them is most of
+    // where the capacity comes from.
+    const [first, second] = configurationsFor(west)
+    expect(first!.arrivals).toEqual(['27R'])
+    expect(first!.departures).toEqual(['27L'])
+    expect(second!.arrivals).toEqual(['27L'])
+    expect(second!.departures).toEqual(['27R'])
+    expect(first!.segregated).toBe(true)
+  })
+
+  it('lands and departs everything in mixed mode', () => {
+    const mixed = configurationsFor(west).at(-1)!
+    expect(mixed.arrivals).toEqual(['27R', '27L'])
+    expect(mixed.departures).toEqual(['27R', '27L'])
+    expect(mixed.segregated).toBe(false)
+  })
+
+  it('offers a single runway no choice it does not have', () => {
+    const configs = configurationsFor(facesFor(['27R']))
+    expect(configs).toHaveLength(1)
+    expect(configs[0]!.arrivals).toEqual(['27R'])
+    expect(configs[0]!.departures).toEqual(['27R'])
+    expect(configs[0]!.segregated).toBe(false)
+  })
+
+  it('has nothing to offer for a direction with no runways', () => {
+    expect(configurationsFor([])).toEqual([])
+  })
+})
+
+describe('the same strip from the other end', () => {
+  it('pairs each face with its reciprocal', () => {
+    // 27R and 09L are one piece of concrete; 27L and 09R the other.
+    const rwy = (id: string) => FACES.find((f) => f.id === id)!
+    expect(reciprocalOf(rwy('27R'), FACES)?.id).toBe('09L')
+    expect(reciprocalOf(rwy('09L'), FACES)?.id).toBe('27R')
+    expect(reciprocalOf(rwy('27L'), FACES)?.id).toBe('09R')
+    expect(reciprocalOf(rwy('09R'), FACES)?.id).toBe('27L')
+  })
+
+  it('finds nothing when the other end is not there', () => {
+    const only = FACES.filter((f) => f.id === '27R')
+    expect(reciprocalOf(only[0]!, only)).toBeNull()
+  })
+
+  it('does not pair a runway with its own parallel', () => {
+    const rwy = FACES.find((f) => f.id === '27R')!
+    expect(reciprocalOf(rwy, FACES)?.id).not.toBe('27L')
+  })
+})
+
+describe('turning the field round', () => {
+  const west = facesFor(['27R', '27L'])
+  const east = facesFor(['09L', '09R'])
+
+  it('keeps a segregated operation segregated', () => {
+    // Landing on the northern strip goes on landing on the northern strip,
+    // under its other name. Reverting to everything landing would change
+    // the operation, not just the direction.
+    const segregated = makeAtis({
+      arrivals: ['27R'],
+      departures: ['27L'],
+      wind: WESTERLY,
+    })
+    expect(flipTo(segregated, east, FACES)).toEqual({
+      arrivals: ['09L'],
+      departures: ['09R'],
+    })
+  })
+
+  it('keeps a mixed operation mixed', () => {
+    const mixed = makeAtis({
+      arrivals: ['27R', '27L'],
+      departures: ['27R', '27L'],
+      wind: WESTERLY,
+    })
+    expect(flipTo(mixed, east, FACES)).toEqual({
+      arrivals: ['09L', '09R'],
+      departures: ['09L', '09R'],
+    })
+  })
+
+  it('is its own inverse', () => {
+    const start = makeAtis({ arrivals: ['27L'], departures: ['27R'], wind: WESTERLY })
+    const there = flipTo(start, east, FACES)
+    const back = flipTo(makeAtis({ ...start, ...there }), west, FACES)
+    expect(back).toEqual({ arrivals: ['27L'], departures: ['27R'] })
+  })
+
+  it('leaves a direction it is already facing alone', () => {
+    const start = makeAtis({ arrivals: ['27R'], departures: ['27L'], wind: WESTERLY })
+    expect(flipTo(start, west, FACES)).toEqual({ arrivals: ['27R'], departures: ['27L'] })
+  })
+
+  it('falls back to the whole direction landing when it cannot map', () => {
+    // Safe rather than clever: an operation that cannot be carried across
+    // becomes a plain one rather than a wrong one.
+    const odd = makeAtis({ arrivals: ['XXX'], departures: ['XXX'], wind: WESTERLY })
+    expect(flipTo(odd, east, FACES)).toEqual({
+      arrivals: ['09L', '09R'],
+      departures: ['09L', '09R'],
+    })
+  })
+})
+
+describe('the feed in a segregated operation', () => {
+  it('sends every fix to the one runway that is landing', () => {
+    // With a single arrival runway there is no pairing left to do -- which
+    // is correct, and is why the pairing is computed rather than configured.
+    const one = facesFor(['27R'])
+    for (const name of ['BNN', 'LAM', 'BIG', 'OCK']) {
+      expect(feedRunway(fixAt(name), one)).toBe('27R')
+    }
+  })
+})

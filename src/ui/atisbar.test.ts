@@ -116,29 +116,65 @@ describe('the toggle', () => {
   })
 })
 
+/** How the field actually runs: one runway landing, the other departing. */
+const SEGREGATED = makeAtis({
+  arrivals: ['27R'],
+  departures: ['27L'],
+  wind: WESTERLY,
+})
+
 describe('choosing a direction', () => {
   it('offers each direction once, not each runway', () => {
-    const ui = mount(START)
+    const ui = mount(SEGREGATED)
     const names = ui.choices().map((b) => b.querySelector('.atis-choice-name')?.textContent)
-    expect(names).toEqual(['27R/27L', '09L/09R', '27R/27L', '09L/09R'])
+    // Two directions, then the operations available within the one in use.
+    expect(names).toEqual(['27R/27L', '09L/09R', '27R lands', '27L lands', 'Both land'])
   })
 
   it('marks the direction in use as pressed in', () => {
-    const ui = mount(START)
+    const ui = mount(SEGREGATED)
     expect(ui.choices()[0]!.classList.contains('is-on')).toBe(true)
     expect(ui.choices()[1]!.classList.contains('is-on')).toBe(false)
   })
 
-  it('reports the whole new configuration, not just the half that changed', () => {
-    const ui = mount(START)
+  it('keeps the operation when the field turns round', () => {
+    // Landing on the northern strip goes on landing on the northern strip,
+    // under its other name -- rather than reverting to everything landing.
+    const ui = mount(SEGREGATED)
     ui.choices()[1]!.click()
-    expect(ui.changes).toEqual([{ arrivals: ['09L', '09R'], departures: ['27R'] }])
+    expect(ui.changes).toEqual([{ arrivals: ['09L'], departures: ['09R'] }])
   })
 
-  it('changes the departure runways on their own', () => {
-    const ui = mount(START)
+  it('offers the segregated operations before mixed mode', () => {
+    // Segregated is what the field does; mixed is the exception, so it is
+    // offered rather than assumed.
+    const ui = mount(SEGREGATED)
+    const names = ui.choices().slice(2).map((b) => b.textContent)
+    expect(names[0]).toContain('27R lands')
+    expect(names[0]).toContain('dep 27L')
+    expect(names[2]).toContain('mixed mode')
+  })
+
+  it('swaps which runway lands without changing direction', () => {
+    const ui = mount(SEGREGATED)
     ui.choices()[3]!.click()
-    expect(ui.changes).toEqual([{ arrivals: ['27R', '27L'], departures: ['09L', '09R'] }])
+    expect(ui.changes).toEqual([{ arrivals: ['27L'], departures: ['27R'] }])
+  })
+
+  it('goes to mixed mode when asked, and marks it as the one in use', () => {
+    const ui = mount(SEGREGATED)
+    ui.choices()[4]!.click()
+    expect(ui.changes).toEqual([
+      { arrivals: ['27R', '27L'], departures: ['27R', '27L'] },
+    ])
+
+    const mixed = mount(makeAtis({ arrivals: ['27R', '27L'], departures: ['27R', '27L'], wind: WESTERLY }))
+    expect(mixed.choices()[4]!.classList.contains('is-on')).toBe(true)
+    expect(mixed.choices()[2]!.classList.contains('is-on')).toBe(false)
+  })
+
+  it('shows which runway lands and which departs on the board', () => {
+    expect(mount(SEGREGATED).values()).toEqual(['27R', '27L', '250/18'])
   })
 
   it('shows the wind on each face, so the choice is informed', () => {

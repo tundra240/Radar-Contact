@@ -801,10 +801,12 @@ function start(
    */
   let atis: Atis = makeAtis({
     arrivals: airport.arrivalRunways.map((r) => r.id),
-    // No departures are modelled yet, so the field departs off the same
-    // direction it lands on. Carried and broadcast because a controller
-    // reads it, and because departures will need somewhere to look.
-    departures: airport.arrivalRunways.map((r) => r.id),
+    // A different runway from the arrivals, because that is how the field
+    // is run: an arrival and a departure off the same strip have to be
+    // separated in time, and splitting them is most of where the capacity
+    // comes from. Nothing departs in the simulation yet, but the runway is
+    // real, it is broadcast, and it is kept clear of the landing traffic.
+    departures: airport.departureRunways.map((r) => r.id),
     wind: airport.weather.wind,
   })
 

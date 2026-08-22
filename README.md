@@ -21,7 +21,7 @@ display, the rules and the docs cannot disagree with each other.
 | Area of responsibility | 40 NM radius of the airport reference point |
 | Vertical limits | 1,500 ft to FL150 |
 | Range rings | 5, 10, 15 and 20 NM |
-| Arrival runways | 27R and 27L, both ILS, both landing (mixed mode) |
+| Runways | Four faces, all ILS. **Segregated**: 27R lands, 27L departs -- changeable on the ATIS |
 | Intercept altitude | 3,000 ft or below |
 | Final approach fix | 10 NM from the threshold, 3 degree glideslope |
 | Speed limit | 250 kt below 10,000 ft |
@@ -137,7 +137,10 @@ rather than loaded.
 
 **There is an ATIS, and you can turn the field round.** An **ATIS** button beside WX shows and
 hides a small board on the scope: information letter, runways landing, runways departing, wind.
-The runway selection is on the board, with the headwind and crosswind on each direction so the
+The board picks the **direction** the field faces and the **operation** it runs in that
+direction. Segregated is the default and what the real field does: **27R lands, 27L departs**, so
+arrivals and departures are not queueing for the same concrete. You can swap which runway lands,
+or go to mixed mode with both landing. Each direction shows its headwind and crosswind so the
 choice is informed. Unlike the options menu the board does not dismiss itself when you click on
 the radar -- a readout that vanished the moment you touched an aircraft would be one you could
 never use while working -- and whether it is up is remembered between sessions. Change the direction and the
