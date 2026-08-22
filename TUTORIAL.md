@@ -76,6 +76,42 @@ There is one slot, and saving overwrites it. A save is tied to the airport it wa
 to this version of the game; anything else is refused with a reason rather than loaded into a
 world it does not fit.
 
+### Weather
+
+**WX** on the scope, next to the menu button, shows and hides the precipitation. It is on to
+start with, because you have to fly round it.
+
+Cells are drawn in three nested contours: **green** for light, **amber** for moderate, **red**
+for heavy. A shower is a single green blob; a storm is three rings with a red core. They drift
+slowly downwind all session, so the gap you were aiming for closes and a fix that was clear at
+the top of the hour is not at the bottom of it.
+
+**Light is a nuisance, moderate and heavy are a hazard.** Fly an aircraft into moderate or worse
+and the crew asks to leave it: the strip reads *WX -- REQUESTING VECTOR*, the data block picks up
+a **WX** flag and turns red, and the console says so once. The answer is a vector round it -- so
+you are now solving the spacing, the descent and the weather at the same time, which is the job.
+
+Turning WX off does not turn the weather off. It only stops it being drawn, so you can see what
+is underneath a cell. The aircraft in it still ask.
+
+### The wind
+
+There is a wind, and it is doing three things.
+
+Your **groundspeed readouts differ from the speeds you assign**. The data block shows what the
+radar measures -- groundspeed -- and the strip shows what you assigned, which is an airspeed. In
+a westerly, traffic heading east reads faster than traffic heading west at the same assigned
+speed, and the difference is real: it changes how quickly the gap in front of an aircraft closes.
+
+Aircraft **drift**, a couple of degrees across the wind. Enough that a long leg needs a nudge;
+not enough to make a vector a guess.
+
+And the weather drifts with it, which is why the cells always move the same way.
+
+The wind is deliberately applied at a fraction of its reported strength. A full crosswind at
+approach speed is an eight degree drift angle, and vectoring against that stops being a game and
+becomes an exercise in anticipating the wind.
+
 ### Keeping score
 
 **SCORE** on the status bar. Landing an aircraft is worth **+100**; losing one off the boundary

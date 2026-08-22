@@ -616,6 +616,61 @@ the cadence or the callsigns would diverge.
 Loading always pauses. Dropping a controller into moving traffic they have not looked at yet is
 how a saved session gets lost twice.
 
+### Wind, and two speeds
+
+A controller assigns an airspeed; radar measures a groundspeed; the wind is the difference. So
+the Aircraft record carries both. `iasKts` is what the autopilot drives towards
+`clearedSpdKts`, and `gsKts` is derived every step from **the distance the aircraft actually
+covered** -- which means it also accounts for the arc flown through a turn, for nothing. It is
+stored rather than recomputed on demand for exactly the reason `vsFpm` is: it is a readout, and
+the block and the strip both want it.
+
+That is why the data block shows the groundspeed and the strip shows the assigned airspeed. Not
+an inconsistency: it is what each of those two instruments actually knows.
+
+`stepAircraft` takes the wind as a **velocity vector**, already scaled, rather than as a Wind.
+The flight model flies through moving air and does not need to know why it moves, and the policy
+-- how much of the reported wind a session applies -- stays in one place.
+
+It is deliberately not all of it. `windEffect` is a third: a full twenty-knot crosswind at
+approach speed is an eight degree drift angle, and vectoring against that stops being a game and
+becomes an exercise in anticipating the wind. A third gives a twelve-knot spread between upwind
+and downwind legs and about two degrees of drift -- visible on the readouts, correctable with a
+nudge.
+
+### Weather on the scope
+
+`sim/weather.ts` and `render/layers/weather.ts`.
+
+**Nothing about the weather is saved.** The cells are a pure function of the session seed and
+the config, and where they have drifted to is a pure function of elapsed time -- so a loaded
+session regenerates exactly the weather it was saved with, without the save carrying a single
+polygon. It draws on its own stream rather than the traffic's, so a seed that puts a storm over
+Bovingdon does not also decide what arrives there.
+
+A cell is a **circle plus four harmonics**: cheap, smooth, closed by construction, and it reads
+as weather rather than as a drawn shape, which a circle never does. Intensity is a dome --
+`peak * (1 - f^2)` -- and the three contours come from **inverting** it: the boundary for a
+threshold t sits at `f = sqrt(1 - t/peak)`. Which gives the nice property for free that a cell
+too weak to reach a band has **no contour for it**, so a shower is one green blob rather than a
+storm with rings of zero size.
+
+The layer is drawn over the map and under everything else, the way a real scope underlays it.
+Weather you cannot see the traffic through has taken the display away from you.
+
+**Light is drawn but not alerted on.** An aircraft that asked to avoid every shower would make
+the request meaningless, so `isAvoidable` starts at moderate. The request itself is announced
+**on the edge** -- main.ts keeps the set of who was already asking -- because a request repeated
+twenty times a second is not a request, it is a fault.
+
+WX sits on the scope rather than only in the overlays menu, because it is the one layer a
+controller reaches for mid-vector. It toggles the same overlay key the menu checkbox does, so
+there is one piece of state and the two cannot disagree.
+
+Measured over an hour: four to seven per cent of the sector is bad enough to avoid, and three to
+six aircraft of fourteen asked for a vector round it. Enough to be in the way; not enough to
+close the sector.
+
 ### The score
 
 `sim/score.ts`. Two events move it, because two things happen to an arrival: +100 for a

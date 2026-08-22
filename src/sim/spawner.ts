@@ -441,9 +441,9 @@ export class Spawner {
     // place to revisit when wind arrives.
     // Standard entry speed, never above what the type can do, and never
     // above the sector limit when entering below the limit altitude.
-    let gsKts = Math.min(airport.traffic.entrySpeedKts, flight.cruiseKts)
+    let iasKts = Math.min(airport.traffic.entrySpeedKts, flight.cruiseKts)
     if (altFt < airport.sector.speedLimitBelowFt) {
-      gsKts = Math.min(gsKts, airport.sector.speedLimitKts)
+      iasKts = Math.min(iasKts, airport.sector.speedLimitKts)
     }
 
     // An arrival arrives already holding: it appears out along the hold's
@@ -466,13 +466,15 @@ export class Spawner {
       pos: at,
       altFt,
       hdg,
-      gsKts,
+      iasKts,
+      // Released into the wind it was born in; the next step re-derives it.
+      gsKts: iasKts,
       vsFpm: 0,
       // Nobody has vectored it. In the hold it is navigating itself, so a
       // cleared heading would be a vector on the strip that nothing flies.
       clearedHdg: hold === null ? hdg : null,
       clearedAltFt: altFt,
-      clearedSpdKts: gsKts,
+      clearedSpdKts: iasKts,
       navMode: hold === null ? 'VECTOR' : 'HOLD',
       clearedApproach: null,
       hold,

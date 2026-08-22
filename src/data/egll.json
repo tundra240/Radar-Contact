@@ -26,6 +26,18 @@
       "27L"
     ]
   },
+  "weather": {
+    "wind": {
+      "fromDeg": 250,
+      "speedKts": 18
+    },
+    "windEffect": 0.35,
+    "cellCount": 6,
+    "minRadiusNM": 4,
+    "maxRadiusNM": 10,
+    "driftFactor": 0.8,
+    "spreadNM": 34
+  },
   "render": {
     "runwayExaggeration": 3,
     "exaggerationCutoffPxPerNM": 45,

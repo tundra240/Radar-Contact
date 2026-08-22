@@ -135,6 +135,17 @@ how far through the current gap the spawner is -- and a load puts it back and pa
 read the picture first. One slot; a save from another airport or another version is refused
 rather than loaded.
 
+**There is weather.** Precipitation cells in three contours -- green, amber, red -- drifting
+downwind all session, with a **WX** button on the scope to show and hide them. Fly into moderate
+or heavy and the crew asks for a vector out: the strip reads *WX -- REQUESTING VECTOR*, the data
+block flags **WX** in red, and the console says so. Turning the layer off stops it being drawn,
+not being there.
+
+**And there is wind.** Applied at a fraction of its reported strength, so groundspeed visibly
+differs from the assigned airspeed depending which way an aircraft is pointing, and a long leg
+drifts a couple of degrees. The data block reads the groundspeed, as radar does; the strip reads
+what you assigned.
+
 **There is a score.** `SCORE` on the status bar: +100 for a landing, -50 for an aircraft lost
 off the boundary unlanded. Losing one costs less than landing one earns, so landing most of
 your traffic still climbs.

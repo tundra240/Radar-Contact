@@ -27,6 +27,7 @@ function aircraft(over: Partial<Aircraft> = {}): Aircraft {
     pos: { x: 12.5, y: -3.25 },
     altFt: 7000,
     hdg: 249,
+    iasKts: 220,
     gsKts: 220,
     vsFpm: -1500,
     clearedHdg: 270,

@@ -20,6 +20,7 @@ const base: Aircraft = {
   pos: { x: 14, y: 6 },
   altFt: 7000,
   hdg: 250,
+  iasKts: 240,
   gsKts: 240,
   vsFpm: 0,
   clearedHdg: 250,
@@ -457,7 +458,7 @@ describe('from a typed line to a turning aircraft', () => {
     expect(after.hdg).toBe(270)
     expect(after.altFt).toBeLessThan(7000)
     expect(after.vsFpm).toBeLessThan(0)
-    expect(after.gsKts).toBeLessThan(240)
+    expect(after.iasKts).toBeLessThan(240)
   })
 
   it('leaves an aircraft alone when the line is refused', () => {

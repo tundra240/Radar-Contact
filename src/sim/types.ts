@@ -100,6 +100,18 @@ export interface Aircraft {
   readonly pos: Vec2NM
   readonly altFt: number
   readonly hdg: number
+  /** Airspeed: what it is flying through the air, and what a speed
+   * clearance assigns. */
+  readonly iasKts: number
+  /**
+   * Groundspeed: what it is actually making good.
+   *
+   * Derived every step from the distance covered rather than commanded --
+   * the controller assigns an airspeed and the wind decides the rest, so an
+   * aircraft downwind reads faster than the same aircraft upwind. Stored
+   * rather than worked out on demand for the same reason `vsFpm` is: it is
+   * a readout, and the data block and the strip both want it.
+   */
   readonly gsKts: number
   readonly vsFpm: number
 

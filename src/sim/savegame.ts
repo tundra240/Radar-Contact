@@ -36,7 +36,7 @@ import type { WakeCategory } from '../data/airport'
  * Bumped whenever the shape changes. An older save is refused rather than
  * guessed at -- there is no migration path worth the bugs it would carry.
  */
-export const SAVE_VERSION = 2
+export const SAVE_VERSION = 3
 
 export interface SavedController {
   readonly initials: string
@@ -164,6 +164,7 @@ function parseAircraft(v: unknown, path: string): Aircraft {
     pos: vec(o['pos'], `${path}.pos`),
     altFt: num(o['altFt'], `${path}.altFt`),
     hdg: num(o['hdg'], `${path}.hdg`),
+    iasKts: num(o['iasKts'], `${path}.iasKts`),
     gsKts: num(o['gsKts'], `${path}.gsKts`),
     vsFpm: num(o['vsFpm'], `${path}.vsFpm`),
     clearedHdg: nullableNum(o['clearedHdg'], `${path}.clearedHdg`),

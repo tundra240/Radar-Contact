@@ -75,17 +75,17 @@ export function stepAltitude(
 
 /** Accelerate or decelerate towards the cleared speed, never past it. */
 export function stepSpeed(
-  gsKts: number,
+  iasKts: number,
   clearedSpdKts: number,
   dtSeconds: number,
   rates: Rates = STANDARD_RATES,
 ): number {
-  if (dtSeconds <= 0) return gsKts
+  if (dtSeconds <= 0) return iasKts
 
-  const remaining = clearedSpdKts - gsKts
+  const remaining = clearedSpdKts - iasKts
   const most = rates.accelKtsPerSec * dtSeconds
   if (Math.abs(remaining) <= most) return clearedSpdKts
-  return gsKts + Math.sign(remaining) * most
+  return iasKts + Math.sign(remaining) * most
 }
 
 /**
@@ -96,12 +96,12 @@ export function autopilot(
   a: Aircraft,
   dtSeconds: number,
   rates: Rates = STANDARD_RATES,
-): Pick<Aircraft, 'hdg' | 'altFt' | 'vsFpm' | 'gsKts'> {
+): Pick<Aircraft, 'hdg' | 'altFt' | 'vsFpm' | 'iasKts'> {
   const vertical = stepAltitude(a.altFt, a.clearedAltFt, dtSeconds, rates)
   return {
     hdg: stepHeading(a.hdg, a.clearedHdg, dtSeconds, rates),
     altFt: vertical.altFt,
     vsFpm: vertical.vsFpm,
-    gsKts: stepSpeed(a.gsKts, a.clearedSpdKts, dtSeconds, rates),
+    iasKts: stepSpeed(a.iasKts, a.clearedSpdKts, dtSeconds, rates),
   }
 }

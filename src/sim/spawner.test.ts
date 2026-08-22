@@ -50,7 +50,7 @@ function fly(
       world = world
         .map((a) => ({
           ...a,
-          pos: advancePos(a.pos, a.hdg, (a.gsKts / 3600) * step),
+          pos: advancePos(a.pos, a.hdg, (a.iasKts / 3600) * step),
         }))
         .map((a) => enterSector(a, airport.controlZone))
         .filter((a) => departureOf(a, airport.controlZone, OUTER_LIMIT_NM) === null)
@@ -73,6 +73,7 @@ function parked(
     pos,
     altFt,
     hdg: 270,
+    iasKts: 220,
     gsKts: 220,
     vsFpm: 0,
     clearedHdg: 270,
@@ -228,7 +229,7 @@ describe('entry state', () => {
     const sector = airport.sector
     for (const a of all) {
       if (a.altFt < sector.speedLimitBelowFt) {
-        expect(a.gsKts, `${a.callsign} at ${a.altFt}`).toBeLessThanOrEqual(sector.speedLimitKts)
+        expect(a.iasKts, `${a.callsign} at ${a.altFt}`).toBeLessThanOrEqual(sector.speedLimitKts)
       }
     }
   })
@@ -242,20 +243,20 @@ describe('entry state', () => {
       if (a.altFt < sector.speedLimitBelowFt) {
         expected = Math.min(expected, sector.speedLimitKts)
       }
-      expect(a.gsKts, `${a.callsign} ${a.type} at ${a.altFt}`).toBe(expected)
+      expect(a.iasKts, `${a.callsign} ${a.type} at ${a.altFt}`).toBe(expected)
     }
   })
 
   it('uses the standard entry speed in practice', () => {
     // Every type cruises faster than the standard entry speed, so in this
     // configuration every arrival enters at it.
-    for (const a of all) expect(a.gsKts, a.callsign).toBe(airport.traffic.entrySpeedKts)
+    for (const a of all) expect(a.iasKts, a.callsign).toBe(airport.traffic.entrySpeedKts)
   })
 
   it('arrives level, with no vector on it', () => {
     for (const a of all) {
       expect(a.clearedAltFt, a.callsign).toBe(a.altFt)
-      expect(a.clearedSpdKts, a.callsign).toBe(a.gsKts)
+      expect(a.clearedSpdKts, a.callsign).toBe(a.iasKts)
       // No cleared heading: in the hold it is navigating itself, so a
       // vector on the strip would be one nothing is flying.
       expect(a.clearedHdg, a.callsign).toBeNull()
@@ -468,7 +469,7 @@ describe('reproducibility', () => {
   it('produces an identical stream for the same seed', () => {
     // A scenario can be replayed and a bug report acted on.
     const key = (a: Aircraft): string =>
-      `${a.spawnedAt.toFixed(2)}|${a.callsign}|${a.type}|${a.originFix}|${a.altFt}|${a.gsKts}`
+      `${a.spawnedAt.toFixed(2)}|${a.callsign}|${a.type}|${a.originFix}|${a.altFt}|${a.iasKts}`
     const a = fly(makeSpawner(777), 1800).all.map(key)
     const b = fly(makeSpawner(777), 1800).all.map(key)
     expect(a).toEqual(b)
@@ -607,6 +608,7 @@ describe('on command', () => {
         pos: { x: 4 + i * 0.4, y: -6 },
         altFt: 9000,
         hdg: 270,
+        iasKts: 220,
         gsKts: 220,
         vsFpm: 0,
         clearedHdg: 270,

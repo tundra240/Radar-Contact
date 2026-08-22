@@ -74,6 +74,7 @@ export function drawTargets(
   cam: Camera,
   traffic: readonly Aircraft[],
   selected: string | null,
+  alerts: ReadonlySet<string> = new Set(),
 ): void {
   // Two passes so that no target's data block can be buried under a
   // neighbour's trail, however close the two pass.
@@ -81,7 +82,7 @@ export function drawTargets(
   for (const a of traffic) {
     const alpha = alphaFor(a)
     g.globalAlpha = alpha
-    drawTarget(g, cam, a, a.callsign === selected)
+    drawTarget(g, cam, a, a.callsign === selected, alerts.has(a.callsign))
     // Back to full strength for whatever is drawn next, here or after.
     if (alpha !== 1) g.globalAlpha = 1
   }
@@ -120,11 +121,14 @@ function drawTarget(
   cam: Camera,
   a: Aircraft,
   isSelected: boolean,
+  alerting = false,
 ): void {
   const p = cam.worldToScreen(a.pos)
   // Selection is a change of ink rather than an extra mark, so a selected
-  // target stays the same size and shape as every other one.
-  const ink = isSelected ? theme.accent : theme.target
+  // target stays the same size and shape as every other one. An aircraft
+  // asking to get out of the weather overrides both: it is the one thing on
+  // the display that wants doing something about.
+  const ink = alerting ? theme.warn : isSelected ? theme.accent : theme.target
 
   // Where it will be in a minute. This is the single most useful mark on
   // an approach scope: two vectors that cross are two aircraft that will.
@@ -148,14 +152,14 @@ function drawTarget(
     g.stroke()
   }
 
-  if (cam.pxPerNM >= BLOCK_MIN_PX_PER_NM) drawBlock(g, cam, a, p, ink)
+  if (cam.pxPerNM >= BLOCK_MIN_PX_PER_NM) drawBlock(g, cam, a, p, ink, alerting)
 }
 
 /**
  * The three lines every approach controller reads off a target: who it is,
  * what level it is passing and where it is going, and how fast.
  */
-export function blockLines(a: Aircraft): readonly string[] {
+export function blockLines(a: Aircraft, alerting = false): readonly string[] {
   const trend = trendOf(a.vsFpm)
   const glyph = trend === 'climb' ? '^' : 'v'
 
@@ -167,7 +171,11 @@ export function blockLines(a: Aircraft): readonly string[] {
   // second, and a digit that changes every frame cannot be read.
   const speed = Math.round(a.gsKts / 5) * 5
 
-  return [`${a.callsign}${isHeavy(a.wake) ? ' H' : ''}`, level, `${speed} ${a.type}`]
+  // WX against the callsign rather than a fourth line: the block is read at
+  // a glance and a line that appears and disappears moves everything under
+  // it.
+  const flags = `${isHeavy(a.wake) ? ' H' : ''}${alerting ? ' WX' : ''}`
+  return [`${a.callsign}${flags}`, level, `${speed} ${a.type}`]
 }
 
 /**
@@ -201,8 +209,9 @@ function drawBlock(
   a: Aircraft,
   p: Vec2Px,
   ink: string,
+  alerting = false,
 ): void {
-  const lines = blockLines(a)
+  const lines = blockLines(a, alerting)
   const box = blockBox(cam, a, p)
   const dir = box.flip ? -1 : 1
   // The text hangs off whichever edge of the box faces the target.

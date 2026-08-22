@@ -1267,3 +1267,28 @@ canvas {
   outline: 1px dotted var(--chrome-text);
   outline-offset: -3px;
 }
+
+/* The WX button reads as pressed in while the layer is showing, which is
+   the whole affordance of a toolbar toggle of this era. */
+.wx-button.is-on {
+  color: var(--title-text);
+  background: var(--title-bar);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+/* A strip whose aircraft is asking to get out of the weather. The request
+   is the thing that wants acting on, so it takes the warning colour and
+   overrides the phase-of-flight colouring underneath it. */
+.strip[data-wx] .strip-status {
+  font-weight: bold;
+  color: var(--warn);
+}
+
+.strip.is-selected[data-wx] .strip-status {
+  /* On the inverted card the warn colour stops being readable, so the
+     emphasis carries it instead. */
+  color: var(--title-text);
+  text-decoration: underline;
+}

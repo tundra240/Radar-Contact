@@ -146,6 +146,10 @@ describe('palette legibility', () => {
     // The per-mile ticks are how spacing is judged by eye, so they carry
     // information and belong here rather than with the grid.
     'centrelineTick',
+    // Weather is read for its band, so it has to be legible as a colour.
+    'wxLight',
+    'wxModerate',
+    'wxHeavy',
     // The FIR limit is a real airspace boundary, so it is read rather than
     // merely sensed.
     'fir',

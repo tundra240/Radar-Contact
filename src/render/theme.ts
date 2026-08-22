@@ -37,6 +37,15 @@ export interface Palette {
   readonly hold: string
 
   /**
+   * Precipitation, in three bands. Green, amber, red on a colour tube; on
+   * the monochrome one they cannot be told apart by hue, so they are
+   * separated by brightness the way a single-gun display had to do it.
+   */
+  readonly wxLight: string
+  readonly wxModerate: string
+  readonly wxHeavy: string
+
+  /**
    * Traffic. The boldest ink in every palette, because the map is context
    * and the traffic is the job. The trail is the same mark one step
    * quieter, so a history never competes with the target it belongs to.
@@ -124,6 +133,11 @@ export const palettes = {
     navaidFreq: '#5f5a48',
     hold: '#8a4e00',
 
+    // Dark and saturated, because a pale green on tan is a smudge.
+    wxLight: '#2f6b2a',
+    wxModerate: '#7a5c00',
+    wxHeavy: '#8f1f14',
+
     // VGA dark green: the one bold ink the rest of this palette leaves
     // free, so traffic cannot be mistaken for a runway or a boundary.
     target: '#0e4a1c',
@@ -183,6 +197,10 @@ export const palettes = {
     // Phosphor amber, for the fixes traffic is actually holding at.
     hold: '#ffb000',
 
+    wxLight: '#29a05a',
+    wxModerate: '#d9c020',
+    wxHeavy: '#e0452f',
+
     target: '#40ff80',
     trail: '#217a42',
 
@@ -238,6 +256,11 @@ export const palettes = {
     navaidLabel: '#ffc860',
     navaidFreq: '#96702a',
     hold: '#fff2cc',
+
+    // A brightness ladder rather than three hues.
+    wxLight: '#946820',
+    wxModerate: '#bd8720',
+    wxHeavy: '#f5b43e',
 
     target: '#ffe9bd',
     trail: '#a87516',

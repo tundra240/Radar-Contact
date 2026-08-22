@@ -36,6 +36,9 @@ const SECONDS_PER_HOUR = 3600
 /** The airport reference point, which world space is anchored on. */
 const ORIGIN_NM: Vec2NM = { x: 0, y: 0 }
 
+/** Still air. */
+const NO_WIND: Vec2NM = { x: 0, y: 0 }
+
 /**
  * Advance a position along the track flown during the step.
  *
@@ -49,11 +52,11 @@ export function advancePosition(
   pos: Vec2NM,
   hdgFrom: number,
   hdgTo: number,
-  gsKts: number,
+  iasKts: number,
   dtSeconds: number,
 ): Vec2NM {
-  if (dtSeconds <= 0 || gsKts <= 0) return pos
-  const distNM = (gsKts / SECONDS_PER_HOUR) * dtSeconds
+  if (dtSeconds <= 0 || iasKts <= 0) return pos
+  const distNM = (iasKts / SECONDS_PER_HOUR) * dtSeconds
   const mid = normalizeHeading(hdgFrom + angleDelta(hdgFrom, hdgTo) / 2)
   return advance(pos, mid, distNM)
 }
@@ -90,10 +93,25 @@ export function stepTrail(
  * That order matters. The autopilot decides the heading for this step, the
  * move uses it, and the trail records where the aircraft was before it.
  */
+/**
+ * One step of flight.
+ *
+ * `windKts` is a velocity: where the air is going and how fast, already
+ * scaled to whatever fraction of the real wind this session applies. Given
+ * as a vector rather than as a Wind so the flight model needs no notion of
+ * an ATIS -- it flies through moving air and does not care why it moves.
+ *
+ * The aircraft flies its heading at `iasKts` through that air, so where it
+ * ends up is the air displacement plus the wind displacement, and `gsKts`
+ * is simply the distance it actually covered over the time. Deriving the
+ * groundspeed that way rather than from a second vector calculation means
+ * it also accounts for the arc flown through a turn, for free.
+ */
 export function stepAircraft(
   a: Aircraft,
   dtSeconds: number,
   elapsedSeconds: number,
+  windKts: Vec2NM = NO_WIND,
   rates: Rates = STANDARD_RATES,
 ): Aircraft {
   // An aircraft on an approach is flown by the approach, one in a hold by
@@ -104,7 +122,7 @@ export function stepAircraft(
   // Down and stopped. It keeps its last position for the tick it takes the
   // world to notice, rather than rolling on through the airfield.
   if (guided !== null && guided.navMode === 'LANDED') {
-    return { ...a, ...guided, altFt: guided.clearedAltFt, vsFpm: 0 }
+    return { ...a, ...guided, altFt: guided.clearedAltFt, vsFpm: 0, gsKts: 0 }
   }
 
   // A holding aircraft navigates itself: the pattern picks the heading and
@@ -115,7 +133,16 @@ export function stepAircraft(
   const flying =
     guided !== null ? { ...a, ...guided } : steer === null ? a : { ...a, clearedHdg: steer }
   const flown = autopilot(flying, dtSeconds, rates)
-  const pos = advancePosition(a.pos, a.hdg, flown.hdg, flown.gsKts, dtSeconds)
+  // Through the air first, then carried by it.
+  const throughAir = advancePosition(a.pos, a.hdg, flown.hdg, flown.iasKts, dtSeconds)
+  const hours = Math.max(0, dtSeconds) / SECONDS_PER_HOUR
+  const pos: Vec2NM = {
+    x: throughAir.x + windKts.x * hours,
+    y: throughAir.y + windKts.y * hours,
+  }
+  // What it actually made good. A step of no length says nothing about
+  // speed, so the last figure stands.
+  const gsKts = hours > 0 ? distanceNM(a.pos, pos) / hours : a.gsKts
   const trail = stepTrail(a, a.pos, elapsedSeconds)
 
   return {
@@ -126,7 +153,8 @@ export function stepAircraft(
     hdg: flown.hdg,
     altFt: flown.altFt,
     vsFpm: flown.vsFpm,
-    gsKts: flown.gsKts,
+    iasKts: flown.iasKts,
+    gsKts,
     pos,
     trail: trail.trail,
     trailAt: trail.trailAt,
@@ -188,6 +216,6 @@ export function enterSector(a: Aircraft, zone: ControlZone | null): Aircraft {
   return !a.entered && isInSector(a, zone) ? { ...a, entered: true } : a
 }
 
-export function distanceFlownNM(gsKts: number, dtSeconds: number): number {
-  return (gsKts / SECONDS_PER_HOUR) * Math.max(0, dtSeconds)
+export function distanceFlownNM(iasKts: number, dtSeconds: number): number {
+  return (iasKts / SECONDS_PER_HOUR) * Math.max(0, dtSeconds)
 }

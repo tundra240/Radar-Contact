@@ -17,6 +17,8 @@ import {
 } from '../data/airport'
 import type { Aircraft } from '../sim/types'
 import { drawTargets, drawVectorDrag, type VectorDrag } from './layers/targets'
+import { drawWeather } from './layers/weather'
+import type { Weather } from '../sim/weather'
 import { OVERLAY_ITEMS, countEnabled, densityOf, type Overlays } from './overlays'
 import { airspaceColour, fonts, formatLevel, theme } from './theme'
 
@@ -39,7 +41,14 @@ const ORIGIN: Vec2NM = { x: 0, y: 0 }
  */
 const OUTSIDE_VEIL = 0.55
 
-/** What the status bar needs from the loop, and nothing more. */
+/**
+ * The state of the session the display reflects.
+ *
+ * Started as what the status bar needed and has grown past it: who is on
+ * position, whether the airspace rule is in force, what the weather is
+ * doing. All of it is session state rather than airport data, which is the
+ * line that matters -- the airport comes in as `airport`.
+ */
 export interface ScopeStatus {
   readonly clock: Clock
   readonly speed: Speed
@@ -62,6 +71,11 @@ export interface ScopeStatus {
    * is drawn whole: there is no boundary to be on the wrong side of.
    */
   readonly airspaceEnforced: boolean
+  /**
+   * The weather. Where the cells have drifted to is worked out from the
+   * clock above, so this is the same object all session.
+   */
+  readonly weather: Weather
 }
 
 /** The traffic picture: everything on frequency, and which one is selected. */
@@ -71,6 +85,12 @@ export interface ScopeContacts {
   readonly selected: string | null
   /** A vector being dragged out with the mouse, while one is in progress. */
   readonly drag?: VectorDrag | null
+  /**
+   * Callsigns asking for a vector out of the weather. Marked on the block
+   * because it is the aircraft that has the problem, and a controller reads
+   * the scope before the strips.
+   */
+  readonly alerts?: ReadonlySet<string>
 }
 
 const NO_CONTACTS: ScopeContacts = { aircraft: [], selected: null }
@@ -92,6 +112,13 @@ export function drawScope(
   for (const feature of airport.geography) {
     if (!geographyShown(feature.kind, overlays)) continue
     drawGeography(g, cam, feature)
+  }
+
+  // Over the map and under everything else, the way a real scope underlays
+  // it: weather you cannot see the traffic through has taken the display
+  // away from you.
+  if (overlays.weather) {
+    drawWeather(g, cam, status.weather, status.clock.elapsedSeconds)
   }
 
   const volumes = airport.airspace.filter((v) =>
@@ -149,7 +176,7 @@ export function drawScope(
 
   // Above every overlay and below the chrome: traffic is the top layer of
   // the radar picture, but it is still inside the display.
-  drawTargets(g, cam, contacts.aircraft, contacts.selected)
+  drawTargets(g, cam, contacts.aircraft, contacts.selected, contacts.alerts)
   // Above the traffic: the line being dragged is the thing the controller
   // is looking at, and it has to be readable over a target it crosses.
   if (contacts.drag) drawVectorDrag(g, cam, contacts.drag)

@@ -10,6 +10,7 @@ const base: Aircraft = {
   pos: { x: 10, y: 5 },
   altFt: 7000,
   hdg: 250,
+  iasKts: 240,
   gsKts: 240,
   vsFpm: -1200,
   clearedHdg: 250,
@@ -150,7 +151,7 @@ describe('strip content', () => {
   })
 
   it('shows actual and cleared heading and speed', () => {
-    h.bay.update([ac({ hdg: 95, clearedHdg: 250, gsKts: 240, clearedSpdKts: 220 })], null)
+    h.bay.update([ac({ hdg: 95, clearedHdg: 250, iasKts: 240, clearedSpdKts: 220 })], null)
     expect(document.querySelector('.strip-hdg')?.textContent).toBe('HDG 095/250')
     expect(document.querySelector('.strip-spd')?.textContent).toBe('SPD 240/220')
   })
@@ -593,5 +594,63 @@ describe('inbound traffic', () => {
     expect(text('COMING3', '.strip-seq')).toBe('1')
     // Same element, moved: it is the same aircraft.
     expect(strips().find((s) => s.dataset['callsign'] === 'COMING3')).toBe(before)
+  })
+})
+
+describe('a weather request on a strip', () => {
+  const strip = (callsign: string): HTMLElement => {
+    const el = strips().find((s) => s.dataset['callsign'] === callsign)
+    if (!el) throw new Error(`no strip for ${callsign}`)
+    return el
+  }
+
+  const roster = [
+    ac({ callsign: 'WET1', pos: { x: 10, y: 0 } }),
+    ac({ callsign: 'DRY2', pos: { x: 14, y: 0 } }),
+  ]
+
+  it('says what the aircraft is asking for', () => {
+    h.bay.update(roster, null, new Set(['WET1']))
+    expect(strip('WET1').querySelector('.strip-status')?.textContent)
+      .toBe('WX -- REQUESTING VECTOR')
+  })
+
+  it('displaces the phase of flight while it lasts', () => {
+    // The phase is what the aircraft is doing; this is what it wants. The
+    // request is the thing that needs acting on.
+    h.bay.update(roster, null, new Set(['WET1']))
+    expect(strip('DRY2').querySelector('.strip-status')?.textContent).toBe('VECTORING')
+  })
+
+  it('marks the row, so the stylesheet can shout about it', () => {
+    h.bay.update(roster, null, new Set(['WET1']))
+    expect(strip('WET1').dataset['wx']).toBe('true')
+    expect(strip('DRY2').dataset['wx']).toBeUndefined()
+  })
+
+  it('clears the mark once the aircraft is out of it', () => {
+    h.bay.update(roster, null, new Set(['WET1']))
+    h.bay.update(roster, null, new Set())
+    expect(strip('WET1').dataset['wx']).toBeUndefined()
+    expect(strip('WET1').querySelector('.strip-status')?.textContent).toBe('VECTORING')
+  })
+
+  it('writes nothing when the weather has not changed', async () => {
+    // The bay refreshes five times a second forever, and an aircraft sitting
+    // in a cell for two minutes must not rewrite its strip six hundred times.
+    h.bay.update(roster, null, new Set(['WET1']))
+
+    const records: MutationRecord[] = []
+    const observer = new MutationObserver((r) => records.push(...r))
+    observer.observe(h.mount, {
+      childList: true,
+      attributes: true,
+      characterData: true,
+      subtree: true,
+    })
+    h.bay.update(roster, null, new Set(['WET1']))
+    await Promise.resolve()
+    observer.disconnect()
+    expect(records).toEqual([])
   })
 })

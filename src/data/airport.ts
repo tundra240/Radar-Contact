@@ -77,6 +77,36 @@ export interface EntryBand {
   readonly maxAltFt: number
 }
 
+/**
+ * The weather for a session: the wind, and how much precipitation to put on
+ * the scope.
+ *
+ * All gameplay values. Real weather comes from a real forecast, and the
+ * point of these is a scope that has to be vectored around rather than a
+ * faithful met report.
+ */
+export interface WeatherSettings {
+  /** Direction the wind is FROM, degrees true, and its speed. */
+  readonly wind: { readonly fromDeg: number; readonly speedKts: number }
+  /**
+   * How much of the wind an aircraft actually feels, 0..1.
+   *
+   * Deliberately not all of it. A full twenty-knot crosswind at 180 kt is
+   * an eight degree drift angle, and vectoring against that stops being a
+   * game and becomes an exercise in anticipating the wind. A third of it
+   * gives groundspeeds that visibly differ upwind and down, and a drift
+   * that has to be corrected but not fought.
+   */
+  readonly windEffect: number
+  readonly cellCount: number
+  readonly minRadiusNM: number
+  readonly maxRadiusNM: number
+  /** Cells drift at this fraction of the wind speed. */
+  readonly driftFactor: number
+  /** Cells are placed within this range of the field. */
+  readonly spreadNM: number
+}
+
 export interface Airline {
   readonly code: string
   readonly weight: number
@@ -314,6 +344,7 @@ export interface Airport {
   readonly runways: readonly Runway[]
   readonly navaids: readonly Navaid[]
   readonly airports: readonly NeighbourAirport[]
+  readonly weather: WeatherSettings
   readonly airspace: readonly AirspaceVolume[]
   /**
    * The area of responsibility: the published controlled airspace over this
@@ -557,6 +588,7 @@ export function loadAirport(raw: unknown): Airport {
     navaids,
     airports,
     airspace,
+    weather: parseWeather(root['weather']),
     controlZone,
     controlFootprint: footprint(controlZone),
     geography,
@@ -593,6 +625,49 @@ function parseSector(raw: unknown): Sector {
     rangeRingsNM: rings,
     defaultRangeNM: num(o['defaultRangeNM'], 'sector.defaultRangeNM'),
     activeArrivalRunways: active,
+  }
+}
+
+function parseWeather(raw: unknown): WeatherSettings {
+  const o = obj(raw, 'weather')
+  const w = obj(o['wind'], 'weather.wind')
+
+  const fromDeg = num(w['fromDeg'], 'weather.wind.fromDeg')
+  if (fromDeg < 0 || fromDeg > 360) {
+    throw new ConfigError('weather.wind.fromDeg', 'must be a bearing within 0..360')
+  }
+  const speedKts = num(w['speedKts'], 'weather.wind.speedKts')
+  if (speedKts < 0) throw new ConfigError('weather.wind.speedKts', 'must not be negative')
+
+  const windEffect = num(o['windEffect'], 'weather.windEffect')
+  if (windEffect < 0 || windEffect > 1) {
+    throw new ConfigError('weather.windEffect', 'must be a fraction within 0..1')
+  }
+
+  const cellCount = num(o['cellCount'], 'weather.cellCount')
+  if (cellCount < 0) throw new ConfigError('weather.cellCount', 'must not be negative')
+
+  const minRadiusNM = num(o['minRadiusNM'], 'weather.minRadiusNM')
+  const maxRadiusNM = num(o['maxRadiusNM'], 'weather.maxRadiusNM')
+  if (minRadiusNM <= 0) throw new ConfigError('weather.minRadiusNM', 'must be positive')
+  if (maxRadiusNM < minRadiusNM) {
+    throw new ConfigError('weather.maxRadiusNM', 'must not be below the minimum')
+  }
+
+  const driftFactor = num(o['driftFactor'], 'weather.driftFactor')
+  if (driftFactor < 0) throw new ConfigError('weather.driftFactor', 'must not be negative')
+
+  const spreadNM = num(o['spreadNM'], 'weather.spreadNM')
+  if (spreadNM <= 0) throw new ConfigError('weather.spreadNM', 'must be positive')
+
+  return {
+    wind: { fromDeg: normalizeHeading(fromDeg), speedKts },
+    windEffect,
+    cellCount,
+    minRadiusNM,
+    maxRadiusNM,
+    driftFactor,
+    spreadNM,
   }
 }
 

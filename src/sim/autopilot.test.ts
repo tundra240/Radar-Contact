@@ -10,6 +10,7 @@ const base: Aircraft = {
   pos: { x: 0, y: 0 },
   altFt: 9000,
   hdg: 90,
+  iasKts: 220,
   gsKts: 220,
   vsFpm: 0,
   clearedHdg: 90,
@@ -165,6 +166,7 @@ describe('autopilot', () => {
       clearedHdg: 180,
       altFt: 9000,
       clearedAltFt: 6000,
+      iasKts: 250,
       gsKts: 250,
       clearedSpdKts: 200,
     }
@@ -172,14 +174,14 @@ describe('autopilot', () => {
     expect(next.hdg).toBeCloseTo(93, 9)
     expect(next.altFt).toBeCloseTo(8975, 9)
     expect(next.vsFpm).toBeCloseTo(-1500, 6)
-    expect(next.gsKts).toBeCloseTo(248.5, 9)
+    expect(next.iasKts).toBeCloseTo(248.5, 9)
   })
 
   it('leaves an aircraft that has nothing to do alone', () => {
     const next = autopilot(base, 1)
     expect(next.hdg).toBe(base.hdg)
     expect(next.altFt).toBe(base.altFt)
-    expect(next.gsKts).toBe(base.gsKts)
+    expect(next.iasKts).toBe(base.iasKts)
     expect(next.vsFpm).toBe(0)
   })
 
@@ -189,7 +191,7 @@ describe('autopilot', () => {
     const next = autopilot(a, 1, fast)
     expect(next.hdg).toBeCloseTo(96, 9)
     expect(next.altFt).toBeCloseTo(8950, 9)
-    expect(next.gsKts).toBeCloseTo(217, 9)
+    expect(next.iasKts).toBeCloseTo(217, 9)
   })
 
   it('reaches every clearance eventually and then stays put', () => {
@@ -207,7 +209,7 @@ describe('autopilot', () => {
     }
     expect(a.hdg).toBeCloseTo(300, 6)
     expect(a.altFt).toBeCloseTo(4000, 6)
-    expect(a.gsKts).toBeCloseTo(180, 6)
+    expect(a.iasKts).toBeCloseTo(180, 6)
     expect(a.vsFpm).toBe(0)
   })
 })

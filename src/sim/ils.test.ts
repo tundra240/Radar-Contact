@@ -52,6 +52,7 @@ function ac(over: Partial<Aircraft> = {}): Aircraft {
     pos: onFinal(12),
     altFt: 3000,
     hdg: ILS.courseTrue,
+    iasKts: 180,
     gsKts: 180,
     vsFpm: 0,
     clearedHdg: ILS.courseTrue,

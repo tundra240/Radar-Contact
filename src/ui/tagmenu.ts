@@ -136,7 +136,7 @@ export function tagReadout(a: Aircraft): string {
   const trend = trendOf(a.vsFpm)
   const glyph = trend === 'climb' ? '^' : trend === 'descend' ? 'v' : '='
   const hdg = String(Math.round(a.hdg)).padStart(3, '0')
-  return `${modeC(a.altFt)} ${glyph} ${modeC(a.clearedAltFt)}   ${Math.round(a.gsKts)}kt   H${hdg}`
+  return `${modeC(a.altFt)} ${glyph} ${modeC(a.clearedAltFt)}   ${Math.round(a.iasKts)}kt   H${hdg}`
 }
 
 /* ---------------------------------------------------------------- panel */

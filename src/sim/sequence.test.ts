@@ -11,6 +11,7 @@ function ac(over: Partial<Aircraft> = {}): Aircraft {
     pos: { x: 10, y: 0 },
     altFt: 7000,
     hdg: 270,
+    iasKts: 220,
     gsKts: 220,
     vsFpm: 0,
     clearedHdg: 270,

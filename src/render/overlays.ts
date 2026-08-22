@@ -8,6 +8,15 @@
  * choice.
  */
 export interface Overlays {
+  /**
+   * Precipitation on the scope.
+   *
+   * Operational rather than contextual -- traffic has to be vectored round
+   * the bad of it -- but switchable all the same, because a controller wants
+   * to see the picture underneath it and because the returns cover the map.
+   * The WX button on the scope is the quick way to it.
+   */
+  readonly weather: boolean
   /** Control zones, control areas and the TMA. */
   readonly airspace: boolean
   /** Class G aerodrome traffic zones, which are numerous and small. */
@@ -37,6 +46,7 @@ export type OverlayKey = keyof Overlays
 
 /** Display order and wording for the control panel. */
 export const OVERLAY_ITEMS: readonly { readonly key: OverlayKey; readonly label: string }[] = [
+  { key: 'weather', label: 'Weather (WX)' },
   { key: 'rangeRings', label: 'Range rings' },
   { key: 'centrelines', label: 'Extended centrelines' },
   { key: 'airspace', label: 'Controlled airspace' },
@@ -56,6 +66,7 @@ export type DensityName = 'minimal' | 'standard' | 'full'
 export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
   /** Just the geometry needed to run an approach. */
   minimal: {
+    weather: true,
     airspace: false,
     trafficZones: false,
     airspaceLabels: false,
@@ -71,6 +82,7 @@ export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
   },
   /** Enough surrounding context to stay oriented. */
   standard: {
+    weather: true,
     airspace: true,
     trafficZones: false,
     airspaceLabels: true,
@@ -86,6 +98,7 @@ export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
   },
   /** Everything the data supports. */
   full: {
+    weather: true,
     airspace: true,
     trafficZones: true,
     airspaceLabels: true,

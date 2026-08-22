@@ -30,6 +30,7 @@ const base: Aircraft = {
   pos: { x: 0, y: 0 },
   altFt: 9000,
   hdg: 90,
+  iasKts: 220,
   gsKts: 220,
   vsFpm: 0,
   clearedHdg: 90,
@@ -154,7 +155,7 @@ describe('the history trail', () => {
     expect(flown.trail.length).toBeGreaterThanOrEqual(3)
     // Consecutive points are a sweep apart, so roughly the distance flown
     // in that time.
-    const expectedGap = distanceFlownNM(base.gsKts, TRAIL_INTERVAL_SECONDS)
+    const expectedGap = distanceFlownNM(base.iasKts, TRAIL_INTERVAL_SECONDS)
     const first = flown.trail[0]
     const second = flown.trail[1]
     expect(first).toBeDefined()
@@ -172,6 +173,7 @@ describe('one step of everything', () => {
       clearedHdg: 180,
       altFt: 9000,
       clearedAltFt: 6000,
+      iasKts: 250,
       gsKts: 250,
       clearedSpdKts: 200,
     }
@@ -180,7 +182,7 @@ describe('one step of everything', () => {
     expect(next.hdg).toBeCloseTo(93, 9)
     expect(next.altFt).toBeCloseTo(8975, 9)
     expect(next.vsFpm).toBeCloseTo(-1500, 6)
-    expect(next.gsKts).toBeCloseTo(248.5, 9)
+    expect(next.iasKts).toBeCloseTo(248.5, 9)
     expect(distanceNM(a.pos, next.pos)).toBeCloseTo(distanceFlownNM(248.5, 1), 4)
     expect(next.trail).toHaveLength(1)
   })
@@ -217,6 +219,7 @@ describe('arrivals actually leave their entry fix', () => {
       pos: lam.posNM,
       hdg: inbound,
       clearedHdg: inbound,
+      iasKts: airport.traffic.entrySpeedKts,
       gsKts: airport.traffic.entrySpeedKts,
       clearedSpdKts: airport.traffic.entrySpeedKts,
     }
@@ -243,6 +246,7 @@ describe('arrivals actually leave their entry fix', () => {
       pos: lam.posNM,
       hdg: inbound,
       clearedHdg: inbound,
+      iasKts: airport.traffic.entrySpeedKts,
       gsKts: airport.traffic.entrySpeedKts,
       clearedSpdKts: airport.traffic.entrySpeedKts,
     }

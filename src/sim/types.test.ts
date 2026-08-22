@@ -15,6 +15,7 @@ const base: Aircraft = {
   pos: { x: 0, y: 0 },
   altFt: 5000,
   hdg: 270,
+  iasKts: 200,
   gsKts: 200,
   vsFpm: 0,
   clearedHdg: null,

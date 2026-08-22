@@ -36,6 +36,7 @@ function ac(over: Partial<Aircraft> = {}): Aircraft {
     pos: LAM.posNM,
     altFt: 8000,
     hdg: LAM.inboundTrue,
+    iasKts: 220,
     gsKts: 220,
     vsFpm: 0,
     clearedHdg: null,
@@ -153,9 +154,9 @@ describe('holdLeg', () => {
 
   it('shortens the outbound leg for a slower aircraft', () => {
     const at = advance(LAM.posNM, 69, 3.2)
-    expect(holdLeg(ac({ pos: at, hdg: 69, gsKts: 220 }), LAM)).toBe('outbound')
+    expect(holdLeg(ac({ pos: at, hdg: 69, iasKts: 220, gsKts: 220 }), LAM)).toBe('outbound')
     // 180 kt makes the leg 3 NM, so the same spot is now the far end.
-    expect(holdLeg(ac({ pos: at, hdg: 69, gsKts: 180 }), LAM)).toBe('turningInbound')
+    expect(holdLeg(ac({ pos: at, hdg: 69, iasKts: 180, gsKts: 180 }), LAM)).toBe('turningInbound')
   })
 })
 
@@ -241,8 +242,8 @@ describe('flying the pattern', () => {
   })
 
   it('flies a smaller pattern when it is slowed down', () => {
-    const fast = fly(ac({ gsKts: 250, clearedSpdKts: 250 }), 20)
-    const slow = fly(ac({ gsKts: 180, clearedSpdKts: 180 }), 20)
+    const fast = fly(ac({ iasKts: 250, gsKts: 250, clearedSpdKts: 250 }), 20)
+    const slow = fly(ac({ iasKts: 180, gsKts: 180, clearedSpdKts: 180 }), 20)
     expect(slow.furthest).toBeLessThan(fast.furthest)
   })
 
@@ -338,6 +339,7 @@ describe('holding inside the real airspace', () => {
         hdg: pattern.inboundTrue,
         altFt: band.maxAltFt,
         clearedAltFt: band.maxAltFt,
+        iasKts: 240,
         gsKts: 240,
         clearedSpdKts: 240,
         hold: clearance,

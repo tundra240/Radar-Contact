@@ -144,6 +144,7 @@ function plane(over: Partial<Aircraft> = {}): Aircraft {
     pos: { x: 0, y: 0 },
     altFt: 7000,
     hdg: 90,
+    iasKts: 240,
     gsKts: 240,
     vsFpm: 0,
     clearedHdg: 90,
@@ -189,7 +190,7 @@ describe('drawTargets', () => {
 
   it('reaches one minute ahead along the heading', () => {
     // Due east at 240 knots: four miles in a minute, and east is +x.
-    const r = render([plane({ hdg: 90, gsKts: 240 })])
+    const r = render([plane({ hdg: 90, iasKts: 240, gsKts: 240 })])
     const vector = r.lines[0] as Line
     expect(vector).toBeDefined()
     expect(vector.to.x - vector.from.x).toBeCloseTo(r.cam.nmToPx(4), 1)
@@ -197,7 +198,7 @@ describe('drawTargets', () => {
   })
 
   it('points the vector north as up', () => {
-    const r = render([plane({ hdg: 0, gsKts: 300 })])
+    const r = render([plane({ hdg: 0, iasKts: 300 })])
     const vector = r.lines[0] as Line
     // Screen y grows downward, so northbound must decrease it.
     expect(vector.to.y).toBeLessThan(vector.from.y)
@@ -290,7 +291,7 @@ describe('drawTargets', () => {
 
 describe('blockLines', () => {
   it('reads callsign, level and speed', () => {
-    expect(blockLines(plane({ altFt: 7000, gsKts: 240 }))).toEqual(['BAW123', '070', '240 A320'])
+    expect(blockLines(plane({ altFt: 7000, iasKts: 240, gsKts: 240 }))).toEqual(['BAW123', '070', '240 A320'])
   })
 
   it('flags a heavy', () => {
@@ -315,8 +316,8 @@ describe('blockLines', () => {
   })
 
   it('rounds speed to five knots so the digits can be read', () => {
-    expect(blockLines(plane({ gsKts: 238 }))[2]).toBe('240 A320')
-    expect(blockLines(plane({ gsKts: 232 }))[2]).toBe('230 A320')
+    expect(blockLines(plane({ iasKts: 238, gsKts: 238 }))[2]).toBe('240 A320')
+    expect(blockLines(plane({ iasKts: 232, gsKts: 232 }))[2]).toBe('230 A320')
   })
 })
 
@@ -611,5 +612,54 @@ describe('traffic outside the area of responsibility', () => {
     ])
     const mine = r.labels.find((l) => l.s === 'MINE')
     expect(mine?.alpha).toBe(1)
+  })
+})
+
+describe('an aircraft asking to get out of the weather', () => {
+  const render = (alerts: ReadonlySet<string>) => {
+    const cam = new Camera({ x: 0, y: 0 }, 20, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const rec = recorder()
+    drawTargets(
+      rec.ctx,
+      cam,
+      [plane({ callsign: 'BAW123' }), plane({ callsign: 'VIR9', pos: { x: 6, y: 6 } })],
+      null,
+      alerts,
+    )
+    return rec
+  }
+
+  it('marks the block WX', () => {
+    const flagged = render(new Set(['BAW123']))
+    expect(flagged.labels.some((l) => l.s === 'BAW123 WX')).toBe(true)
+    // And leaves the other one alone.
+    expect(flagged.labels.some((l) => l.s === 'VIR9')).toBe(true)
+  })
+
+  it('puts the whole block in the warning colour', () => {
+    // It is the one thing on the display that wants doing something about,
+    // so it outranks both the ordinary ink and the selection.
+    const flagged = render(new Set(['BAW123']))
+    const label = flagged.labels.find((l) => l.s === 'BAW123 WX')
+    expect(label?.style).toBe(theme.warn)
+    expect(flagged.labels.find((l) => l.s === 'VIR9')?.style).toBe(theme.target)
+  })
+
+  it('keeps the block three lines, so nothing shifts under it', () => {
+    const plain = blockLines(plane())
+    const flagged = blockLines(plane(), true)
+    expect(flagged).toHaveLength(plain.length)
+    expect(flagged[1]).toBe(plain[1])
+    expect(flagged[2]).toBe(plain[2])
+  })
+
+  it('keeps the heavy flag alongside it', () => {
+    expect(blockLines(plane({ wake: 'H' }), true)[0]).toBe('BAW123 H WX')
+  })
+
+  it('marks nothing when nothing is asking', () => {
+    const quiet = render(new Set())
+    expect(quiet.labels.some((l) => l.s.includes('WX'))).toBe(false)
   })
 })

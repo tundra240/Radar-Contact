@@ -65,6 +65,7 @@ interface Rendered {
   tight: boolean
   status: string
   mode: string
+  wx: boolean
 }
 
 interface Row {
@@ -174,7 +175,11 @@ export class StripBay {
    * before they are written, and rows are only moved when the running
    * order has actually changed.
    */
-  update(aircraft: readonly Aircraft[], selected: string | null): void {
+  update(
+    aircraft: readonly Aircraft[],
+    selected: string | null,
+    alerts: ReadonlySet<string> = new Set(),
+  ): void {
     this.selectedCallsign = selected
 
     // The bay's order IS the sequence: nearest the field first, then the
@@ -191,7 +196,7 @@ export class StripBay {
     for (const a of ordered) {
       present.add(a.callsign)
       const row = this.rows.get(a.callsign) ?? this.buildRow(a.callsign)
-      this.renderRow(row, a, entries.get(a.callsign))
+      this.renderRow(row, a, entries.get(a.callsign), alerts.has(a.callsign))
     }
 
     for (const [callsign, row] of [...this.rows]) {
@@ -317,6 +322,7 @@ export class StripBay {
         tight: false,
         status: '',
         mode: '',
+        wx: false,
       },
       selected: false,
     }
@@ -329,6 +335,7 @@ export class StripBay {
     row: Row,
     a: Aircraft,
     entry: SequencedFlight | StackedFlight | undefined,
+    alerting = false,
   ): void {
     const inSequence = entry !== undefined && 'position' in entry
     const heavy = isHeavy(a.wake) ? ` ${a.wake}` : ''
@@ -341,7 +348,7 @@ export class StripBay {
       seq: flight === null ? '--' : String(flight.position),
       head: `${a.callsign}${heavy}  ${a.type}`,
       alt: `${modeC(a.altFt)} ${trend} ${modeC(a.clearedAltFt)}`,
-      spd: `SPD ${Math.round(a.gsKts)}/${Math.round(a.clearedSpdKts)}`,
+      spd: `SPD ${Math.round(a.iasKts)}/${Math.round(a.clearedSpdKts)}`,
       hdg:
         a.clearedHdg === null
           ? `HDG ${hdgNow}`
@@ -360,8 +367,12 @@ export class StripBay {
               'NO 1'
             : `GAP ${flight.gapNM.toFixed(1)}/${flight.requiredNM}`,
       tight: flight !== null && isTight(flight),
-      status: statusText(a),
+      // The weather displaces the phase of flight while it lasts: the phase
+      // is what the aircraft is doing and this is what it is asking for,
+      // and the request is the thing that wants acting on.
+      status: alerting ? 'WX -- REQUESTING VECTOR' : statusText(a),
       mode: a.navMode,
+      wx: alerting,
     }
 
     // Field by field: at 5 Hz a wholesale rewrite would be visible work for
@@ -377,6 +388,11 @@ export class StripBay {
     if (next.status !== row.rendered.status) row.status.textContent = next.status
     if (next.mode !== row.rendered.mode) {
       row.el.dataset['mode'] = next.mode
+    }
+    if (next.wx !== row.rendered.wx) {
+      // Guarded, like everything else here: an idle refresh must not write.
+      if (next.wx) row.el.dataset['wx'] = 'true'
+      else delete row.el.dataset['wx']
     }
     row.rendered = next
 

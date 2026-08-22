@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Camera } from '../core/camera'
+import { makeRng } from '../core/rng'
+import { makeWeather } from '../sim/weather'
 import { loadAirport, runwayScaleAt } from '../data/airport'
 import raw from '../data/egll.json'
 import { drawScope } from './scope'
@@ -136,6 +138,16 @@ const airport = loadAirport(raw)
 
 // A settled clock, so the status bar has something to show without the
 // tests needing a running loop.
+/** No weather, so a test that is not about weather sees none. */
+const CALM = makeWeather(makeRng(1), {
+  wind: { fromDeg: 250, speedKts: 0 },
+  cellCount: 0,
+  minRadiusNM: 4,
+  maxRadiusNM: 8,
+  driftFactor: 0,
+  spreadNM: 20,
+})
+
 const STATUS: ScopeStatus = {
   clock: { ticks: 0, elapsedSeconds: 0, timeOfDaySeconds: 12 * 3600 },
   speed: 1,
@@ -143,6 +155,7 @@ const STATUS: ScopeStatus = {
   traffic: { spawned: 0, held: 0, landed: 0, left: 0, points: 0 },
   controller: null,
   airspaceEnforced: true,
+  weather: CALM,
 }
 
 // Most tests assert that a feature draws, so they render everything; the
@@ -821,6 +834,7 @@ describe('the clock and rate readouts', () => {
       traffic: { spawned: 0, held: 0, landed: 0, left: 0, points: 0 },
   controller: null,
   airspaceEnforced: true,
+  weather: CALM,
     })
     expect(labels).toContain('TIME')
     expect(labels).toContain('13:01:01')
@@ -840,6 +854,7 @@ describe('the clock and rate readouts', () => {
         traffic: { spawned: 0, held: 0, landed: 0, left: 0, points: 0 },
   controller: null,
   airspaceEnforced: true,
+  weather: CALM,
       })
       expect(labels, `x${speed}`).toContain('RATE')
       expect(labels, `x${speed}`).toContain(shown)
@@ -855,6 +870,7 @@ describe('the clock and rate readouts', () => {
       traffic: { spawned: 0, held: 0, landed: 0, left: 0, points: 0 },
   controller: null,
   airspaceEnforced: true,
+  weather: CALM,
     })
     expect(labels).toContain('PAUSED')
     expect(labels).not.toContain('x4')
@@ -875,6 +891,7 @@ describe('the traffic readout', () => {
       traffic: { spawned: 7, held: 3, landed: 2, left: 1, points: 150 },
       controller: null,
       airspaceEnforced: true,
+      weather: CALM,
     })
     const labels = rec.texts.map((t) => t.s)
     expect(labels).toContain('TRAFFIC')
@@ -1044,6 +1061,7 @@ describe('traffic on the scope', () => {
       pos: { x: 8, y: 8 },
       altFt: 9000,
       hdg: 225,
+      iasKts: 250,
       gsKts: 250,
       vsFpm: -1500,
       clearedHdg: 225,
@@ -1195,6 +1213,7 @@ describe('a vector being dragged', () => {
       pos: { x: 6, y: 6 },
       altFt: 9000,
       hdg: 225,
+      iasKts: 250,
       gsKts: 250,
       vsFpm: 0,
       clearedHdg: 225,
@@ -1353,5 +1372,47 @@ describe('a session with the airspace rule switched off', () => {
   it('hands the canvas back opaque either way', () => {
     expect(draw(false).alphaAtEnd()).toBe(1)
     expect(draw(true).alphaAtEnd()).toBe(1)
+  })
+})
+
+describe('the weather layer', () => {
+  const STORMY = makeWeather(makeRng(4), {
+    wind: { fromDeg: 250, speedKts: 20 },
+    cellCount: 5,
+    minRadiusNM: 5,
+    maxRadiusNM: 9,
+    driftFactor: 0.8,
+    spreadNM: 15,
+  })
+
+  const draw = (weather = STORMY, overlays = OVERLAY_PRESETS.full) => {
+    const cam = new Camera({ x: 0, y: 0 }, 60, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, airport, overlays, { ...STATUS, weather })
+    return rec
+  }
+
+  /** The weather is the only thing filled at partial strength in a colour. */
+  const cellFills = (rec: ReturnType<typeof draw>) =>
+    rec.washes.filter((w) => w.alpha > 0 && w.alpha < 0.5)
+
+  it('draws the cells when the layer is on', () => {
+    expect(cellFills(draw()).length).toBeGreaterThan(0)
+  })
+
+  it('draws none of it when the layer is off', () => {
+    const off = draw(STORMY, { ...OVERLAY_PRESETS.full, weather: false })
+    expect(cellFills(off)).toHaveLength(0)
+  })
+
+  it('is on in every preset, because it is weather and not decoration', () => {
+    for (const name of ['minimal', 'standard', 'full'] as const) {
+      expect(OVERLAY_PRESETS[name].weather, name).toBe(true)
+    }
+  })
+
+  it('hands the canvas back opaque with the cells drawn', () => {
+    expect(draw().alphaAtEnd()).toBe(1)
   })
 })

@@ -65,6 +65,7 @@ function ac(over: Partial<Aircraft> = {}): Aircraft {
     pos: { x: 10, y: 4 },
     altFt: 7000,
     hdg: 90,
+    iasKts: 240,
     gsKts: 240,
     vsFpm: 0,
     clearedHdg: 90,
@@ -179,7 +180,7 @@ describe('speeds', () => {
 
 describe('readout', () => {
   it('says what the aircraft is doing now', () => {
-    expect(tagReadout(ac({ altFt: 12000, vsFpm: -1500, clearedAltFt: 7000, gsKts: 253, hdg: 88 })))
+    expect(tagReadout(ac({ altFt: 12000, vsFpm: -1500, clearedAltFt: 7000, iasKts: 253, hdg: 88 })))
       .toBe('120 v 070   253kt   H088')
   })
 

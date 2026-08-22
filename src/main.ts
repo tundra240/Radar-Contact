@@ -4,6 +4,8 @@ import { loadAirport, outerLimitNM } from './data/airport'
 import egllConfig from './data/egll.json'
 import { departureOf, enterSector, isInSector, stepAircraft } from './sim/aircraft'
 import { NO_SCORE, pointsFor, scoreDeparture, type Score } from './sim/score'
+import { intensityAt, isAvoidable, makeWeather, windVector } from './sim/weather'
+import { makeRng } from './core/rng'
 import type { ControlZone } from './sim/airspace'
 import {
   SAVE_VERSION,
@@ -365,6 +367,25 @@ function start(
   controls.className = 'controls'
   container.appendChild(controls)
 
+  /**
+   * WX: the weather layer, on the scope rather than buried in the menu.
+   *
+   * It is the one overlay a controller reaches for mid-vector -- to see what
+   * is underneath a cell, or to check whether the gap they are aiming for is
+   * really a gap -- so it gets a button of its own. It toggles the same
+   * overlay key the menu checkbox does, so there is one piece of state and
+   * the two can never disagree.
+   */
+  const wxButton = document.createElement('button')
+  wxButton.type = 'button'
+  wxButton.className = 'mode-toggle wx-button'
+  wxButton.textContent = 'WX'
+  wxButton.title = 'Show or hide precipitation'
+  wxButton.addEventListener('click', () => {
+    setOverlays({ ...overlays, weather: !overlays.weather })
+  })
+  controls.appendChild(wxButton)
+
   const menu = new Menu({
     mount: controls,
     onOverlays: (next) => setOverlays(next),
@@ -400,6 +421,12 @@ function start(
     title: `${airport.icao} approach -- how to play`,
     note: 'This guide is TUTORIAL.md, rendered as it stands. Edit that file to change it.',
   })
+
+  /** The button reads as pressed in while the layer is on. */
+  const paintWx = (): void => {
+    wxButton.classList.toggle('is-on', overlays.weather)
+    wxButton.setAttribute('aria-pressed', String(overlays.weather))
+  }
 
   const paintMenu = (): void => {
     menu.paint({
@@ -473,7 +500,7 @@ function start(
   // is what stops the concurrency cap filling permanently.
 
   const syncStrips = (): void => {
-    bay.update(traffic, selected)
+    bay.update(traffic, selected, asking)
     tagMenu.sync(traffic)
   }
 
@@ -703,6 +730,37 @@ function start(
    * The score, and the two counts behind it. One value rather than three
    * loose counters, so what a session came to is a single thing.
    */
+  /**
+   * The weather, from the session seed.
+   *
+   * A separate stream from the traffic, so the two are not correlated -- a
+   * seed that happens to put a storm over Bovingdon should not also decide
+   * what arrives there. Nothing about it goes into a save: the cells are a
+   * function of the seed and where they have drifted to is a function of
+   * the clock, so a loaded session regenerates exactly the weather it was
+   * saved with.
+   */
+  const weather = makeWeather(makeRng(spawner.seed ^ 0x7715), airport.weather)
+
+  /**
+   * The wind the aircraft feel: a fraction of the reported wind. See
+   * windEffect in data/airport.ts for why it is not all of it.
+   */
+  const windKts = windVector(airport.weather.wind, airport.weather.windEffect)
+
+  /** Callsigns in weather bad enough that the crew would ask to leave it. */
+  const inWeather = (): ReadonlySet<string> => {
+    const out = new Set<string>()
+    const at = loop.clock.elapsedSeconds
+    for (const a of traffic) {
+      if (isAvoidable(intensityAt(weather, a.pos, at))) out.add(a.callsign)
+    }
+    return out
+  }
+
+  /** Who was already asking, so each request is made once and not per tick. */
+  let asking: ReadonlySet<string> = new Set()
+
   let score: Score = NO_SCORE
 
   /** Nothing exists beyond this: see data/airport.ts. */
@@ -742,7 +800,9 @@ function start(
       // indistinguishable from a bug, and one of them used to happen five
       // miles outside the only boundary the scope draws.
       const flown: Aircraft[] = []
-      for (const stepped of traffic.map((x) => stepAircraft(x, dt, clock.elapsedSeconds))) {
+      for (const stepped of traffic.map((x) =>
+        stepAircraft(x, dt, clock.elapsedSeconds, windKts),
+      )) {
         // Crossing in is what makes an aircraft the controller's, and it is
         // the only moment at which that changes.
         const zone = activeZone()
@@ -777,7 +837,17 @@ function start(
         selected = null
       }
 
-      if (clock.ticks % SYNC_EVERY_TICKS === 0) syncStrips()
+      if (clock.ticks % SYNC_EVERY_TICKS === 0) {
+        // Once each, as they run into it. A request repeated twenty times a
+        // second is not a request, it is a fault.
+        const now = inWeather()
+        for (const callsign of now) {
+          if (asking.has(callsign)) continue
+          commandConsole.write(`${callsign} requesting vector due to severe weather`, 'reject')
+        }
+        asking = now
+        syncStrips()
+      }
     },
     render: () => {
       if (!dirty && !simAdvanced) return
@@ -800,9 +870,10 @@ function start(
           points: score.points,
         },
         airspaceEnforced: activeZone() !== null,
+        weather,
           controller,
         },
-        { aircraft: traffic, selected, drag: currentDrag() },
+        { aircraft: traffic, selected, drag: currentDrag(), alerts: asking },
       )
     },
   })
@@ -896,6 +967,7 @@ function start(
   })
 
   syncStrips()
+  paintWx()
   paintMenu()
   resize()
   // Stopped until someone logs on, so the shift starts when the controller
@@ -940,6 +1012,7 @@ function start(
   const setOverlays = (value: Overlays): void => {
     overlays = value
     rememberOverlays(value)
+    paintWx()
     paintMenu()
     requestDraw()
   }
