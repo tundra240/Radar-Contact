@@ -213,6 +213,21 @@ Heathrow arrivals do not appear at the edge of the sector on a random bearing. T
 over one of four VOR holds -- the *stacks* -- and which one they arrive over was decided long
 before they reached you, by the direction they came from.
 
+**And the game models that**, so the callsign tells you something about the corridor:
+
+| Stack | Corner | Who comes down it |
+|---|---|---|
+| **BNN** | North-west | Transatlantic from North America and Canada, Ireland, the UK north, Iceland |
+| **OCK** | South-west | The US south and Caribbean, South America, Spain and Portugal, the UK south |
+| **LAM** | North-east | Germany, Scandinavia and the Baltics, and the Far East over the pole |
+| **BIG** | South-east | France, the Low Countries, Switzerland and Italy, the Middle East, India, Asia, Australasia |
+
+So American and United arrive over Bovingdon four times out of five, Iberia and TAP over Ockham
+nine times out of ten, KLM and Lufthansa over Lambourne, Emirates and Swiss over Biggin. British
+Airways comes down all four, because it flies everywhere. If an operator's own stack is full to
+the ceiling the arrival is put somewhere else rather than held back -- but with six or seven
+levels to a stack that is rare, and over a measured hour of traffic it did not happen once.
+
 Distances and bearings below are computed by the loader from the published navaid
 coordinates, measured from the airport reference point *(config)*:
 

@@ -788,3 +788,157 @@ describe('where arrivals appear', () => {
     }
   })
 })
+
+describe('routing arrivals by where they came from', () => {
+  /**
+   * An arrival comes down the corridor that faces where it has flown from:
+   * transatlantic over Bovingdon, the Middle East and Asia over Biggin,
+   * Iberia over Ockham, northern Europe over Lambourne. An American 777
+   * arriving over Biggin is wrong in a way a controller notices at once.
+   *
+   * Released into an empty world so that every fix is always free, which
+   * isolates the preference from the availability.
+   */
+  const sample = (count: number): Map<string, Map<string, number>> => {
+    const spawner = makeSpawner(987)
+    const byAirline = new Map<string, Map<string, number>>()
+    for (let i = 0; i < count; i += 1) {
+      for (const a of spawner.spawnNow(clockAt(i * 120), [])) {
+        const code = a.callsign.replace(/\d+$/, '')
+        const fixes = byAirline.get(code) ?? new Map<string, number>()
+        fixes.set(a.originFix ?? '?', (fixes.get(a.originFix ?? '?') ?? 0) + 1)
+        byAirline.set(code, fixes)
+      }
+    }
+    return byAirline
+  }
+
+  const shares = sample(4000)
+
+  it('never sends an operator down a corridor it does not use', () => {
+    // The structural claim, and the one that would be most obviously wrong
+    // on the scope: no American over Biggin, no Iberia over Lambourne.
+    for (const airline of airport.traffic.airlines) {
+      const seen = shares.get(airline.code)
+      if (seen === undefined) continue
+      for (const fix of seen.keys()) {
+        expect(
+          airline.preferredFixes[fix],
+          `${airline.code} arrived over ${fix}, which is not one of its corridors`,
+        ).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('follows the configured split, within a few points', () => {
+    for (const airline of airport.traffic.airlines) {
+      const seen = shares.get(airline.code)
+      if (seen === undefined) continue
+      const n = [...seen.values()].reduce((a, b) => a + b, 0)
+      // A thin sample says nothing about a percentage.
+      if (n < 60) continue
+
+      const total = Object.values(airline.preferredFixes).reduce((a, b) => a + b, 0)
+      for (const [fix, weight] of Object.entries(airline.preferredFixes)) {
+        const want = (weight / total) * 100
+        const got = ((seen.get(fix) ?? 0) / n) * 100
+        expect(
+          Math.abs(got - want),
+          `${airline.code} over ${fix}: ${got.toFixed(0)}% against ${want.toFixed(0)}%`,
+        ).toBeLessThan(12)
+      }
+    }
+  })
+
+  it('puts the traffic where the brief says it should be', () => {
+    // Spelled out for a few, so a change to the tables shows up as a
+    // failure here and not only as a statistic.
+    const busiest = (code: string): string => {
+      const seen = shares.get(code)
+      if (!seen) throw new Error(`no ${code} in the sample`)
+      return [...seen].sort((a, b) => b[1] - a[1])[0]![0]
+    }
+    expect(busiest('AAL')).toBe('BNN')
+    expect(busiest('UAL')).toBe('BNN')
+    expect(busiest('EIN')).toBe('BNN')
+    expect(busiest('IBE')).toBe('OCK')
+    expect(busiest('TAP')).toBe('OCK')
+    expect(busiest('KLM')).toBe('LAM')
+    expect(busiest('DLH')).toBe('LAM')
+    expect(busiest('UAE')).toBe('BIG')
+    expect(busiest('SWR')).toBe('BIG')
+  })
+
+  it('spreads British Airways over all four, being everywhere', () => {
+    const seen = shares.get('BAW')
+    expect(seen?.size).toBe(4)
+    for (const fix of ['LAM', 'BIG', 'BNN', 'OCK']) {
+      expect(seen?.get(fix) ?? 0, fix).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('when a corridor is full', () => {
+  /** Every level of a fix, occupied by traffic holding there. */
+  const fill = (name: string): Aircraft[] => {
+    const fix = airport.navaids.find((n) => n.name === name)
+    if (!fix?.hold || !fix.entry) throw new Error(`no hold at ${name}`)
+    const pattern = {
+      fix: name,
+      posNM: fix.posNM,
+      inboundTrue: fix.hold.inboundTrue,
+      turns: fix.hold.turns,
+      legMins: fix.hold.legMins,
+    }
+    const out: Aircraft[] = []
+    for (let ft = bottomOf(fix); ft <= fix.entry.maxAltFt; ft += 1000) {
+      out.push(
+        parked(`${name}${ft}`, fix.posNM, ft, {
+          navMode: 'HOLD',
+          hold: pattern,
+          originFix: name,
+          entered: true,
+        }),
+      )
+    }
+    return out
+  }
+
+  it('sends the traffic somewhere else rather than holding it back', () => {
+    // An arrival with nowhere geographically sensible to go is better put
+    // somewhere than refused for the sake of its own plausibility.
+    const blocked = [...fill('BNN'), ...fill('OCK')]
+    expect(blocked.length).toBeLessThan(airport.traffic.maxConcurrent)
+
+    const spawner = makeSpawner(31)
+    const released: Aircraft[] = []
+    for (let i = 0; i < 40; i += 1) {
+      released.push(...spawner.spawnNow(clockAt(i * 120), blocked))
+    }
+
+    expect(released.length).toBeGreaterThan(20)
+    // Nothing went to a full stack...
+    for (const a of released) {
+      expect(['LAM', 'BIG'], a.callsign).toContain(a.originFix)
+    }
+    // ...including the transatlantics, whose own corridors are the full ones.
+    const atlantic = released.filter((a) => /^(AAL|UAL|ACA|EIN|DAL)/.test(a.callsign))
+    expect(atlantic.length).toBeGreaterThan(0)
+  })
+
+  it('burns no callsign on a release it holds back', () => {
+    // The issued set is session-long, so a name spent on a spawn that did
+    // not happen is a name gone for good. Which is why the flight is
+    // generated only after a slot is known to exist.
+    const spawner = makeSpawner(77)
+    const full = Array.from({ length: airport.traffic.maxConcurrent }, (_u, i) =>
+      parked(`FULL${i}`, { x: 4 + i * 0.4, y: -6 }, 9000, { entered: true }),
+    )
+
+    const before = spawner.snapshot().flights.issued.length
+    const due = airport.traffic.firstSpawnSeconds
+    expect(spawner.update(due, clockAt(due), full)).toHaveLength(0)
+    expect(spawner.deferred).toBeGreaterThan(0)
+    expect(spawner.snapshot().flights.issued.length).toBe(before)
+  })
+})

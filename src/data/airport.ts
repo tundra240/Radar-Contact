@@ -88,6 +88,24 @@ export interface Airline {
   readonly fleet: readonly string[]
   /** Bands its flight numbers fall in. Plausible, not authoritative. */
   readonly numbers: readonly FlightNumberRange[]
+  /**
+   * Which holding fixes this operator arrives over, and how often, keyed by
+   * fix name.
+   *
+   * An arrival does not pick its corridor at random: it comes down the one
+   * that faces where it has flown from. Transatlantic traffic enters over
+   * Bovingdon to the north-west, the Middle East and Asia over Biggin to
+   * the south-east, Iberia over Ockham to the south-west, and northern
+   * Europe over Lambourne to the north-east. So an American 777 arriving
+   * over Biggin is wrong in a way a controller would notice immediately.
+   *
+   * Weights rather than probabilities -- they happen to be written as
+   * percentages, and nothing depends on them summing to a hundred. An empty
+   * table means no preference, and so does one whose fixes all happen to be
+   * full: sim/spawner.ts falls back to any fix with room rather than
+   * holding an arrival for the sake of its geography.
+   */
+  readonly preferredFixes: Readonly<Record<string, number>>
 }
 
 export interface FlightNumberRange {
@@ -464,7 +482,15 @@ export function loadAirport(raw: unknown): Airport {
   const aircraftTypes = arr(root['aircraftTypes'], 'aircraftTypes').map((t, i) =>
     parseAircraftType(t, `aircraftTypes[${i}]`),
   )
-  const traffic = parseTraffic(root['traffic'], new Set(aircraftTypes.map((t) => t.type)))
+  const traffic = parseTraffic(
+    root['traffic'],
+    new Set(aircraftTypes.map((t) => t.type)),
+    // The fixes an arrival can actually be released over, which is what a
+    // routing preference has to name to mean anything.
+    new Set(
+      rawNavaids.filter((n) => n.hold !== null && n.entry !== null).map((n) => n.name),
+    ),
+  )
 
   assertUnique(runways.map((r) => r.id), 'runways[].id')
   assertUnique(rawNavaids.map((n) => n.name), 'navaids[].name')
@@ -570,7 +596,11 @@ function parseSector(raw: unknown): Sector {
   }
 }
 
-function parseTraffic(raw: unknown, knownTypes: ReadonlySet<string>): TrafficConfig {
+function parseTraffic(
+  raw: unknown,
+  knownTypes: ReadonlySet<string>,
+  knownFixes: ReadonlySet<string>,
+): TrafficConfig {
   const o = obj(raw, 'traffic')
 
   const initial = num(o['initialIntervalSeconds'], 'traffic.initialIntervalSeconds')
@@ -621,11 +651,26 @@ function parseTraffic(raw: unknown, knownTypes: ReadonlySet<string>): TrafficCon
       return { min, max }
     })
 
+    const prefsPath = `${path}.preferredFixes`
+    const prefsRaw = obj(ao['preferredFixes'], prefsPath)
+    const preferredFixes: Record<string, number> = {}
+    for (const [fix, weight] of Object.entries(prefsRaw)) {
+      if (!knownFixes.has(fix)) {
+        // Catches a typo in a routing table at load rather than as an
+        // operator that quietly arrives from everywhere.
+        throw new ConfigError(prefsPath, `references unknown holding fix "${fix}"`)
+      }
+      const w = num(weight, `${prefsPath}.${fix}`)
+      if (w < 0) throw new ConfigError(`${prefsPath}.${fix}`, 'must not be negative')
+      preferredFixes[fix] = w
+    }
+
     return {
       code,
       weight: num(ao['weight'], `${path}.weight`),
       fleet,
       numbers,
+      preferredFixes,
     }
   })
   if (!airlines.some((a) => a.weight > 0)) {

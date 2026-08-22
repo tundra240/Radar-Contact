@@ -2,8 +2,12 @@ import type { Clock } from '../core/loop'
 import { advance, bearingDeg, distanceNM, type Vec2NM } from '../core/geo'
 import { exitRangeNM } from './airspace'
 import { makeRng, makeRngAt, type Rng } from '../core/rng'
-import type { Airport, Navaid } from '../data/airport'
-import { FlightGenerator, type FlightGeneratorState } from './flightgen'
+import type { Airline, Airport, Navaid } from '../data/airport'
+import {
+  FlightGenerator,
+  type FlightGeneratorState,
+  type FlightIdentity,
+} from './flightgen'
 import type { Aircraft, HoldClearance } from './types'
 
 /**
@@ -83,6 +87,8 @@ export class Spawner {
   private readonly lastUsedAt = new Map<string, number>()
   /** Entry points never move, and finding one walks the boundary. */
   private readonly gates = new Map<string, Vec2NM>()
+  /** Airlines by code, for looking up where each one arrives from. */
+  private readonly airlines: ReadonlyMap<string, Airline>
   private spawnCount = 0
   private deferCount = 0
 
@@ -97,6 +103,7 @@ export class Spawner {
     this.flights = new FlightGenerator(opts.airport)
     this.fixes = opts.airport.navaids.filter((n) => n.hold !== null && n.entry !== null)
     this.waitSeconds = opts.airport.traffic.firstSpawnSeconds
+    this.airlines = new Map(opts.airport.traffic.airlines.map((a) => [a.code, a]))
   }
 
   /**
@@ -193,13 +200,13 @@ export class Spawner {
       return []
     }
 
-    const slot = this.chooseSlot(clock, existing, { ignoreCooldown: false })
-    if (!slot) {
+    const slots = this.eligibleSlots(clock, existing, { ignoreCooldown: false })
+    if (slots.length === 0) {
       this.hold()
       return []
     }
 
-    return [this.release(slot, clock, existing)]
+    return [this.release(slots, clock, existing)]
   }
 
   /**
@@ -217,17 +224,33 @@ export class Spawner {
       return []
     }
 
-    const slot = this.chooseSlot(clock, existing, { ignoreCooldown: true })
-    if (!slot) {
+    const slots = this.eligibleSlots(clock, existing, { ignoreCooldown: true })
+    if (slots.length === 0) {
       this.deferCount += 1
       return []
     }
 
-    return [this.release(slot, clock, existing)]
+    return [this.release(slots, clock, existing)]
   }
 
-  private release(slot: Slot, clock: Clock, existing: readonly Aircraft[]): Aircraft {
-    const aircraft = this.build(slot, clock, existing)
+  private release(
+    slots: readonly Slot[],
+    clock: Clock,
+    existing: readonly Aircraft[],
+  ): Aircraft {
+    // The flight before the fix, which is the other way round from how this
+    // used to work. Which corridor an arrival comes down is a property of
+    // where it has flown from, so the operator has to be known before the
+    // fix can be chosen -- an American 777 arriving over Biggin is wrong in
+    // a way a controller notices immediately.
+    //
+    // Done only once a slot is known to exist, so a release that gets held
+    // back never burns a callsign: the issued set is session-long, and a
+    // name spent on a spawn that did not happen is a name gone for good.
+    const flight = this.flights.next(this.rng, new Set(existing.map((a) => a.callsign)))
+    const slot = this.chooseSlot(slots, flight.airline)
+
+    const aircraft = this.build(slot, flight, clock)
     this.lastUsedAt.set(slot.fix.name, clock.elapsedSeconds)
     this.spawnCount += 1
     // A release resets the cadence either way, so a manual one is not
@@ -262,14 +285,14 @@ export class Spawner {
    * not that the airspace over it is empty -- it will not be, for long --
    * but that there is a level free in the stack.
    *
-   * Returns null when every fix is full, which is the signal to hold the
+   * Returns empty when every fix is full, which is the signal to hold the
    * release back.
    */
-  private chooseSlot(
+  private eligibleSlots(
     clock: Clock,
     existing: readonly Aircraft[],
     opts: { ignoreCooldown: boolean },
-  ): Slot | null {
+  ): readonly Slot[] {
     const t = this.airport.traffic
     const slots: Slot[] = []
 
@@ -298,8 +321,23 @@ export class Spawner {
       slots.push({ fix, altFt })
     }
 
-    if (slots.length === 0) return null
-    return this.rng.pick(slots)
+    return slots
+  }
+
+  /**
+   * Which of the free slots this operator arrives over.
+   *
+   * Weighted by the corridor it actually flies: see `preferredFixes` in
+   * data/airport.ts. `rng.weighted` falls back to a uniform choice when
+   * every weight is zero, which is exactly the behaviour wanted when all of
+   * an airline's usual gates happen to be full -- an arrival with nowhere
+   * geographically sensible to go is better put somewhere than held for the
+   * sake of its own plausibility.
+   */
+  private chooseSlot(slots: readonly Slot[], airline: string): Slot {
+    const preferred = this.airlines.get(airline)?.preferredFixes
+    if (preferred === undefined) return this.rng.pick(slots)
+    return this.rng.weighted(slots, (slot) => preferred[slot.fix.name] ?? 0)
   }
 
   /**
@@ -393,12 +431,9 @@ export class Spawner {
     return out
   }
 
-  private build(slot: Slot, clock: Clock, existing: readonly Aircraft[]): Aircraft {
+  private build(slot: Slot, flight: FlightIdentity, clock: Clock): Aircraft {
     const airport = this.airport
     const { fix, altFt } = slot
-    // Who the flight is comes from the generator; where and how it enters
-    // is this module's business.
-    const flight = this.flights.next(this.rng, new Set(existing.map((a) => a.callsign)))
 
     // Groundspeed only for now: indicated airspeed and the wind that
     // separates the two are not modelled yet, so the sector speed limit is

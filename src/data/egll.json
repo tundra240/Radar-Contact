@@ -17305,6 +17305,12 @@
     "airlines": [
       {
         "code": "BAW",
+        "preferredFixes": {
+          "BNN": 25,
+          "OCK": 25,
+          "LAM": 25,
+          "BIG": 25
+        },
         "weight": 30,
         "fleet": [
           "A319",
@@ -17330,6 +17336,10 @@
       },
       {
         "code": "SHT",
+        "preferredFixes": {
+          "BNN": 70,
+          "OCK": 30
+        },
         "weight": 6,
         "fleet": [
           "A319",
@@ -17346,6 +17356,11 @@
       },
       {
         "code": "VIR",
+        "preferredFixes": {
+          "BNN": 60,
+          "OCK": 30,
+          "BIG": 10
+        },
         "weight": 6,
         "fleet": [
           "A359",
@@ -17360,6 +17375,10 @@
       },
       {
         "code": "AAL",
+        "preferredFixes": {
+          "BNN": 80,
+          "OCK": 20
+        },
         "weight": 5,
         "fleet": [
           "B789",
@@ -17374,6 +17393,10 @@
       },
       {
         "code": "UAL",
+        "preferredFixes": {
+          "BNN": 80,
+          "OCK": 20
+        },
         "weight": 4,
         "fleet": [
           "B789",
@@ -17388,6 +17411,10 @@
       },
       {
         "code": "DAL",
+        "preferredFixes": {
+          "BNN": 70,
+          "OCK": 30
+        },
         "weight": 4,
         "fleet": [
           "A359",
@@ -17402,6 +17429,10 @@
       },
       {
         "code": "DLH",
+        "preferredFixes": {
+          "LAM": 70,
+          "BIG": 30
+        },
         "weight": 4,
         "fleet": [
           "A320",
@@ -17418,6 +17449,10 @@
       },
       {
         "code": "AFR",
+        "preferredFixes": {
+          "BIG": 80,
+          "OCK": 20
+        },
         "weight": 3,
         "fleet": [
           "A319",
@@ -17434,6 +17469,10 @@
       },
       {
         "code": "KLM",
+        "preferredFixes": {
+          "LAM": 80,
+          "BIG": 20
+        },
         "weight": 3,
         "fleet": [
           "B738",
@@ -17448,6 +17487,10 @@
       },
       {
         "code": "SWR",
+        "preferredFixes": {
+          "BIG": 80,
+          "LAM": 20
+        },
         "weight": 3,
         "fleet": [
           "A319",
@@ -17464,6 +17507,10 @@
       },
       {
         "code": "IBE",
+        "preferredFixes": {
+          "OCK": 90,
+          "BIG": 10
+        },
         "weight": 3,
         "fleet": [
           "A319",
@@ -17480,6 +17527,10 @@
       },
       {
         "code": "UAE",
+        "preferredFixes": {
+          "BIG": 70,
+          "LAM": 30
+        },
         "weight": 3,
         "fleet": [
           "A388",
@@ -17494,6 +17545,10 @@
       },
       {
         "code": "ETD",
+        "preferredFixes": {
+          "BIG": 70,
+          "LAM": 30
+        },
         "weight": 2,
         "fleet": [
           "B789",
@@ -17508,6 +17563,10 @@
       },
       {
         "code": "QTR",
+        "preferredFixes": {
+          "BIG": 70,
+          "LAM": 30
+        },
         "weight": 2,
         "fleet": [
           "B789",
@@ -17522,6 +17581,10 @@
       },
       {
         "code": "SIA",
+        "preferredFixes": {
+          "BIG": 60,
+          "LAM": 40
+        },
         "weight": 2,
         "fleet": [
           "A388",
@@ -17536,6 +17599,10 @@
       },
       {
         "code": "QFA",
+        "preferredFixes": {
+          "BIG": 60,
+          "LAM": 40
+        },
         "weight": 2,
         "fleet": [
           "A388",
@@ -17550,6 +17617,10 @@
       },
       {
         "code": "ACA",
+        "preferredFixes": {
+          "BNN": 90,
+          "OCK": 10
+        },
         "weight": 2,
         "fleet": [
           "B789",
@@ -17564,6 +17635,10 @@
       },
       {
         "code": "JAL",
+        "preferredFixes": {
+          "LAM": 70,
+          "BNN": 30
+        },
         "weight": 2,
         "fleet": [
           "B789",
@@ -17578,6 +17653,10 @@
       },
       {
         "code": "ANA",
+        "preferredFixes": {
+          "LAM": 70,
+          "BNN": 30
+        },
         "weight": 2,
         "fleet": [
           "B789",
@@ -17592,6 +17671,10 @@
       },
       {
         "code": "CPA",
+        "preferredFixes": {
+          "LAM": 60,
+          "BIG": 40
+        },
         "weight": 2,
         "fleet": [
           "A359",
@@ -17606,6 +17689,10 @@
       },
       {
         "code": "EIN",
+        "preferredFixes": {
+          "BNN": 90,
+          "OCK": 10
+        },
         "weight": 2,
         "fleet": [
           "A320",
@@ -17620,6 +17707,10 @@
       },
       {
         "code": "TAP",
+        "preferredFixes": {
+          "OCK": 90,
+          "BIG": 10
+        },
         "weight": 2,
         "fleet": [
           "A320",
@@ -17634,6 +17725,10 @@
       },
       {
         "code": "TOM",
+        "preferredFixes": {
+          "OCK": 70,
+          "BIG": 30
+        },
         "weight": 1,
         "fleet": [
           "B738"
@@ -17647,6 +17742,11 @@
       },
       {
         "code": "EZY",
+        "preferredFixes": {
+          "OCK": 34,
+          "BIG": 33,
+          "LAM": 33
+        },
         "weight": 1,
         "fleet": [
           "A319",

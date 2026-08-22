@@ -179,7 +179,12 @@ npm run dev        # http://localhost:5173
 On the scope: drag to pan, wheel to zoom, `R` to reset the view, space to pause, `D` to cycle
 the display schemes, and `M` to open the menu (`O` does too).
 
-Arrivals are released by `sim/spawner.ts` on a timer that tightens as the session goes on. Each
+Arrivals are released by `sim/spawner.ts` on a timer that tightens as the session goes on, and
+**which stack each one arrives over follows where it has flown from**: transatlantic over
+Bovingdon to the north-west, Iberia over Ockham to the south-west, northern Europe over
+Lambourne to the north-east, the Middle East and Asia over Biggin to the south-east. Each
+airline carries a `preferredFixes` table in the config, so an American 777 arriving over Biggin
+-- wrong in a way a controller notices at once -- cannot happen. Each
 one appears twelve miles out along its hold's inbound leg, tracks **direct to its VOR, and
 enters the hold when it gets there** -- so traffic parks itself over the four fixes, stacked in
 1,000 ft layers, and waits for you. Nothing crosses the sector unless you send it somewhere.

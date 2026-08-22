@@ -959,6 +959,29 @@ by design. The spawner picks a **slot** -- a fix *and* a level in its stack -- n
   dead when paused, and produces the same stream for a given seed however the session was
   played.
 
+**Which stack an arrival comes over follows where it has flown from.** Every airline carries a
+`preferredFixes` table -- fix name to weight -- and the release is drawn from the free slots
+weighted by it: transatlantic over Bovingdon, Iberia over Ockham, northern Europe over
+Lambourne, the Middle East and Asia over Biggin. British Airways is spread over all four
+because it flies everywhere.
+
+That inverted the order of two things. The fix used to be chosen first and the flight generated
+afterwards, which cannot work when the corridor is a property of the operator -- so the flight
+is generated first and the fix chosen from it. The generation is still done only once a free
+slot is known to exist, because the issued-callsign set is session-long and a name spent on a
+release that got held back is a name gone for good. There is a test for exactly that.
+
+Two things fall out of `rng.weighted` rather than needing code. An airline whose whole corridor
+is full gets a **uniform choice among what is left**, because the helper already falls back that
+way when every weight is zero -- an arrival with nowhere geographically sensible to go is better
+put somewhere than held for the sake of its own plausibility. And an empty table means no
+preference, which is the same path. In a measured hour of traffic the fallback never fired:
+with six or seven levels to a stack, a whole corridor being full is rare.
+
+The tables are validated at load against the fixes arrivals can actually be released over, in
+the same way the fleet lists are validated against the aircraft types. A typo would otherwise be
+an operator that quietly arrives from everywhere.
+
 A consequence worth stating plainly: a sector nobody works fills to `maxConcurrent` and stops.
 That is correct. The releases being held back are held back because there is genuinely nowhere
 to put them, and the flow resumes the moment traffic is taken out of a stack -- there is an

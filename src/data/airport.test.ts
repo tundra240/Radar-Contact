@@ -980,3 +980,74 @@ describe('hold racetracks', () => {
     }
   })
 })
+
+describe('inbound routing tables', () => {
+  const withAirlines = (
+    change: (airlines: Array<Record<string, unknown>>) => void,
+  ): Record<string, unknown> => {
+    const cfg = structuredClone(raw) as Record<string, unknown>
+    const traffic = cfg['traffic'] as Record<string, unknown>
+    change(traffic['airlines'] as Array<Record<string, unknown>>)
+    return cfg
+  }
+
+  it('gives every operator a corridor to arrive down', () => {
+    for (const airline of egll.traffic.airlines) {
+      expect(airline.preferredFixes, airline.code).toBeDefined()
+      expect(Object.keys(airline.preferredFixes).length, airline.code).toBeGreaterThan(0)
+    }
+  })
+
+  it('names only fixes that arrivals can actually be released over', () => {
+    const usable = new Set(
+      egll.navaids.filter((n) => n.hold !== null && n.entry !== null).map((n) => n.name),
+    )
+    for (const airline of egll.traffic.airlines) {
+      for (const fix of Object.keys(airline.preferredFixes)) {
+        expect(usable.has(fix), `${airline.code} -> ${fix}`).toBe(true)
+      }
+    }
+  })
+
+  it('refuses a corridor that names a fix which does not exist', () => {
+    // A typo here would be an operator that quietly arrives from
+    // everywhere, which is the failure this catches at load instead.
+    const cfg = withAirlines((airlines) => {
+      airlines[0]!['preferredFixes'] = { BNN: 50, BOVINGDON: 50 }
+    })
+    expect(() => loadAirport(cfg)).toThrow(/preferredFixes.*BOVINGDON/)
+  })
+
+  it('refuses a fix that exists but is not a holding fix', () => {
+    // A navaid on the chart is not somewhere traffic can be released.
+    const plain = egll.navaids.find((n) => n.hold === null)
+    expect(plain).toBeDefined()
+    const cfg = withAirlines((airlines) => {
+      airlines[0]!['preferredFixes'] = { [plain?.name ?? 'DET']: 100 }
+    })
+    expect(() => loadAirport(cfg)).toThrow(/preferredFixes/)
+  })
+
+  it('refuses a negative share', () => {
+    const cfg = withAirlines((airlines) => {
+      airlines[0]!['preferredFixes'] = { BNN: 80, OCK: -20 }
+    })
+    expect(() => loadAirport(cfg)).toThrow(/preferredFixes\.OCK/)
+  })
+
+  it('refuses an operator with no routing table at all', () => {
+    const cfg = withAirlines((airlines) => {
+      delete airlines[0]!['preferredFixes']
+    })
+    expect(() => loadAirport(cfg)).toThrow(/preferredFixes/)
+  })
+
+  it('accepts an empty table, which means no preference', () => {
+    // Documented behaviour rather than an oversight: the spawner falls back
+    // to any fix with room.
+    const cfg = withAirlines((airlines) => {
+      airlines[0]!['preferredFixes'] = {}
+    })
+    expect(() => loadAirport(cfg)).not.toThrow()
+  })
+})
