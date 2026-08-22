@@ -295,7 +295,7 @@ the interface is drawn in, and that changes the arrangement as well as the edges
 | Position | a raised panel with a margin round it | a strip hard into the corner |
 | Controls | wide labelled buttons in the top right | a rail of small square buttons down the left edge |
 | Captions | a saturated bar with light lettering | a ruled heading |
-| Strips | raised cards | a dense ruled list |
+| Strips | raised cards | raised cards, recoloured -- see below |
 
 Both the canvas and the stylesheet read that one field, so a scheme cannot come out half 1999
 desktop and half modern position. The readouts themselves are one list either way -- only the

@@ -388,7 +388,13 @@ that one field governs the furniture as well as the edges:
 | Position block | a raised panel with a margin round it | a strip hard into the corner |
 | Controls | wide labelled buttons in the top-right | a rail of small square buttons down the left |
 | Captions | a saturated bar with light lettering | a ruled heading |
-| Strips | raised cards | a dense ruled list |
+| Strips | raised cards | raised cards, recoloured -- see below |
+
+**The strips are exempt, deliberately.** A modern flight list would be a dense ruled list, and
+an earlier pass at this scheme drew one. It is not done here: the arrangement of a strip is fixed,
+so a strip stays a bordered card in a bordered well and changes only its colours with the palette.
+The hairline it takes in place of its bevel is the same single edge change every other surface
+gets, not a rearrangement.
 
 Both halves of the interface read the same field. On the canvas, `drawHud` picks between
 `drawTitleBlock`/`drawStatusBar` and `drawPositionStrip`/`drawDataTable`; `bevel()` and the

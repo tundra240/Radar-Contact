@@ -1470,7 +1470,9 @@ canvas {
 :root[data-chrome='flat'] .tagmenu-key,
 :root[data-chrome='flat'] .tagmenu-readout,
 :root[data-chrome='flat'] .strip-count,
-:root[data-chrome='flat'] .strip-empty {
+:root[data-chrome='flat'] .strip-empty,
+:root[data-chrome='flat'] .atis-box,
+:root[data-chrome='flat'] .atis-choice {
   box-shadow: none;
   border: 1px solid var(--bevel-light);
 }
@@ -1588,6 +1590,54 @@ canvas {
   width: 196px;
 }
 
+/* The ATIS board is a readout rather than a menu, so it stays put while you
+   work -- but it opens off the rail the same way, or it would be the one
+   panel arriving from a different direction. */
+:root[data-chrome='flat'] .atis-box {
+  top: 0;
+  right: auto;
+  left: calc(100% + 1px);
+  min-width: 196px;
+  padding: 0 0 6px;
+}
+
+/* The letter is the headline on a real board, and the one place this
+   interface earns a saturated bar: it is how a controller finds the ATIS at
+   a glance across a dark position. */
+:root[data-chrome='flat'] .atis-letter {
+  margin: 0 0 6px;
+  padding: 4px 6px;
+  border-bottom: 0;
+  background: var(--title-bar);
+  color: var(--title-text);
+  font-size: 10px;
+}
+
+:root[data-chrome='flat'] .atis-readout {
+  padding: 0 6px;
+  margin-bottom: 6px;
+}
+
+:root[data-chrome='flat'] .atis-row {
+  padding: 0 6px;
+  gap: 1px;
+}
+
+:root[data-chrome='flat'] .atis-advice {
+  padding: 0 6px;
+}
+
+/* A square-shouldered choice, matching the rail rather than the period
+   button it inherits from. */
+:root[data-chrome='flat'] .atis-choice {
+  padding: 4px 6px;
+}
+
+:root[data-chrome='flat'] .atis-choice-name {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
 :root[data-chrome='flat'] .guide-window {
   right: auto;
   left: 32px;
@@ -1615,15 +1665,15 @@ canvas {
   letter-spacing: 0.02em;
 }
 
-/* The strip bay as a dense ruled list rather than a stack of raised cards,
-   which is how a modern flight list is drawn. */
-:root[data-chrome='flat'] .strip {
-  border-width: 0 0 1px 0;
-}
+/* The strips keep their shape.
 
-:root[data-chrome='flat'] .strip-list {
-  border-width: 0;
-}
+   A modern flight list would be drawn as a dense ruled list, and an earlier
+   pass at this scheme did exactly that. It is deliberately not done here:
+   the arrangement of a strip is the one part of the interface that stays
+   put, so a strip remains a bordered card in a bordered well and takes only
+   the colours of whichever palette is in force. The hairline it gets in
+   place of its bevel comes from the shared edge rule above, which is the
+   same single change every other surface gets. */
 
 /* The console sits flush under the picture with one rule between them. */
 :root[data-chrome='flat'] .console {
