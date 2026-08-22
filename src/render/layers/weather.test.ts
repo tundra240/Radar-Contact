@@ -77,7 +77,8 @@ function recorder(): {
 
 const CONFIG: WeatherConfig = {
   wind: { fromDeg: 250, speedKts: 20 },
-  cellCount: 4,
+  chance: 1,
+  maxCells: 4,
   minRadiusNM: 5,
   maxRadiusNM: 9,
   driftFactor: 0.8,
@@ -94,7 +95,7 @@ const draw = (weather: Weather, elapsed = 0, rangeNM = 60) => {
 
 describe('drawWeather', () => {
   it('draws nothing at all for a clear scope', () => {
-    const r = draw(makeWeather(makeRng(1), { ...CONFIG, cellCount: 0 }))
+    const r = draw(makeWeather(makeRng(1), { ...CONFIG, maxCells: 0 }))
     expect(r.fills).toEqual([])
     expect(r.strokes).toEqual([])
   })

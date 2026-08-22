@@ -32,11 +32,12 @@
       "speedKts": 18
     },
     "windEffect": 0.35,
-    "cellCount": 6,
+    "chance": 0.2,
+    "maxCells": 4,
     "minRadiusNM": 4,
-    "maxRadiusNM": 10,
+    "maxRadiusNM": 12,
     "driftFactor": 0.8,
-    "spreadNM": 34
+    "spreadNM": 22
   },
   "render": {
     "runwayExaggeration": 3,

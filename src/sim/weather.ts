@@ -71,7 +71,18 @@ export interface Weather {
 
 export interface WeatherConfig {
   readonly wind: Wind
-  readonly cellCount: number
+  /**
+   * The chance that a session gets any precipitation at all, 0..1.
+   *
+   * Deliberately low. Weather that is always on the scope is not weather,
+   * it is terrain: it stops being something you react to and becomes part
+   * of the chart. Most sessions are clear.
+   *
+   * The wind is not gated by this. Wind is always there.
+   */
+  readonly chance: number
+  /** The most cells a session with weather gets. Fewer is the common case. */
+  readonly maxCells: number
   readonly minRadiusNM: number
   readonly maxRadiusNM: number
   readonly driftFactor: number
@@ -83,14 +94,36 @@ export interface WeatherConfig {
 const LOBE_COUNT = 4
 
 /**
+ * How many cells a session gets: usually none, occasionally a few.
+ *
+ * Two draws rather than one, because they answer different questions. The
+ * first is whether today has weather at all -- most days do not. The second
+ * is how much, and it is skewed low, so an occurrence is a shower or two far
+ * more often than it is a front lying across the whole area.
+ *
+ * The count is settled before any cell is placed, so a clear session draws
+ * one number and stops.
+ */
+export function cellCount(rng: Rng, config: WeatherConfig): number {
+  const most = Math.max(0, Math.floor(config.maxCells))
+  if (most === 0) return 0
+  if (!rng.chance(config.chance)) return 0
+  // Squared, so half of the wet sessions are a single cell and the full
+  // four are the exception. The rarity is meant to be felt twice: most
+  // sessions have nothing, and most of the rest have one thing.
+  return 1 + Math.floor(Math.pow(rng.next(), 2) * most)
+}
+
+/**
  * Weather for a session, from the seeded generator.
  *
  * Seeded rather than random so that a scenario is repeatable and a bug
- * report is actionable, for the same reasons the traffic is.
+ * report is actionable, for the same reasons the traffic is. Most sessions
+ * come back with no cells at all -- see `cellCount`.
  */
 export function makeWeather(rng: Rng, config: WeatherConfig): Weather {
   const cells: WeatherCell[] = []
-  for (let i = 0; i < Math.max(0, Math.floor(config.cellCount)); i += 1) {
+  for (let i = 0, count = cellCount(rng, config); i < count; i += 1) {
     cells.push({
       // Placed by bearing and range rather than in a square, so the spread
       // is actually round and cells are not clustered in the corners.

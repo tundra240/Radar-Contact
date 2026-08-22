@@ -15,13 +15,25 @@ import {
   type WeatherConfig,
 } from './weather'
 
+// Weather forced on, so the geometry tests below always have cells to look
+// at. The shipped config is a fifth of this; the rarity is tested on its own
+// terms in `how often there is weather at all`.
 const CONFIG: WeatherConfig = {
   wind: { fromDeg: 250, speedKts: 20 },
-  cellCount: 6,
+  chance: 1,
+  maxCells: 6,
   minRadiusNM: 4,
   maxRadiusNM: 10,
   driftFactor: 0.8,
   spreadNM: 34,
+}
+
+/** Cell counts over a run of sessions, one seed each. */
+function counts(config: WeatherConfig, sessions: number): number[] {
+  return Array.from(
+    { length: sessions },
+    (_unused, i) => makeWeather(makeRng(i + 1), config).cells.length,
+  )
 }
 
 describe('windVector', () => {
@@ -51,11 +63,48 @@ describe('windVector', () => {
   })
 })
 
-describe('makeWeather', () => {
-  it('produces the configured number of cells', () => {
-    expect(makeWeather(makeRng(1), CONFIG).cells).toHaveLength(6)
+describe('how often there is weather at all', () => {
+  it('leaves most sessions clear, at the configured chance', () => {
+    // The point of the whole exercise: weather on every session is not
+    // weather, it is terrain, and a hazard met every time stops being one.
+    const wet = counts({ ...CONFIG, chance: 0.2 }, 2000).filter((n) => n > 0)
+    expect(wet.length / 2000).toBeGreaterThan(0.17)
+    expect(wet.length / 2000).toBeLessThan(0.23)
   })
 
+  it('does not correlate the answer with the seed', () => {
+    // Sequential seeds, because that is what a run of sessions looks like.
+    // A generator whose first draw tracked its seed would give runs of wet
+    // days and runs of dry ones, and the rarity above would be a fiction.
+    const halves = [0, 1].map(
+      (half) =>
+        counts({ ...CONFIG, chance: 0.2 }, 4000)
+          .slice(half * 2000, (half + 1) * 2000)
+          .filter((n) => n > 0).length / 2000,
+    )
+    expect(Math.abs(halves[0]! - halves[1]!)).toBeLessThan(0.05)
+  })
+
+  it('skews a wet session towards a single cell', () => {
+    const wet = counts({ ...CONFIG, chance: 1 }, 2000)
+    expect(wet.filter((n) => n === 1).length / 2000).toBeGreaterThan(0.35)
+    expect(wet.filter((n) => n <= 2).length / 2000).toBeGreaterThan(0.5)
+    expect(Math.max(...wet)).toBeLessThanOrEqual(CONFIG.maxCells)
+    expect(Math.min(...wet)).toBe(1)
+  })
+
+  it('is clear every time at no chance, and never clear at every chance', () => {
+    expect(counts({ ...CONFIG, chance: 0 }, 200).every((n) => n === 0)).toBe(true)
+    expect(counts({ ...CONFIG, chance: 1 }, 200).every((n) => n >= 1)).toBe(true)
+  })
+
+  it('treats a chance outside 0..1 as the nearest end rather than trusting it', () => {
+    expect(counts({ ...CONFIG, chance: -1 }, 50).every((n) => n === 0)).toBe(true)
+    expect(counts({ ...CONFIG, chance: 5 }, 50).every((n) => n >= 1)).toBe(true)
+  })
+})
+
+describe('makeWeather', () => {
   it('is the same weather for the same seed, and different for another', () => {
     // Seeded for the same reasons the traffic is: a repeatable scenario and
     // an actionable bug report. It is also why no save carries a polygon.
@@ -78,15 +127,18 @@ describe('makeWeather', () => {
   })
 
   it('asks for no cells and gets none', () => {
-    expect(makeWeather(makeRng(1), { ...CONFIG, cellCount: 0 }).cells).toEqual([])
+    expect(makeWeather(makeRng(1), { ...CONFIG, maxCells: 0 }).cells).toEqual([])
   })
 
   it('spreads the cells round the field rather than into one corner', () => {
     // Placed by bearing and range, with the range square-rooted so the
     // distribution is even over the area rather than bunched at the middle.
-    const weather = makeWeather(makeRng(3), { ...CONFIG, cellCount: 60 })
+    // Pooled over sessions, because one session is a cell or two now.
+    const origins = Array.from({ length: 40 }, (_unused, i) =>
+      makeWeather(makeRng(i + 1), { ...CONFIG, chance: 1 }).cells,
+    ).flat()
     const quadrants = new Set(
-      weather.cells.map((c) => Math.floor(bearingDeg({ x: 0, y: 0 }, c.originNM) / 90)),
+      origins.map((c) => Math.floor(bearingDeg({ x: 0, y: 0 }, c.originNM) / 90)),
     )
     expect(quadrants.size).toBe(4)
   })
@@ -165,13 +217,17 @@ describe('intensity', () => {
   })
 
   it('is clear air where there is no weather at all', () => {
-    const calm = makeWeather(makeRng(1), { ...CONFIG, cellCount: 0 })
+    const calm = makeWeather(makeRng(1), { ...CONFIG, maxCells: 0 })
     expect(intensityAt(calm, { x: 0, y: 0 }, 0)).toBe(0)
     expect(bandOf(intensityAt(calm, { x: 0, y: 0 }, 0))).toBeNull()
   })
 
   it('takes the worst cell where two overlap', () => {
-    const pair = makeWeather(makeRng(2), { ...CONFIG, cellCount: 2, spreadNM: 1 })
+    // Seed 5 is the first that draws two cells out of a possible two; the
+    // count is a roll now, so the fixture has to name a seed that gives the
+    // overlap this test is about.
+    const pair = makeWeather(makeRng(5), { ...CONFIG, chance: 1, maxCells: 2, spreadNM: 1 })
+    expect(pair.cells).toHaveLength(2)
     const worst = Math.max(...pair.cells.map((c) => c.peak))
     const middle = pair.cells[0]!.originNM
     expect(intensityAt(pair, middle, 0)).toBeLessThanOrEqual(worst)

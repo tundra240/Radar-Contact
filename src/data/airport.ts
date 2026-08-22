@@ -98,7 +98,16 @@ export interface WeatherSettings {
    * that has to be corrected but not fought.
    */
   readonly windEffect: number
-  readonly cellCount: number
+  /**
+   * The chance a session gets any precipitation at all, 0..1.
+   *
+   * Kept low on purpose. Weather on every session is not weather, it is
+   * terrain, and a hazard you meet every time stops being a hazard. The
+   * wind is not gated by this -- wind is always there.
+   */
+  readonly chance: number
+  /** The most cells a session with weather gets; fewer is the norm. */
+  readonly maxCells: number
   readonly minRadiusNM: number
   readonly maxRadiusNM: number
   /** Cells drift at this fraction of the wind speed. */
@@ -644,8 +653,13 @@ function parseWeather(raw: unknown): WeatherSettings {
     throw new ConfigError('weather.windEffect', 'must be a fraction within 0..1')
   }
 
-  const cellCount = num(o['cellCount'], 'weather.cellCount')
-  if (cellCount < 0) throw new ConfigError('weather.cellCount', 'must not be negative')
+  const chance = num(o['chance'], 'weather.chance')
+  if (chance < 0 || chance > 1) {
+    throw new ConfigError('weather.chance', 'must be a probability within 0..1')
+  }
+
+  const maxCells = num(o['maxCells'], 'weather.maxCells')
+  if (maxCells < 0) throw new ConfigError('weather.maxCells', 'must not be negative')
 
   const minRadiusNM = num(o['minRadiusNM'], 'weather.minRadiusNM')
   const maxRadiusNM = num(o['maxRadiusNM'], 'weather.maxRadiusNM')
@@ -663,7 +677,8 @@ function parseWeather(raw: unknown): WeatherSettings {
   return {
     wind: { fromDeg: normalizeHeading(fromDeg), speedKts },
     windEffect,
-    cellCount,
+    chance,
+    maxCells,
     minRadiusNM,
     maxRadiusNM,
     driftFactor,

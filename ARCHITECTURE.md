@@ -642,6 +642,23 @@ nudge.
 
 `sim/weather.ts` and `render/layers/weather.ts`.
 
+**Most sessions have none.** `chance` is 0.2, so four scopes in five are clear, and the count of
+a wet one is drawn squared against `maxCells` so half of those are a single cell. Two draws
+rather than one, because they answer different questions -- is it raining, and how much -- and
+the first is settled before any cell is placed, so a clear session draws one number and stops.
+
+The rarity is the point. Weather on every session is not weather, it is terrain: a hazard met
+every time stops being a hazard and becomes part of the chart you route around by habit. Rare
+also means an occurrence has to be worth something, which is what `spreadNM` buys. Measured over
+4000 sessions: **20.4%** have any weather, **17.0%** have something bad enough to avoid somewhere
+in radar cover, and **10.0%** have it sitting on one of the four arrival corridors. So about one
+session in five you see weather, and one in ten you have to work around it. Scattering the same
+cells over the old 34 NM spread dropped that last figure to 4.5% -- weather that was visible but
+almost never in the way, which is decoration.
+
+Note what is *not* gated by this: the **wind** is always there. Groundspeed and drift do not wait
+for a rainy day.
+
 **Nothing about the weather is saved.** The cells are a pure function of the session seed and
 the config, and where they have drifted to is a pure function of elapsed time -- so a loaded
 session regenerates exactly the weather it was saved with, without the save carrying a single

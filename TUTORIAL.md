@@ -78,8 +78,13 @@ world it does not fit.
 
 ### Weather
 
+**Most sessions are clear.** Weather turns up about one time in five, and when it does it is
+usually a single cell rather than a front -- roughly one session in ten actually puts it across an
+arrival corridor where you have to do something about it. So an empty scope is not a bug, and a
+scope with a red core on it is a day worth remembering.
+
 **WX** on the scope, next to the menu button, shows and hides the precipitation. It is on to
-start with, because you have to fly round it.
+start with, because on the days there is any, you have to fly round it.
 
 Cells are drawn in three nested contours: **green** for light, **amber** for moderate, **red**
 for heavy. A shower is a single green blob; a storm is three rings with a red core. They drift
