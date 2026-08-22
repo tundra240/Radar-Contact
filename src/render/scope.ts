@@ -193,6 +193,18 @@ export function drawScope(
 function drawScreenFrame(g: CanvasRenderingContext2D, cam: Camera): void {
   const w = cam.width
   const h = cam.height
+
+  if (theme.chromeStyle === 'flat') {
+    // One hairline all the way round. A modern display is a rectangle of
+    // glass in a bezel, not a window recessed into a desktop.
+    g.fillStyle = theme.chromeLight
+    g.fillRect(0, 0, w, 1)
+    g.fillRect(0, h - 1, w, 1)
+    g.fillRect(0, 0, 1, h)
+    g.fillRect(w - 1, 0, 1, h)
+    return
+  }
+
   g.fillStyle = theme.chromeShadow
   g.fillRect(0, 0, w, 2)
   g.fillRect(0, 0, 2, h)
@@ -1006,9 +1018,17 @@ function drawExtendedCentreline(
 const charW = (px: number): number => px * 0.6
 
 /**
- * A raised or sunken panel face, the way interfaces of this era drew
- * every control: a one-pixel light edge along the top and left, a shadow
- * edge along the bottom and right, and the two swapped to read as sunken.
+ * A panel face, drawn in whichever idiom the active scheme declares.
+ *
+ * Under `bevel` it is the turn-of-the-century control: a one-pixel light
+ * edge along the top and left, a shadow edge along the bottom and right,
+ * the two swapped to read as sunken.
+ *
+ * Under `flat` it is a fill and a single hairline border, which is what
+ * every screen in a modern control room does -- there is no raised and no
+ * sunken, only a panel and a well, told apart by how dark the fill is.
+ * Drawing a bevel there would be the one detail that gave the whole thing
+ * away.
  */
 function bevel(
   g: CanvasRenderingContext2D,
@@ -1020,6 +1040,15 @@ function bevel(
 ): void {
   g.fillStyle = sunken ? theme.chromeWell : theme.chromeFace
   g.fillRect(x, y, w, h)
+
+  if (theme.chromeStyle === 'flat') {
+    g.fillStyle = theme.chromeLight
+    g.fillRect(x, y, w, 1)
+    g.fillRect(x, y + h - 1, w, 1)
+    g.fillRect(x, y, 1, h)
+    g.fillRect(x + w - 1, y, 1, h)
+    return
+  }
 
   const topLeft = sunken ? theme.chromeShadow : theme.chromeLight
   const bottomRight = sunken ? theme.chromeLight : theme.chromeShadow

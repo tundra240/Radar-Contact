@@ -343,7 +343,23 @@ corrected it.
 
 ### Colour
 
-The palettes are period references rather than a light and a dark theme of the same design.
+`tracon` is the shipped scheme and the only one that is not a period reference: a present-day
+terminal radar position, taken from photographs of real control rooms. Three things define it
+and all three are decisions rather than taste:
+
+- **The ground is not black.** It is a dark, slightly blue-green slate, `#0b171c`. Black is
+  right for a CRT and wrong for an LCD in a dimmed room, where it lifts to grey anyway and
+  takes the contrast with it.
+- **One ink for data, a very quiet map underneath.** Modern displays do not colour-code the
+  world by class the way the period schemes do; they draw almost everything in one mint green
+  and let the map recede. Airspace keeps a little hue so the classes are still separable, but
+  pulled well down. Holds are the single warm colour on the display, which is why the fixes
+  traffic is stacked over are the one thing that is not mint.
+- **The traffic wins by a wide margin.** The target sits at 12:1 against the ground where the
+  map furniture is under 2:1. That gap *is* the look, and there is a test asserting it.
+
+The other three are period references rather than a light and a dark theme of the same design.
+`beige` follows the desktop software of the era: a warm tan tube at `#c3bda9`, an interface
 `beige` follows the desktop software of the era: a warm tan tube at `#c3bda9`, an interface
 face in the canonical `#d4d0c8` with a white highlight and a mid-grey shadow, and symbology
 taken from the VGA system colours -- navy for class A, purple for the control zones, olive
@@ -357,7 +373,30 @@ whatever traffic is holding at.
 
 Schemes cycle rather than toggle -- `PALETTE_ORDER` is the single place that order is
 stated, and the control, the keyboard shortcut and the stored preference all read from it, so
-adding a fourth scheme is a palette plus one array entry.
+adding a scheme is a palette plus one array entry.
+
+### Bevelled or flat
+
+The one thing about an interface's era that a colour cannot express is how a panel edge is
+drawn, so `Palette` carries a `chromeStyle` of `bevel` or `flat` alongside the hex values.
+
+- **`bevel`** is the turn-of-the-century control: a light edge along the top and left, a shadow
+  edge along the bottom and right, the two swapped to read as sunken.
+- **`flat`** is what replaced it: one hairline border and a change of fill. There is no raised
+  and no sunken, only a panel and a well, told apart by how dark they are.
+
+Both halves of the interface read that same field, which is the point of having it. On the
+canvas, `bevel()` and the screen frame in `render/scope.ts` branch on it. In the DOM, `main.ts`
+stamps it on the root element as `data-chrome` and the stylesheet carries one block of
+overrides that turn every inset box-shadow into a border. The overrides are written as
+overrides rather than as a second set of rules so that layout, spacing and type stay in exactly
+one place and only the edges change.
+
+Under `flat` the caption strips lose their saturated fill and become ruled headings, because a
+navy bar with white lettering is the single most dating detail in the whole interface -- and
+`chromeShadow` is never drawn at all, which is what the test checks: seeing it anywhere in the
+chrome would mean a bevel survived. It is still required to be darker than the face, so that
+switching a scheme from flat to bevelled cannot render it inside out.
 
 Legibility is a test, not a hope. `theme.test.ts` measures WCAG contrast for every colour
 against its own ground and asserts that primary text and runways clear 4.5:1, all symbology

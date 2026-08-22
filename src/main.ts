@@ -1060,6 +1060,10 @@ function start(
     root.setProperty('--hold', theme.hold)
     root.setProperty('--established', theme.fafTick)
     root.setProperty('--warn', theme.warn)
+    // Whether panels are bevelled or flat is geometry rather than colour, so
+    // it travels as an attribute and the stylesheet switches on it. One
+    // source of truth: the canvas chrome reads the same field.
+    document.documentElement.dataset['chrome'] = theme.chromeStyle
     document.body.style.background = theme.bg
     document.body.style.color = theme.text
   }

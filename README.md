@@ -264,9 +264,18 @@ fast-forward is the same simulation sooner rather than a different one. The stat
 the clock and the current rate on the scope itself, so you can see whether time is running
 without opening anything. Interface sound is switched here too; controls click when it is on.
 
-**Display scheme.** Three period palettes, picked by name: **beige** (a Windows-2000-era
-desktop with a tan tube), **dark** (a colour CRT), and **amber** (a monochrome phosphor tube).
-`D` still cycles them without opening the menu, because that is a by-eye choice.
+**Display scheme.** Four palettes, picked by name. **tracon** is the shipped look and the only
+one that is not a period reference: a present-day terminal radar position, taken from
+photographs of real control rooms -- a dark blue-slate ground, mint-green symbology, and flat
+panels with hairline borders instead of bevels. Then three period schemes: **beige** (a
+Windows-2000-era desktop with a tan tube), **dark** (a colour CRT), and **amber** (a monochrome
+phosphor tube). `D` still cycles them without opening the menu, because that is a by-eye
+choice.
+
+The difference between tracon and the rest is not only colour. Whether a panel edge is a
+two-tone bevel or a single hairline is carried by the palette itself, and both the canvas
+chrome and the stylesheet read that one field -- so a scheme cannot come out half 1999 desktop
+and half modern position.
 
 **Overlays.** How much context is drawn -- coastline, the Thames, the FIR boundary, airspace,
 traffic zones, other aerodromes, other navaids, **hold patterns**, labels, range rings,
