@@ -7,7 +7,7 @@ import {
   densityOf,
   type Overlays,
 } from '../render/overlays'
-import { PALETTE_ORDER, type PaletteName } from '../render/theme'
+import { PALETTE_LABEL, PALETTE_ORDER, type PaletteName } from '../render/theme'
 import { Menu, type MenuState } from './menu'
 
 /**
@@ -236,31 +236,31 @@ describe('display scheme', () => {
     // until the one you want comes round.
     const { mount } = mountMenu()
     for (const name of PALETTE_ORDER) {
-      expect(() => keyed(mount, name.toUpperCase())).not.toThrow()
+      expect(() => keyed(mount, PALETTE_LABEL[name])).not.toThrow()
     }
   })
 
   it('reports the scheme that was picked', () => {
     const { mount, palettes } = mountMenu()
-    keyed(mount, 'AMBER').click()
+    keyed(mount, PALETTE_LABEL.amber).click()
     expect(palettes).toEqual(['amber'])
   })
 
   it('shows the active scheme pressed in', () => {
     const { mount, menu } = mountMenu()
     menu.paint(state({ palette: 'dark' }))
-    expect(keyed(mount, 'DARK').classList.contains('is-active')).toBe(true)
-    expect(keyed(mount, 'BEIGE').classList.contains('is-active')).toBe(false)
+    expect(keyed(mount, PALETTE_LABEL.dark).classList.contains('is-active')).toBe(true)
+    expect(keyed(mount, PALETTE_LABEL.beige).classList.contains('is-active')).toBe(false)
   })
 
   it('follows a scheme change made by keyboard', () => {
     // D still cycles the palette without opening the menu, so paint has to
     // be what decides the display -- not the last button pressed here.
     const { mount, menu } = mountMenu()
-    keyed(mount, 'BEIGE').click()
+    keyed(mount, PALETTE_LABEL.beige).click()
     menu.paint(state({ palette: 'amber' }))
-    expect(keyed(mount, 'AMBER').classList.contains('is-active')).toBe(true)
-    expect(keyed(mount, 'BEIGE').classList.contains('is-active')).toBe(false)
+    expect(keyed(mount, PALETTE_LABEL.amber).classList.contains('is-active')).toBe(true)
+    expect(keyed(mount, PALETTE_LABEL.beige).classList.contains('is-active')).toBe(false)
   })
 })
 

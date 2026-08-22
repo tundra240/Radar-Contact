@@ -278,18 +278,28 @@ fast-forward is the same simulation sooner rather than a different one. The stat
 the clock and the current rate on the scope itself, so you can see whether time is running
 without opening anything. Interface sound is switched here too; controls click when it is on.
 
-**Display scheme.** Four palettes, picked by name. **tracon** is the shipped look and the only
-one that is not a period reference: a present-day terminal radar position, taken from
+**Display scheme.** Five palettes in two families.
+
+**TRACON Dark** is the shipped look: a present-day terminal radar position taken from
 photographs of real control rooms -- a dark blue-slate ground, mint-green symbology, and flat
-panels with hairline borders instead of bevels. Then three period schemes: **beige** (a
-Windows-2000-era desktop with a tan tube), **dark** (a colour CRT), and **amber** (a monochrome
-phosphor tube). `D` still cycles them without opening the menu, because that is a by-eye
-choice.
+panels with hairline borders instead of bevels. **TRACON Light** is the same position under room
+lighting. It is not an inversion: a dark scope glows and a light one is ink on paper, so the
+symbology goes dark and the ground goes pale while the hues stay put, mint for the navaids and
+traffic and warm for the holds. The two read as one instrument in two lighting conditions.
+
+**Classic Light**, **Classic Dark** and **Classic Amber** are the period schemes, kept exactly as
+they were for anyone who preferred them: a Windows-2000-era desktop with a tan tube, a colour CRT,
+and a monochrome amber phosphor tube. They keep their bevelled furniture; only the two TRACON
+schemes are flat.
+
+The two modern schemes sit together at the front of the cycle, so changing the lighting does not
+mean walking through three period tubes to get from one to the other. `D` still cycles them
+without opening the menu, because that is a by-eye choice.
 
 **The difference is not only colour -- it is the furniture.** The palette carries which idiom
 the interface is drawn in, and that changes the arrangement as well as the edges:
 
-| | Period schemes | tracon |
+| | Classic schemes | TRACON schemes |
 |---|---|---|
 | Readouts | a bevelled cell each, label beside value, inset from the corner | a ruled table, heading over value, flush along the bottom |
 | Position | a raised panel with a margin round it | a strip hard into the corner |

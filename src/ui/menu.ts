@@ -7,7 +7,7 @@ import {
   type OverlayKey,
   type Overlays,
 } from '../render/overlays'
-import { PALETTE_ORDER, type PaletteName } from '../render/theme'
+import { PALETTE_LABEL, PALETTE_ORDER, type PaletteName } from '../render/theme'
 
 /**
  * The options menu.
@@ -63,7 +63,8 @@ export interface MenuOptions {
  * silently unlabelled button.
  */
 const SCHEME_NOTE: Record<PaletteName, string> = {
-  tracon: 'A present-day terminal radar position',
+  traconDark: 'A present-day terminal radar position, lights down',
+  traconLight: 'The same position under room lighting',
   beige: 'A Windows-2000-era desktop with a tan tube',
   dark: 'A colour CRT',
   amber: 'A monochrome amber phosphor tube',
@@ -163,7 +164,7 @@ export class Menu {
       const b = document.createElement('button')
       b.type = 'button'
       b.className = 'menu-key menu-choice'
-      b.textContent = name.toUpperCase()
+      b.textContent = PALETTE_LABEL[name]
       b.title = SCHEME_NOTE[name]
       b.addEventListener('click', () => this.opts.onPalette(name))
       schemes.appendChild(b)

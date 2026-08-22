@@ -74,6 +74,9 @@ canvas {
   --face: #132229;
   --well: #081216;
   --bevel-light: #2f5560;
+  /* The hairline the flat idiom rules with, which is not the bevel
+     highlight -- see chromeEdge in theme.ts. */
+  --edge: #2f5560;
   --bevel-shadow: #04090b;
   --chrome-text: #cfe6e2;
   --chrome-dim: #8fb0ac;
@@ -1435,7 +1438,7 @@ canvas {
 
    The modern control-room look. Everything above draws its edges as a
    two-tone bevel; under [data-chrome="flat"] every one of those becomes a
-   single hairline in --bevel-light and a change of fill, which is the one
+   single hairline in --edge and a change of fill, which is the one
    structural difference between a 1999 desktop and a 2015 radar position.
 
    Written as overrides rather than as a second set of rules so the layout,
@@ -1474,7 +1477,7 @@ canvas {
 :root[data-chrome='flat'] .atis-box,
 :root[data-chrome='flat'] .atis-choice {
   box-shadow: none;
-  border: 1px solid var(--bevel-light);
+  border: 1px solid var(--edge);
 }
 
 /* Pressing something in this idiom moves the fill, not the edges. */
@@ -1506,7 +1509,7 @@ canvas {
 /* A groove between sections becomes one line. */
 :root[data-chrome='flat'] .menu-section + .menu-section {
   box-shadow: none;
-  border-top: 1px solid var(--bevel-light);
+  border-top: 1px solid var(--edge);
 }
 
 :root[data-chrome='flat'] .guide-body hr {
@@ -1529,7 +1532,7 @@ canvas {
 :root[data-chrome='flat'] .strip-bay-title {
   color: var(--accent);
   background: transparent;
-  border-bottom: 1px solid var(--bevel-light);
+  border-bottom: 1px solid var(--edge);
 }
 
 /* Toolbar toggles that stay pressed while their panel is open: in the flat

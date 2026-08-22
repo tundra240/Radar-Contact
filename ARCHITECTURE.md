@@ -390,6 +390,14 @@ that one field governs the furniture as well as the edges:
 | Captions | a saturated bar with light lettering | a ruled heading |
 | Strips | raised cards | raised cards, recoloured -- see below |
 
+**Two tokens for two kinds of edge.** `chromeLight` is a bevel highlight and `chromeEdge` is a
+hairline, and they were the same value for as long as every flat scheme happened to be dark. A
+light one breaks that: a highlight has to be lighter than the face it sits on or the bevel renders
+inside out, and a rule on a pale face has to be darker than it or the panels have no visible edge
+at all. One token cannot be both, so the stylesheet now rules with `--edge` and the bevels keep
+`--bevel-light`. Every scheme still carries an ordered pair of bevel values even where it never
+draws one, so any of them could be switched to bevelled without rendering inside out.
+
 **The strips are exempt, deliberately.** A modern flight list would be a dense ruled list, and
 an earlier pass at this scheme drew one. It is not done here: the arrangement of a strip is fixed,
 so a strip stays a bordered card in a bordered well and changes only its colours with the palette.

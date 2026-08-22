@@ -1493,20 +1493,20 @@ describe('the flat idiom', () => {
   // covered by the contrast bands in theme.test.ts; what matters here is the
   // structural difference, which no colour can express.
   beforeEach(() => {
-    setPalette('tracon')
+    setPalette('traconDark')
   })
 
   const flat = () => render(1000, 600, 30)
 
   it('is what the display ships in', () => {
-    expect(PALETTE_ORDER[0]).toBe('tracon')
-    expect(palettes.tracon.chromeStyle).toBe('flat')
+    expect(PALETTE_ORDER[0]).toBe('traconDark')
+    expect(palettes.traconDark.chromeStyle).toBe('flat')
   })
 
   it('paints the ground in the modern slate rather than black', () => {
     // Black is right for a CRT and wrong for an LCD in a dimmed room, where
     // it goes grey anyway and takes the contrast with it.
-    expect(flat().fills[0]).toBe(palettes.tracon.bg)
+    expect(flat().fills[0]).toBe(palettes.traconDark.bg)
   })
 
   it('draws panels with a hairline instead of a bevel', () => {
@@ -1514,10 +1514,10 @@ describe('the flat idiom', () => {
     // shadow is the bottom-right of a bevel, and the well is a sunken cell
     // -- and a flat table has no sunken cells, only dividers.
     const { fills } = flat()
-    expect(fills).toContain(palettes.tracon.chromeFace)
-    expect(fills).toContain(palettes.tracon.chromeLight)
-    expect(fills).not.toContain(palettes.tracon.chromeShadow)
-    expect(fills).not.toContain(palettes.tracon.chromeWell)
+    expect(fills).toContain(palettes.traconDark.chromeFace)
+    expect(fills).toContain(palettes.traconDark.chromeLight)
+    expect(fills).not.toContain(palettes.traconDark.chromeShadow)
+    expect(fills).not.toContain(palettes.traconDark.chromeWell)
   })
 
   it('still bevels the schemes that are meant to be bevelled', () => {
@@ -1532,7 +1532,7 @@ describe('the flat idiom', () => {
     // A modern display is a rectangle of glass in a bezel, not a window
     // recessed into a desktop.
     const { fills } = flat()
-    const shadowUsed = fills.filter((f) => f === palettes.tracon.chromeShadow)
+    const shadowUsed = fills.filter((f) => f === palettes.traconDark.chromeShadow)
     expect(shadowUsed).toHaveLength(0)
   })
 
@@ -1548,12 +1548,12 @@ describe('the flat idiom', () => {
         return 0.2126 * c((n >> 16) & 255) + 0.7152 * c((n >> 8) & 255) + 0.0722 * c(n & 255)
       }
       const a = lum(hex)
-      const b = lum(palettes.tracon.bg)
+      const b = lum(palettes.traconDark.bg)
       return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
     }
-    expect(contrast(palettes.tracon.target)).toBeGreaterThan(10)
-    expect(contrast(palettes.tracon.coast)).toBeLessThan(2)
-    expect(contrast(palettes.tracon.ring)).toBeLessThan(2)
+    expect(contrast(palettes.traconDark.target)).toBeGreaterThan(10)
+    expect(contrast(palettes.traconDark.coast)).toBeLessThan(2)
+    expect(contrast(palettes.traconDark.ring)).toBeLessThan(2)
   })
 
   it('still draws the whole picture', () => {
@@ -1569,7 +1569,7 @@ describe('the flat readouts', () => {
   // as a ruled table hard against the glass, not as bevelled cells floating
   // with a margin round them.
   beforeEach(() => {
-    setPalette('tracon')
+    setPalette('traconDark')
   })
 
   /**

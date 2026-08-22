@@ -15,13 +15,13 @@ import {
 afterEach(() => {
   // The active palette is module state shared by every render module, so
   // leaving it switched would leak into other tests.
-  setPalette('tracon')
+  setPalette('traconDark')
 })
 
 describe('palettes', () => {
   it('starts on the modern position', () => {
-    expect(paletteName()).toBe('tracon')
-    expect(theme.bg).toBe(palettes.tracon.bg)
+    expect(paletteName()).toBe('traconDark')
+    expect(theme.bg).toBe(palettes.traconDark.bg)
   })
 
   it('defines every colour in every palette', () => {
@@ -44,7 +44,9 @@ describe('palettes', () => {
     for (const name of PALETTE_ORDER) {
       expect(['bevel', 'flat'], name).toContain(palettes[name].chromeStyle)
     }
-    expect(palettes.tracon.chromeStyle).toBe('flat')
+    expect(palettes.traconDark.chromeStyle).toBe('flat')
+    // Both modern schemes are flat: the idiom is the era, not the lighting.
+    expect(palettes.traconLight.chromeStyle).toBe('flat')
     expect(palettes.beige.chromeStyle).toBe('bevel')
   })
 
@@ -75,19 +77,27 @@ describe('palettes', () => {
   })
 
   it('cycles through every scheme and wraps', () => {
-    expect(nextPaletteName()).toBe('beige')
+    // The two modern schemes sit together at the front, so a controller
+    // changing the lighting does not have to walk through three period
+    // tubes to get from one to the other.
+    expect(nextPaletteName()).toBe('traconLight')
+    expect(cyclePalette()).toBe('traconLight')
     expect(cyclePalette()).toBe('beige')
     expect(cyclePalette()).toBe('dark')
     expect(cyclePalette()).toBe('amber')
-    expect(cyclePalette()).toBe('tracon')
-    expect(theme.bg).toBe(palettes.tracon.bg)
+    expect(cyclePalette()).toBe('traconDark')
+    expect(theme.bg).toBe(palettes.traconDark.bg)
   })
 
-  it('keeps one light ground and two dark ones', () => {
+  it('pairs a light ground with a dark one in each family', () => {
     const lum = (hex: string): number => {
       const n = parseInt(hex.slice(1), 16)
       return (((n >> 16) & 255) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114) / 255
     }
+    // Modern: one of each.
+    expect(lum(palettes.traconLight.bg)).toBeGreaterThan(0.6)
+    expect(lum(palettes.traconDark.bg)).toBeLessThan(0.15)
+    // Period: one of each, and the amber tube alongside them.
     expect(lum(palettes.beige.bg)).toBeGreaterThan(0.6)
     expect(lum(palettes.dark.bg)).toBeLessThan(0.15)
     expect(lum(palettes.amber.bg)).toBeLessThan(0.15)

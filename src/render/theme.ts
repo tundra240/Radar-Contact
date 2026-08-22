@@ -102,6 +102,18 @@ export interface Palette {
    * screen, so the ordering between them still has to hold either way.
    */
   readonly chromeFace: string
+  /**
+   * The colour of a hairline, for the schemes that draw one.
+   *
+   * Separate from `chromeLight` because a bevel highlight and a rule are
+   * different things that only looked like the same thing while every flat
+   * scheme happened to be dark. A highlight must be lighter than the face it
+   * sits on or the bevel renders inside out; a rule on a pale face has to be
+   * darker than it or there is no visible edge at all. One token cannot be
+   * both, and making the light scheme obey the bevel rule would have given
+   * it panels with no edges.
+   */
+  readonly chromeEdge: string
   readonly chromeLight: string
   readonly chromeShadow: string
   readonly chromeText: string
@@ -191,6 +203,7 @@ export const palettes = {
     // mid-grey shadow. Nothing dates an interface faster than getting
     // these three wrong.
     chromeFace: '#d4d0c8',
+    chromeEdge: '#ffffff',
     chromeLight: '#ffffff',
     chromeShadow: '#808080',
     chromeText: '#1c1a14',
@@ -249,6 +262,7 @@ export const palettes = {
     warn: '#ff5252',
 
     chromeFace: '#18222b',
+    chromeEdge: '#3a4a52',
     chromeLight: '#3d5162',
     chromeShadow: '#040709',
     chromeText: '#c4dae6',
@@ -311,6 +325,7 @@ export const palettes = {
     warn: '#ff6a1a',
 
     chromeFace: '#2b1d07',
+    chromeEdge: '#4a3418',
     chromeLight: '#634516',
     chromeShadow: '#0d0801',
     chromeText: '#ffcf80',
@@ -338,7 +353,7 @@ export const palettes = {
    * 12:1 against the ground, where the map furniture sits under 2:1. That
    * gap is the whole look.
    */
-  tracon: {
+  traconDark: {
     bg: '#0b171c',
     chromeStyle: 'flat',
 
@@ -388,6 +403,7 @@ export const palettes = {
     // hairline border, not a highlight. The shadow is kept darker than the
     // face so the ordering holds, but nothing on screen draws with it.
     chromeFace: '#132229',
+    chromeEdge: '#2f5560',
     chromeLight: '#2f5560',
     chromeShadow: '#04090b',
     chromeText: '#cfe6e2',
@@ -395,6 +411,79 @@ export const palettes = {
     chromeWell: '#081216',
     chromeTitleBar: '#1b4a4a',
     chromeTitleText: '#a8f0d4',
+  },
+  /**
+   * The same position under room lighting.
+   *
+   * Not an inversion of the dark one. A dark scope glows and a light one is
+   * ink on paper, so the symbology goes dark and the ground goes pale -- but
+   * the hues stay exactly where they were, mint for the navaids and the
+   * traffic and warm for the holds, so the two read as one instrument in two
+   * lighting conditions rather than as two products.
+   *
+   * The grid is the hard part of a light scheme. On a dark ground a ring can
+   * be dim and still legible; on a pale one it has nowhere to go but towards
+   * the traffic, so these sit deliberately close to the ground -- just above
+   * the floor the contrast gate sets, and nowhere near its ceiling.
+   */
+  traconLight: {
+    bg: '#dde5e8',
+    chromeStyle: 'flat',
+
+    ringFaint: '#d4dee1',
+    ring: '#b6c9cf',
+    ringStrong: '#a6bcc4',
+    cardinal: '#a9bfc7',
+    ringLabel: '#356265',
+
+    airspaceHigh: '#2a5480',
+    airspaceControl: '#6d3583',
+    airspaceLocal: '#55601c',
+    airspaceLabel: '#3a565d',
+
+    runway: '#0c2429',
+    runwayLabel: '#125946',
+    centreline: '#b3c7ce',
+    centrelineTick: '#2a7161',
+    fafTick: '#0d6350',
+
+    navaid: '#0f7259',
+    navaidLabel: '#0d6350',
+    navaidFreq: '#39655d',
+    // Warm against an otherwise entirely cool picture, the same role the
+    // amber holds play on the dark scheme.
+    hold: '#8a5410',
+
+    wxLight: '#2a7350',
+    wxModerate: '#7d6010',
+    wxHeavy: '#b0231f',
+
+    target: '#052c34',
+    trail: '#7ba0a6',
+
+    neighbour: '#456a6d',
+    neighbourLabel: '#3a5c5f',
+
+    coast: '#afc3ca',
+    fir: '#456885',
+
+    text: '#0b1f24',
+    textDim: '#3d5d64',
+    accent: '#0a6650',
+    warn: '#ab1f28',
+
+    chromeFace: '#eaf0f2',
+    chromeEdge: '#9db2ba',
+    // Bevel values it never draws, kept ordered so the scheme could be
+    // switched to bevelled without rendering inside out. The edge it
+    // actually uses is chromeEdge above.
+    chromeLight: '#ffffff',
+    chromeShadow: '#9aacb3',
+    chromeText: '#0b1f24',
+    chromeDim: '#4a6a71',
+    chromeWell: '#dbe3e6',
+    chromeTitleBar: '#17454e',
+    chromeTitleText: '#d8f0e6',
   },
 } satisfies Record<string, Palette>
 
@@ -406,7 +495,30 @@ export type PaletteName = keyof typeof palettes
  * and the three period schemes after it, amber last because it is the most
  * opinionated.
  */
-export const PALETTE_ORDER: readonly PaletteName[] = ['tracon', 'beige', 'dark', 'amber']
+export const PALETTE_ORDER: readonly PaletteName[] = [
+  'traconDark',
+  'traconLight',
+  'beige',
+  'dark',
+  'amber',
+]
+
+/**
+ * What each scheme is called on screen.
+ *
+ * Separate from the key because the two answer different questions. The key
+ * says what the colours are -- `beige` is beige -- and the label says what
+ * the choice means to somebody picking one, which is whether they want the
+ * modern position or the period one, light or dark. Renaming the keys to
+ * match would have touched a hundred call sites to change four words.
+ */
+export const PALETTE_LABEL: Record<PaletteName, string> = {
+  traconDark: 'TRACON Dark',
+  traconLight: 'TRACON Light',
+  beige: 'Classic Light',
+  dark: 'Classic Dark',
+  amber: 'Classic Amber',
+}
 
 export function isPaletteName(value: unknown): value is PaletteName {
   return typeof value === 'string' && (PALETTE_ORDER as readonly string[]).includes(value)
@@ -415,7 +527,7 @@ export function isPaletteName(value: unknown): value is PaletteName {
 type Writable<T> = { -readonly [K in keyof T]: T[K] }
 
 /** The modern position is the shipped default; the button cycles away. */
-const DEFAULT_PALETTE: PaletteName = 'tracon'
+const DEFAULT_PALETTE: PaletteName = 'traconDark'
 
 /**
  * The active palette, exported as a live object rather than a value. Every
@@ -440,7 +552,7 @@ export function setPalette(name: PaletteName): void {
 /** The next scheme in the cycle, without switching to it. */
 export function nextPaletteName(): PaletteName {
   const i = PALETTE_ORDER.indexOf(activeName)
-  return PALETTE_ORDER[(i + 1) % PALETTE_ORDER.length] ?? 'tracon'
+  return PALETTE_ORDER[(i + 1) % PALETTE_ORDER.length] ?? 'traconDark'
 }
 
 /** Advances to the next scheme and returns it. */

@@ -1209,10 +1209,22 @@ function start(
 
   const STORAGE_KEY = 'radar-contact:palette'
 
+  /**
+   * Schemes that have been renamed, so a preference set before the rename
+   * survives it.
+   *
+   * Without this the stored name simply fails validation and the display
+   * silently reverts to the default -- which is the same symptom as the
+   * setting not being saved at all, and is the sort of thing nobody reports
+   * because it looks like they imagined it.
+   */
+  const RENAMED: Record<string, PaletteName> = { tracon: 'traconDark' }
+
   const storedPalette = (): PaletteName | null => {
     try {
       const v = window.localStorage.getItem(STORAGE_KEY)
-      return isPaletteName(v) ? v : null
+      if (isPaletteName(v)) return v
+      return v !== null && v in RENAMED ? (RENAMED[v] ?? null) : null
     } catch {
       // Private browsing and blocked storage both throw; a missing
       // preference is not worth failing the whole display over.
@@ -1235,6 +1247,7 @@ function start(
     const root = document.documentElement.style
     root.setProperty('--face', theme.chromeFace)
     root.setProperty('--well', theme.chromeWell)
+    root.setProperty('--edge', theme.chromeEdge)
     root.setProperty('--bevel-light', theme.chromeLight)
     root.setProperty('--bevel-shadow', theme.chromeShadow)
     root.setProperty('--chrome-text', theme.chromeText)
