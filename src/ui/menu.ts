@@ -1,4 +1,5 @@
 import { SPEEDS, formatSpeed, type Speed } from '../core/loop'
+import { setToolLabel } from './icons'
 import {
   OVERLAY_ITEMS,
   OVERLAY_PRESETS,
@@ -104,7 +105,7 @@ export class Menu {
     this.button = document.createElement('button')
     this.button.type = 'button'
     this.button.className = 'mode-toggle menu-button'
-    this.button.textContent = 'MENU'
+    setToolLabel(this.button, 'menu', 'MENU')
     this.button.title = 'Simulation, display and overlay options'
     this.button.setAttribute('aria-haspopup', 'true')
     this.button.addEventListener('click', () => this.setOpen(!this.isOpen))

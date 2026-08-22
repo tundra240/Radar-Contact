@@ -1298,6 +1298,23 @@ canvas {
   text-decoration: underline;
 }
 
+/* ---- tool glyphs ------------------------------------------------------
+
+   Every tool carries a glyph and a word. The period schemes show the word,
+   because a Windows-2000 toolbar of wordless buttons is the wrong decade;
+   the flat idiom shows the glyph, because its rail is a column of small
+   squares and there is no room in one for "OVERLAYS".
+
+   The word is never removed, only hidden, so it stays the accessible name
+   in both. */
+.tool-icon {
+  display: none;
+}
+
+.tool-text {
+  display: inline;
+}
+
 /* ---- the ATIS board --------------------------------------------------- */
 
 /* A button on the toolbar and a small board under it, the way the real thing
@@ -1563,17 +1580,25 @@ canvas {
   gap: 1px;
 }
 
-/* Square, dense, and no letter-spaced caption -- a tool button, not a
-   dialog button. */
+/* Square, dense, and wordless -- a tool button, not a dialog button. */
 :root[data-chrome='flat'] .mode-toggle {
   min-width: 0;
   width: 30px;
-  height: 28px;
+  height: 30px;
   padding: 0;
-  font-size: 8px;
-  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   /* One shared edge down the rail rather than four round every button. */
   border-width: 1px 1px 0 0;
+}
+
+:root[data-chrome='flat'] .tool-icon {
+  display: block;
+}
+
+:root[data-chrome='flat'] .tool-text {
+  display: none;
 }
 
 :root[data-chrome='flat'] .controls > :last-child .mode-toggle {
@@ -1682,4 +1707,12 @@ canvas {
 :root[data-chrome='flat'] .console {
   border-width: 1px 0 0 0;
   padding: 5px 6px 6px;
+}
+
+/* A modern position has no command line along the bottom of the glass, so
+   it starts put away. Hidden rather than removed: typing is still one of the
+   three ways to work an aircraft, and it is the fastest of them, so the rail
+   button brings it straight back. */
+:root[data-console='off'] .console {
+  display: none;
 }

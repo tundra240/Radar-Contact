@@ -57,9 +57,20 @@ const press = (key: string): void => {
 }
 
 describe('the book button', () => {
-  it('is a book', () => {
-    // Written as a code point so the source file stays ASCII.
-    expect(button(mountGuide().mount).textContent).toBe(String.fromCodePoint(0x1f4d6))
+  it('is a drawn book rather than an emoji', () => {
+    // An emoji renders in whatever colour and weight the platform feels
+    // like, which is never the rail's. This one is a path that takes the
+    // button's own colour.
+    const b = button(mountGuide().mount)
+    const glyph = b.querySelector('svg.tool-icon')
+    expect(glyph).not.toBeNull()
+    expect(glyph?.querySelector('path')?.getAttribute('stroke')).toBe('currentColor')
+    expect(b.textContent).not.toContain(String.fromCodePoint(0x1f4d6))
+  })
+
+  it('hides the glyph from a screen reader, which cannot read a shape', () => {
+    const glyph = button(mountGuide().mount).querySelector('svg.tool-icon')
+    expect(glyph?.getAttribute('aria-hidden')).toBe('true')
   })
 
   it('says what it is, for anyone not seeing the glyph', () => {

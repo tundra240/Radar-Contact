@@ -1579,7 +1579,18 @@ describe('the flat readouts', () => {
    * because map labels -- an aerodrome code, a navaid name -- can land in
    * the same band and must not be mistaken for readouts.
    */
-  function hudRows(w = 1000, h = 600): { y: number; cells: Text[] }[] {
+  /**
+   * The readout rows, looked for at one edge of the glass.
+   *
+   * The band matters: the flat table runs along the top and the period bar
+   * along the bottom, and without it a row of map labels that happens to
+   * have five cells on the same line counts as a readout.
+   */
+  function hudRows(
+    w = 1000,
+    h = 600,
+    band: 'top' | 'bottom' = 'top',
+  ): { y: number; cells: Text[] }[] {
     const cam = new Camera({ x: 0, y: 0 }, 30, { maxNM: 200 })
     cam.setViewport(w, h)
     const rec = recorder()
@@ -1587,7 +1598,7 @@ describe('the flat readouts', () => {
 
     const byRow = new Map<number, Text[]>()
     for (const t of rec.texts) {
-      if (t.y < h - 34) continue
+      if (band === 'top' ? t.y > 34 : t.y < h - 34) continue
       const y = Math.round(t.y)
       byRow.set(y, [...(byRow.get(y) ?? []), t])
     }
@@ -1621,10 +1632,21 @@ describe('the flat readouts', () => {
     expect(rows[1]?.cells[0]?.s).toBe('12:00:00')
   })
 
-  it('runs the table the whole width of the glass', () => {
-    // Flush, not inset: the period bar leaves ten pixels of ground either
-    // side and this does not.
-    expect(Number(hudRows()[0]?.cells[0]?.x)).toBeLessThan(12)
+  it('runs from the position block to the right-hand edge', () => {
+    // It shares the top edge with the position block rather than starting
+    // at the corner, and it is flush to the right: the period bar leaves
+    // ten pixels of ground either side and this does not.
+    const first = Number(hudRows()[0]?.cells[0]?.x)
+    // Past the block, which is about a hundred and sixty pixels of it.
+    expect(first).toBeGreaterThan(100)
+    // And it keeps going well across the glass rather than stopping short.
+    expect(Number(hudRows()[0]?.cells.at(-1)?.x)).toBeGreaterThan(400)
+  })
+
+  it('sits above the picture rather than below it', () => {
+    // The readouts are read against the traffic. At the far bottom of the
+    // glass they are something you look away from the traffic to see.
+    for (const row of hudRows()) expect(row.y).toBeLessThan(34)
   })
 
   it('drops columns from the right when the window narrows', () => {
@@ -1661,6 +1683,6 @@ describe('the flat readouts', () => {
     // The two idioms are different furniture, not one with a flag: beige
     // keeps its single row of inset bevelled cells.
     setPalette('beige')
-    expect(hudRows()).toHaveLength(1)
+    expect(hudRows(1000, 600, 'bottom')).toHaveLength(1)
   })
 })

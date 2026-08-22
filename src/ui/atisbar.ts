@@ -13,6 +13,7 @@ import {
   type Configuration,
   type RunwayFace,
 } from '../sim/atis'
+import { setToolLabel } from './icons'
 
 /**
  * The ATIS box.
@@ -80,7 +81,7 @@ export class AtisBar {
     this.button = document.createElement('button')
     this.button.type = 'button'
     this.button.className = 'mode-toggle atis-button'
-    this.button.textContent = 'ATIS'
+    setToolLabel(this.button, 'atis', 'ATIS')
     this.button.title = 'Show or hide the ATIS board'
     this.button.addEventListener('click', () => {
       this.setOpen(!this.isOpen)

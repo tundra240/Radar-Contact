@@ -16,6 +16,7 @@ import {
   type RunwayFace,
 } from './sim/atis'
 import { AtisBar } from './ui/atisbar'
+import { setToolLabel } from './ui/icons'
 import { makeRng } from './core/rng'
 import type { ControlZone } from './sim/airspace'
 import {
@@ -43,7 +44,7 @@ import { Guide } from './ui/guide'
 import guideSource from '../TUTORIAL.md?raw'
 import clickUrl from './assets/click.wav'
 import { Sfx, isClickable } from './audio/sfx'
-import { formatClock, GameLoop } from './core/loop'
+import { formatClock, formatSpeed, GameLoop, SPEEDS } from './core/loop'
 import { drawScope } from './render/scope'
 import {
   DEFAULT_OVERLAYS,
@@ -416,15 +417,75 @@ function start(
    * overlay key the menu checkbox does, so there is one piece of state and
    * the two can never disagree.
    */
-  const wxButton = document.createElement('button')
-  wxButton.type = 'button'
-  wxButton.className = 'mode-toggle wx-button'
-  wxButton.textContent = 'WX'
-  wxButton.title = 'Show or hide precipitation'
-  wxButton.addEventListener('click', () => {
+  /**
+   * Every tool is its own button.
+   *
+   * Under the flat idiom these become a column of small squares down the
+   * left of the glass, labelled with a glyph, the way a modern position
+   * labels its tools -- there is no room in one for a word. The period
+   * schemes keep the words, because a Windows-2000 toolbar of wordless
+   * buttons would be the wrong decade. Both are always present in the
+   * markup; the stylesheet shows whichever the scheme calls for.
+   *
+   * Several of these duplicate something in the options menu. That is the
+   * point: a rate change or a scheme change mid-vector should not need a
+   * panel opened, and both routes call the same handler, so the two cannot
+   * disagree about what is set.
+   */
+  const tool = (
+    className: string,
+    onClick: () => void,
+  ): HTMLButtonElement => {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = `mode-toggle ${className}`
+    b.addEventListener('click', onClick)
+    controls.appendChild(b)
+    return b
+  }
+
+  const wxButton = tool('wx-button', () => {
     setOverlays({ ...overlays, weather: !overlays.weather })
   })
-  controls.appendChild(wxButton)
+  wxButton.title = 'Show or hide precipitation'
+  setToolLabel(wxButton, 'wx', 'WX')
+
+  /** Run and stop, without opening anything. */
+  const pauseButton = tool('pause-button', () => {
+    loop.togglePaused()
+    paintMenu()
+    paintTools()
+    requestDraw()
+  })
+
+  /** Steps through the rates and wraps, which is quicker than a panel. */
+  const rateButton = tool('rate-button', () => {
+    const i = SPEEDS.indexOf(loop.speed)
+    loop.setSpeed(SPEEDS[(i + 1) % SPEEDS.length] ?? SPEEDS[0]!)
+    loop.setPaused(false)
+    paintMenu()
+    paintTools()
+    requestDraw()
+  })
+
+  /** The command line, which the flat idiom keeps out of the way. */
+  const consoleButton = tool('console-button', () => {
+    setConsoleOpen(!consoleOpen)
+  })
+
+  /**
+   * Sun or moon: the lighting, not the whole scheme list.
+   *
+   * It moves between the two modern schemes only. Somebody on a period tube
+   * has chosen a period tube, so the sensible thing for this button to do
+   * there is take them to the modern position rather than guess which era
+   * they meant.
+   */
+  const themeButton = tool('theme-button', () => {
+    applyPalette(paletteName() === 'traconDark' ? 'traconLight' : 'traconDark')
+    paintMenu()
+    paintTools()
+  })
 
   /**
    * The ATIS board: a button beside WX, and a small board under it showing
@@ -461,6 +522,38 @@ function start(
       }
     },
   })
+
+  const CONSOLE_STORAGE = 'radar-contact:console'
+
+  /**
+   * Whether the command line is showing.
+   *
+   * Hidden by default on the modern position, which has no command line on
+   * it -- but hidden rather than removed, because typing is still one of the
+   * three ways to work an aircraft and taking it away would cost the fastest
+   * one. The rail button brings it back.
+   */
+  let consoleOpen = (() => {
+    try {
+      const v = window.localStorage.getItem(CONSOLE_STORAGE)
+      if (v === 'on') return true
+      if (v === 'off') return false
+    } catch {
+      // Blocked storage: fall through to the default for the scheme.
+    }
+    return theme.chromeStyle !== 'flat'
+  })()
+
+  const setConsoleOpen = (open: boolean): void => {
+    consoleOpen = open
+    document.documentElement.dataset['console'] = open ? 'on' : 'off'
+    try {
+      window.localStorage.setItem(CONSOLE_STORAGE, open ? 'on' : 'off')
+    } catch {
+      // Not worth failing a toggle over.
+    }
+    paintTools()
+  }
 
   const menu = new Menu({
     mount: controls,
@@ -501,6 +594,23 @@ function start(
   /** The ticker, and the runway buttons behind it. */
   const paintAtis = (): void => {
     atisBar.paint({ atis, runways: runwayFaces })
+  }
+
+  /** The tools that relabel themselves as the thing they control changes. */
+  const paintTools = (): void => {
+    setToolLabel(pauseButton, loop.paused ? 'play' : 'pause', loop.paused ? 'RUN' : 'HOLD')
+    pauseButton.title = loop.paused ? 'Start the clock' : 'Stop the clock'
+
+    setToolLabel(rateButton, 'rate', formatSpeed(loop.speed))
+    rateButton.title = `Clock rate -- ${formatSpeed(loop.speed)}, press to step`
+
+    setToolLabel(consoleButton, 'console', 'CMD')
+    consoleButton.title = consoleOpen ? 'Hide the command line' : 'Show the command line'
+    consoleButton.classList.toggle('is-on', consoleOpen)
+
+    const lit = paletteName() === 'traconLight'
+    setToolLabel(themeButton, lit ? 'moon' : 'sun', lit ? 'DARK' : 'LIGHT')
+    themeButton.title = lit ? 'Switch to the dark position' : 'Switch to the light position'
   }
 
   /** The button reads as pressed in while the layer is on. */
@@ -1154,6 +1264,8 @@ function start(
   syncStrips()
   paintWx()
   paintAtis()
+  paintTools()
+  setConsoleOpen(consoleOpen)
   paintMenu()
   resize()
   // Stopped until someone logs on, so the shift starts when the controller

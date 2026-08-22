@@ -1091,7 +1091,14 @@ function drawHud(
 ): void {
   if (theme.chromeStyle === 'flat') {
     drawPositionStrip(g, airport, status)
-    drawDataTable(g, cam, statusCells(cam, airport, overlays, status))
+    // Started where the position block ends, so the two share the top edge
+    // without overlapping.
+    drawDataTable(
+      g,
+      cam,
+      statusCells(cam, airport, overlays, status),
+      positionStripWidth(airport, status) + 2,
+    )
     return
   }
   drawTitleBlock(g, airport, status)
@@ -1113,6 +1120,23 @@ function drawHud(
  * pixels from the corner; this is flush, because a modern display gives its
  * whole area to the picture and lets the furniture sit on the edge of it.
  */
+/**
+ * How wide the position block is.
+ *
+ * Wanted in two places now that the readouts share the top edge with it:
+ * the block draws itself this wide, and the table starts where it ends.
+ * Measured rather than fixed, because the width comes from the text.
+ */
+function positionStripWidth(airport: Airport, status: ScopeStatus): number {
+  const title = `${airport.icao} APPROACH`
+  const under = status.controller
+    ? `${status.controller.position}  ${status.controller.initials}`
+    : airport.name.toUpperCase()
+  return (
+    Math.ceil(Math.max(charW(11) * title.length, charW(9) * under.length)) + 16
+  )
+}
+
 function drawPositionStrip(
   g: CanvasRenderingContext2D,
   airport: Airport,
@@ -1125,10 +1149,7 @@ function drawPositionStrip(
 
   const titleSize = 11
   const underSize = 9
-  const w =
-    Math.ceil(
-      Math.max(charW(titleSize) * title.length, charW(underSize) * under.length),
-    ) + 16
+  const w = positionStripWidth(airport, status)
   const h = 28
 
   g.fillStyle = theme.chromeFace
@@ -1149,7 +1170,8 @@ function drawPositionStrip(
 
 /**
  * The readouts as a ruled table: a row of column headings over a row of
- * values, full width along the bottom of the glass.
+ * values, running along the top of the glass from the position block to the
+ * right-hand edge.
  *
  * The period version puts each readout in its own sunken cell with a gap
  * between them. This is one continuous table with hairline dividers, which
@@ -1161,6 +1183,7 @@ function drawDataTable(
   g: CanvasRenderingContext2D,
   cam: Camera,
   cells: readonly Cell[],
+  startX: number,
 ): void {
   const headSize = 8
   const valueSize = 10
@@ -1169,14 +1192,19 @@ function drawDataTable(
   const valueTop = 15
   const h = 29
 
-  const left = 1
+  // Along the top, beside the position block rather than under the picture.
+  // A controller reads these against the traffic, and a readout at the far
+  // bottom of the glass is a readout you look away from the traffic to see.
+  const left = startX
   const right = cam.width - 1
-  const top = cam.height - h - 1
+  const top = 1
 
   g.fillStyle = theme.chromeFace
   g.fillRect(left, top, right - left, h)
+  // The rule goes under it now: it is the edge between the readouts and the
+  // picture, and that edge is below rather than above.
   g.fillStyle = theme.chromeLight
-  g.fillRect(left, top, right - left, 1)
+  g.fillRect(left, top + h, right - left, 1)
 
   g.textAlign = 'left'
   g.textBaseline = 'top'

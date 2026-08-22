@@ -1,4 +1,5 @@
 import { renderMarkdown } from './markdown'
+import { setToolLabel } from './icons'
 
 /**
  * The in-game guide: a book button that opens the project's own how-to-play
@@ -42,9 +43,10 @@ export class Guide {
     this.button = document.createElement('button')
     this.button.type = 'button'
     this.button.className = 'mode-toggle guide-button'
-    // The emoji is the control, so it carries an explicit label rather than
-    // relying on a screen reader to make something of the glyph.
-    this.button.textContent = String.fromCodePoint(0x1f4d6)
+    // Drawn rather than an emoji: an emoji renders in whatever colour and
+    // weight the platform feels like, which is never the rail's. The label
+    // below is what a screen reader reads, since a glyph is not a name.
+    setToolLabel(this.button, 'guide', 'GUIDE')
     this.button.title = 'How to play'
     this.button.setAttribute('aria-label', 'How to play')
     this.button.setAttribute('aria-haspopup', 'dialog')
