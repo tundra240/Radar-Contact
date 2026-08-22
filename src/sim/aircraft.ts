@@ -7,7 +7,7 @@ import {
 } from '../core/geo'
 import { autopilot, STANDARD_RATES, type Rates } from './autopilot'
 import { isControlled, type ControlZone } from './airspace'
-import { holdSteer } from './hold'
+import { holdSteer, patternReachNM } from './hold'
 import { ilsGuidance } from './ils'
 import type { Aircraft } from './types'
 
@@ -202,13 +202,32 @@ export function departureOf(
   outerLimitNM = Number.POSITIVE_INFINITY,
 ): Departure | null {
   if (a.navMode === 'LANDED') return 'landed'
-  if (a.entered && !isInSector(a, zone)) return 'left'
+  if (a.entered && !isInSector(a, zone) && !inItsHold(a)) return 'left'
   // A backstop for the other direction. Inbound traffic that turns away
   // never enters, so the rule above can never fire for it and it would fly
   // outward for ever, counted in the cap and drawn on a zoomed-out scope.
   // Nothing exists beyond the ring arrivals are released on.
   if (distanceNM(ORIGIN_NM, a.pos) > outerLimitNM) return 'left'
   return null
+}
+
+/**
+ * Whether an aircraft outside the boundary is simply flying the hold it was
+ * told to fly.
+ *
+ * A published hold does not have to sit comfortably inside the airspace, and
+ * at Heathrow one of them does not: Bovingdon is a mile and a half in, so the
+ * turn onto the pattern reaches over the edge. Without this an aircraft doing
+ * exactly what it was cleared to do is counted as having left the sector --
+ * removed from the scope and charged the penalty for it -- which is both
+ * wrong and impossible for the controller to prevent.
+ *
+ * Bounded by the pattern's own reach, so this excuses the hold and nothing
+ * else. An aircraft that drifts away from its fix is gone in the usual way.
+ */
+function inItsHold(a: Aircraft): boolean {
+  if (a.navMode !== 'HOLD' || a.hold === null) return false
+  return distanceNM(a.pos, a.hold.posNM) <= patternReachNM(a.hold, a.gsKts)
 }
 
 /** Marks an inbound aircraft as the controller's, the first time it is. */

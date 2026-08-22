@@ -7,6 +7,7 @@ import {
   normalizeHeading,
   type Vec2NM,
 } from '../core/geo'
+import { STANDARD_RATES } from './autopilot'
 import type { Aircraft, HoldClearance } from './types'
 
 /**
@@ -16,6 +17,7 @@ import type { Aircraft, HoldClearance } from './types'
  * aircraft is on is read back out of where it is and which way it is
  * pointing, every tick, from the pattern it is carrying:
  *
+ *     joining          further off than the pattern ever reaches
  *     inbound          heading is inbound-ish, the fix is still ahead
  *     turningOutbound  heading is inbound-ish, the fix is behind
  *     outbound         heading is outbound-ish, less than a leg run off
@@ -52,8 +54,13 @@ const LEAD_DEG = 90
 /** Below this a leg is too short to fly, whatever the aircraft's speed. */
 const MIN_LEG_NM = 1
 
-/** Which leg of the racetrack an aircraft is on. */
-export type HoldLeg = 'inbound' | 'turningOutbound' | 'outbound' | 'turningInbound'
+/** Which leg of the racetrack an aircraft is on, or its way to it. */
+export type HoldLeg =
+  | 'joining'
+  | 'inbound'
+  | 'turningOutbound'
+  | 'outbound'
+  | 'turningInbound'
 
 /**
  * Leg length in miles.
@@ -87,8 +94,49 @@ export function leadHeading(hdg: number, target: number, turns: TurnDirection): 
   return normalizeHeading(hdg + Math.sign(signed) * LEAD_DEG)
 }
 
+/**
+ * The radius of the turns, in miles, at a given groundspeed.
+ *
+ * Not a published figure: it is whatever a rate one turn comes out at, and
+ * it is what sets how wide the pattern is.
+ */
+export function turnRadiusNM(gsKts: number): number {
+  return Math.max(0.2, Math.max(gsKts, 0) / 3600 / degToRad(STANDARD_RATES.turnDegPerSec))
+}
+
+/**
+ * How far from the fix the pattern itself ever reaches.
+ *
+ * The far corner of the racetrack -- a leg along, two radii across -- and
+ * then one more radius of margin so an aircraft legitimately flying the
+ * outbound leg is never mistaken for one still on its way in.
+ */
+export function patternReachNM(clearance: HoldClearance, gsKts: number): number {
+  const radius = turnRadiusNM(gsKts)
+  return Math.hypot(holdLegNM(clearance, gsKts), 2 * radius) + radius
+}
+
 export function holdLeg(a: Aircraft, clearance: HoldClearance): HoldLeg {
+  // Further off than the pattern ever reaches, so it is not on any leg of
+  // it yet. Without this the leg is read off a heading that has nothing to
+  // do with the racetrack, and an arrival released on a radial that does
+  // not line up with the inbound track gets told it is flying the outbound
+  // leg and turns away from its own fix -- which is what BNN did, because
+  // its hold is the one turned to fit the airspace rather than pointed at
+  // the field.
+  const away = distanceNM(a.pos, clearance.posNM)
+  if (away > patternReachNM(clearance, a.gsKts)) return 'joining'
+
   const inbounding = Math.abs(angleDelta(a.hdg, clearance.inboundTrue)) < 90
+
+  // Pointed at a fix it has not reached, on a heading the pattern does not
+  // account for. An entry is flown FROM the fix, not on the way to it, so it
+  // tracks there first and turns when it arrives. Guarded on `inbounding` so
+  // this cannot steal the inbound leg, where the aircraft is also pointed at
+  // the fix but does belong to the pattern proper.
+  const ahead = Math.abs(angleDelta(a.hdg, bearingDeg(a.pos, clearance.posNM))) < 45
+  if (ahead && !inbounding && away > turnRadiusNM(a.gsKts)) return 'joining'
+
   const along = alongTrackNM(a.pos, clearance)
 
   if (inbounding) return along < 0 ? 'inbound' : 'turningOutbound'
@@ -107,6 +155,11 @@ export function holdSteer(a: Aircraft): number | null {
   const outbound = normalizeHeading(clearance.inboundTrue + 180)
 
   switch (holdLeg(a, clearance)) {
+    case 'joining':
+      // Straight at it. Joining a pattern from outside it is a matter of
+      // getting to the fix; the racetrack takes over when it arrives.
+      return bearingDeg(a.pos, clearance.posNM)
+
     case 'inbound':
       // Straight at the fix rather than along the inbound track. Coming off
       // the far turn the aircraft is a mile or two to one side, so it cuts

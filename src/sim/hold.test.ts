@@ -356,3 +356,90 @@ describe('holding inside the real airspace', () => {
     }
   })
 })
+
+describe('joining a pattern from outside it', () => {
+  /**
+   * BNN, near enough: the one Heathrow hold whose inbound leg is turned to
+   * fit the airspace rather than pointed at the field, so an arrival comes
+   * down a radial that crosses the pattern at ninety degrees.
+   */
+  const BNN: HoldClearance = {
+    fix: 'BNN',
+    posNM: { x: -3.35, y: 15.32 },
+    inboundTrue: 75,
+    turns: 'right',
+    legMins: 1,
+  }
+
+  /** Released up the radial, pointed at the fix, as the spawner does it. */
+  const arriving = (distNM: number) =>
+    ac({
+      pos: advance(BNN.posNM, 348, distNM),
+      hdg: 168,
+      hold: BNN,
+      navMode: 'HOLD',
+    })
+
+  it('calls an aircraft well short of the fix joining, not on a leg', () => {
+    expect(holdLeg(arriving(10), BNN)).toBe('joining')
+  })
+
+  it('flies it straight at the fix rather than turning away', () => {
+    // The bug this exists for: the leg used to be read off a heading that
+    // has nothing to do with the racetrack, so an arrival ten miles out was
+    // told it was on the outbound leg and turned ninety degrees away from
+    // its own fix before coming back.
+    const steer = holdSteer(arriving(10))
+    expect(steer).not.toBeNull()
+    expect(Math.abs(angleDelta(steer as number, 168))).toBeLessThan(5)
+  })
+
+  it('closes on the fix the whole way in', () => {
+    let a = arriving(10)
+    let last = distanceNM(a.pos, BNN.posNM)
+    for (let s = 0; s < 120; s += 1) {
+      a = stepAircraft(a, 1, s)
+      const now = distanceNM(a.pos, BNN.posNM)
+      // Never further off than it started, and never going backwards.
+      expect(now).toBeLessThanOrEqual(last + 0.01)
+      expect(now).toBeLessThanOrEqual(10.01)
+      last = now
+    }
+  })
+
+  it('reaches the fix, and in the time the run in should take', () => {
+    // Ten miles at 220 kt is under three minutes. The looping version took
+    // five and a half.
+    let a = arriving(10)
+    let arrived = -1
+    for (let s = 1; s <= 400 && arrived < 0; s += 1) {
+      a = stepAircraft(a, 1, s)
+      if (distanceNM(a.pos, BNN.posNM) < 0.6) arrived = s
+    }
+    expect(arrived).toBeGreaterThan(0)
+    expect(arrived).toBeLessThan(200)
+  })
+
+  it('hands over to the racetrack once it gets there', () => {
+    // And does not simply fly through: within a couple of circuits it is
+    // going round rather than heading off.
+    let a = arriving(10)
+    for (let s = 1; s <= 900; s += 1) a = stepAircraft(a, 1, s)
+    expect(distanceNM(a.pos, BNN.posNM)).toBeLessThan(8)
+    expect(a.navMode).toBe('HOLD')
+  })
+
+  it('does not steal the inbound leg from an aircraft on it', () => {
+    // Pointed at the fix and on a heading the pattern does account for: it
+    // belongs to the pattern, and is called what it is.
+    const inbound = ac({ pos: advance(LAM.posNM, 69, 3), hdg: 249 })
+    expect(holdLeg(inbound, LAM)).toBe('inbound')
+  })
+
+  it('does not call an aircraft flying the outbound leg joining', () => {
+    // A leg out and two radii across is still inside the pattern's reach,
+    // or the racetrack would collapse into a beeline every circuit.
+    const out = ac({ pos: advance(LAM.posNM, 249 - 180, 3.5), hdg: 69 })
+    expect(holdLeg(out, LAM)).not.toBe('joining')
+  })
+})

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bearingDeg, distanceNM } from '../core/geo'
+import { advance, bearingDeg, distanceNM } from '../core/geo'
 import { makeRng } from '../core/rng'
 import { loadAirport, outerLimitNM } from '../data/airport'
 import type { ControlZone } from './airspace'
@@ -543,5 +543,98 @@ describe('a session with no area of responsibility', () => {
     // world, so it has to keep working.
     const far = ac({ pos: { x: 500, y: 0 }, entered: true })
     expect(departureOf(far, null, 100)).toBe('left')
+  })
+})
+
+describe('an aircraft flying the hold it was cleared to', () => {
+  const airport = loadAirport(raw)
+  const bnn = airport.holdingFixes.find((f) => f.name === 'BNN')!
+  const clearance = {
+    fix: 'BNN',
+    posNM: bnn.posNM,
+    inboundTrue: bnn.hold!.inboundTrue,
+    turns: bnn.hold!.turns,
+    legMins: bnn.hold!.legMins,
+  }
+
+
+  /** A minimal aircraft; only position, level and hold matter here. */
+  const ac = (over: Partial<Aircraft>): Aircraft => ({
+    callsign: 'BAW178',
+    type: 'A320',
+    wake: 'M',
+    pos: { x: 0, y: 0 },
+    altFt: 8000,
+    hdg: 168,
+    iasKts: 220,
+    gsKts: 220,
+    vsFpm: 0,
+    clearedHdg: 168,
+    clearedAltFt: 8000,
+    clearedSpdKts: 220,
+    navMode: 'HOLD',
+    hold: null,
+    clearedApproach: null,
+    entered: true,
+    originFix: 'BNN',
+    spawnedAt: 0,
+    trail: [],
+    trailAt: 0,
+    ...over,
+  })
+
+  /** Out at the far corner of the pattern, which at BNN is over the edge. */
+  const holding = (bearing: number, distNM: number) =>
+    ac({
+      pos: advance(bnn.posNM, bearing, distNM),
+      altFt: bnn.entry?.minAltFt ?? 8000,
+      hold: clearance,
+      navMode: 'HOLD',
+      entered: true,
+    })
+
+  it('is not counted as having left, even outside the boundary', () => {
+    // Bovingdon sits a mile and a half inside the airspace, so the turn on
+    // to the pattern reaches over the edge. Charging the controller for an
+    // aircraft doing exactly what it was told to do is both wrong and
+    // impossible for them to prevent -- and it deleted the aircraft.
+    const out = holding(315, 4)
+    expect(isInSector(out, airport.controlZone)).toBe(false)
+    expect(departureOf(out, airport.controlZone)).toBeNull()
+  })
+
+  it('is still counted as having left once it is clear of its pattern', () => {
+    // The excuse is bounded by the pattern's own reach. An aircraft that
+    // has genuinely wandered off is gone in the usual way.
+    const gone = holding(315, 12)
+    expect(departureOf(gone, airport.controlZone)).toBe('left')
+  })
+
+  it('does not excuse an aircraft that is not holding', () => {
+    const vectored = { ...holding(315, 4), navMode: 'VECTOR' as const, hold: null }
+    expect(departureOf(vectored, airport.controlZone)).toBe('left')
+  })
+
+  it('survives a whole session in the hold without being lost', () => {
+    // The end-to-end version: released, flown in, and still there twenty
+    // minutes later rather than removed part way through its first circuit.
+    let a = ac({
+      pos: advance(bnn.posNM, 348, 9.7),
+      altFt: bnn.entry?.minAltFt ?? 8000,
+      hdg: 168,
+      hold: clearance,
+      navMode: 'HOLD',
+      // Released outside, as the spawner does it: it becomes the
+      // controller's when it crosses in, not before.
+      entered: false,
+    })
+    let lost = false
+    for (let s = 1; s <= 1200; s += 1) {
+      a = stepAircraft(a, 1, s)
+      a = enterSector(a, airport.controlZone)
+      if (departureOf(a, airport.controlZone) !== null) lost = true
+    }
+    expect(lost).toBe(false)
+    expect(a.entered).toBe(true)
   })
 })
