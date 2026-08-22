@@ -83,7 +83,7 @@ export function drawCells(
     for (const band of BANDS) {
       const fraction = contourFraction(cell, band, envelope)
       if (fraction === null) continue
-      drawContour(g, cam, cell, centre, fraction * scale, band)
+      drawContour(g, cam, cell, centre, fraction * scale, band, elapsedSeconds - cell.bornSeconds)
     }
   }
 
@@ -99,10 +99,11 @@ function drawContour(
   centre: Vec2NM,
   fraction: number,
   band: Intensity,
+  ageSeconds: number,
 ): void {
   g.beginPath()
   for (let deg = 0; deg < 360; deg += STEP_DEG) {
-    const at = advance(centre, deg, cellRadiusNM(cell, deg) * fraction)
+    const at = advance(centre, deg, cellRadiusNM(cell, deg, ageSeconds) * fraction)
     const p = cam.worldToScreen(at)
     if (deg === 0) g.moveTo(p.x, p.y)
     else g.lineTo(p.x, p.y)

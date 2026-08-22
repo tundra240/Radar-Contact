@@ -148,6 +148,9 @@ const CALM = makeWeather(makeRng(1), {
   minRadiusNM: 4,
   maxRadiusNM: 8,
   driftFactor: 0,
+  driftSpreadDeg: 30,
+  driftSpeedSpread: 0.35,
+  shapeDriftDegPerMin: 6,
   spreadNM: 20,
 })
 
@@ -1388,6 +1391,9 @@ describe('the weather layer', () => {
     minRadiusNM: 5,
     maxRadiusNM: 9,
     driftFactor: 0.8,
+    driftSpreadDeg: 30,
+    driftSpeedSpread: 0.35,
+    shapeDriftDegPerMin: 6,
     spreadNM: 15,
   })
 

@@ -115,8 +115,20 @@ export interface WeatherSettings {
   readonly heavyChance: number
   readonly minRadiusNM: number
   readonly maxRadiusNM: number
-  /** Cells drift at this fraction of the wind speed. */
+  /** Cells drift at this fraction of the wind speed, on average. */
   readonly driftFactor: number
+  /**
+   * How far either side of the wind an individual cell's track may lie.
+   *
+   * Zero would move every cell on exactly the same vector, and a field that
+   * translates as one piece reads as a picture being panned rather than as
+   * weather. A spread makes them fan out and separate as they cross.
+   */
+  readonly driftSpreadDeg: number
+  /** And how much faster or slower than the mean one may move, as a fraction. */
+  readonly driftSpeedSpread: number
+  /** How fast an outline reshapes itself, degrees of phase per minute. */
+  readonly shapeDriftDegPerMin: number
   /** Cells are placed within this range of the field. */
   readonly spreadNM: number
 }
@@ -683,6 +695,23 @@ function parseWeather(raw: unknown): WeatherSettings {
   const driftFactor = num(o['driftFactor'], 'weather.driftFactor')
   if (driftFactor < 0) throw new ConfigError('weather.driftFactor', 'must not be negative')
 
+  const driftSpreadDeg = num(o['driftSpreadDeg'], 'weather.driftSpreadDeg')
+  if (driftSpreadDeg < 0 || driftSpreadDeg > 180) {
+    throw new ConfigError('weather.driftSpreadDeg', 'must be within 0..180')
+  }
+
+  const driftSpeedSpread = num(o['driftSpeedSpread'], 'weather.driftSpeedSpread')
+  if (driftSpeedSpread < 0 || driftSpeedSpread >= 1) {
+    // At one, a cell could be drawn stationary while the rest of the field
+    // moves, which looks like a bug rather than like weather.
+    throw new ConfigError('weather.driftSpeedSpread', 'must be a fraction below 1')
+  }
+
+  const shapeDriftDegPerMin = num(o['shapeDriftDegPerMin'], 'weather.shapeDriftDegPerMin')
+  if (shapeDriftDegPerMin < 0) {
+    throw new ConfigError('weather.shapeDriftDegPerMin', 'must not be negative')
+  }
+
   const spreadNM = num(o['spreadNM'], 'weather.spreadNM')
   if (spreadNM <= 0) throw new ConfigError('weather.spreadNM', 'must be positive')
 
@@ -696,6 +725,9 @@ function parseWeather(raw: unknown): WeatherSettings {
     minRadiusNM,
     maxRadiusNM,
     driftFactor,
+    driftSpreadDeg,
+    driftSpeedSpread,
+    shapeDriftDegPerMin,
     spreadNM,
   }
 }

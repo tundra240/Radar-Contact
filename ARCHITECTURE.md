@@ -670,21 +670,44 @@ arrives as a green blob, works up through amber, cores out and goes back down th
 grows with it, though never to a point, because a cell shrinking to a dot reads as a disappearing
 symbol rather than as rain thinning out.
 
-Measured over 3000 sessions at the shipped settings (1 cell/hour, 7-18 minute lives,
-`heavyChance` 0.12):
+**And the cells move independently.** Every cell on the identical wind vector makes the whole
+field translate as one piece, which reads as a picture being panned rather than as weather. So
+each draws its own track -- `driftSpreadDeg` either side of the mean wind -- and its own speed --
+`driftSpeedSpread` around `driftFactor` -- and a group visibly spreads out as it crosses.
+Measured: 21.6 degrees of track spread between the cells of one session.
 
-| | at the moment you log on | somewhere in the first hour |
+The outline evolves too. Each harmonic's phase turns at its own rate, faster for the finer ones,
+so the small detail on a cell churns while its overall shape holds -- which is roughly how cloud
+behaves. `shapeDriftDegPerMin` sets the pace; it has to stay low enough that a cell develops over
+its life rather than shimmering, and there is a test pinning the per-ten-second change below 5% of
+the radius.
+
+Note that `intensityAt` has to ask for the shape at the cell's *current* age, exactly as the
+renderer does, or the alert and the picture disagree about where the weather is.
+
+Measured over 4000 refreshes at the shipped settings (4 cells/hour, 7-18 minute lives,
+`heavyChance` 0.12), driven through the app's own seed path rather than sequential seeds:
+
+| | when you log on | somewhere in the first hour |
 |---|---|---|
-| any precipitation | 18.9% | 69.9% |
-| bad enough to need avoiding | 5.8% | -- |
-| a red core | **0.8%** | 11.6% |
-| an arrival corridor blocked | -- | 21.5% |
+| any precipitation | 56.0% | -- |
+| bad enough to need avoiding | 21.9% | -- |
+| **a red core** | **3.7% (1 in 27)** | 38.5% |
+| an arrival corridor blocked | -- | 60.6% |
 
-So you almost never start in front of a thunderstorm -- one session in 125, against nine in ten
-before -- one forms during about one hour in nine, and 5.8% of the average hour has something on
-the scope worth vectoring round. Rare also has to be worth something when it comes, which is what
-`spreadNM` buys: scattering the same cells over 34 NM instead of 22 dropped corridor interference
-from 10% of sessions to 4.5%, which is weather that is visible but almost never in the way.
+A cell forms every **15.2 minutes**, and 20.8% of the average hour has something on the scope
+worth vectoring round. So green is ordinary and red is the event -- which is the intended shape,
+and worth stating because the two are easy to conflate. The old fixed six cells put a red core on
+**89%** of sessions.
+
+The tuning is all in three numbers. `cellsPerHour` sets the cadence; `heavyChance` sets how often
+one of them is the bad kind; the product of the rate and the mean life sets how much is on the
+scope at any moment. A cell only spends about 38% of its life above the heavy threshold even when
+it gets there, which is why 12% of cells coring out yields 3.7% of sessions starting under one.
+
+Rare also has to be worth something when it comes, which is what `spreadNM` buys: scattering the
+same cells over 34 NM instead of 22 dropped corridor interference by more than half, giving
+weather that is visible but almost never in the way.
 
 Note what is *not* gated by any of this: the **wind** is always there. Groundspeed and drift do
 not wait for a rainy day.

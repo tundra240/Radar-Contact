@@ -33,6 +33,9 @@ const CONFIG: WeatherConfig = {
   minRadiusNM: 4,
   maxRadiusNM: 10,
   driftFactor: 0.8,
+  driftSpreadDeg: 30,
+  driftSpeedSpread: 0.35,
+  shapeDriftDegPerMin: 6,
   spreadNM: 34,
 }
 
@@ -223,6 +226,8 @@ describe('the life of a cell', () => {
     lobes: [],
     bornSeconds: 0,
     lifeSeconds: 600,
+    driftOffsetDeg: 0,
+    driftFactor: 0.8,
   }
 
   it('is nothing before it forms and nothing after it collapses', () => {
@@ -275,6 +280,32 @@ describe('cell shape', () => {
   it('closes on itself, so the outline has no seam', () => {
     expect(cellRadiusNM(cell, 0)).toBeCloseTo(cellRadiusNM(cell, 360), 9)
   })
+
+  it('still closes on itself once it has reshaped', () => {
+    // The phases turn with age; the harmonics are whole numbers, so the
+    // outline has to stay seamless however far it has evolved.
+    for (const age of [60, 600, 3600]) {
+      expect(cellRadiusNM(cell, 0, age)).toBeCloseTo(cellRadiusNM(cell, 360, age), 9)
+    }
+  })
+
+  it('changes shape as it ages rather than sliding rigid', () => {
+    const at = (age: number) =>
+      [0, 45, 90, 135, 180, 225, 270, 315].map((b) => cellRadiusNM(cell, b, age))
+    const young = at(0)
+    const older = at(600)
+    const moved = young.filter((r, i) => Math.abs(r - older[i]!) > 0.01).length
+    expect(moved).toBeGreaterThan(3)
+  })
+
+  it('reshapes gradually, not in jumps', () => {
+    // Ten minutes of evolution is a cell developing; ten seconds of it
+    // would be a shimmer.
+    for (let age = 0; age < 600; age += 10) {
+      const step = Math.abs(cellRadiusNM(cell, 90, age) - cellRadiusNM(cell, 90, age + 10))
+      expect(step).toBeLessThan(cell.radiusNM * 0.05)
+    }
+  })
 })
 
 describe('drift', () => {
@@ -285,11 +316,38 @@ describe('drift', () => {
     expect(cellCentreNM(cell, weather, cell.bornSeconds)).toEqual(cell.originNM)
   })
 
-  it('moves downwind at the configured fraction of the wind', () => {
-    // A wind from 250 at 20 kt, drifting at 0.8, is 16 kt towards 070.
+  it('moves broadly downwind, but on its own track', () => {
+    // A wind from 250 at 20 kt drifting at 0.8 gives a mean of 16 kt towards
+    // 070. Each cell varies either side of that -- 35% in speed and 30
+    // degrees in track -- so this is a band, not a number. Moving every cell
+    // on the identical vector is what made the field look panned rather than
+    // alive.
     const after = cellCentreNM(cell, weather, cell.bornSeconds + 3600)
-    expect(distanceNM(cell.originNM, after)).toBeCloseTo(16, 1)
-    expect(bearingDeg(cell.originNM, after)).toBeCloseTo(70, 1)
+    const run = distanceNM(cell.originNM, after)
+    expect(run).toBeGreaterThan(16 * 0.65 - 0.01)
+    expect(run).toBeLessThan(16 * 1.35 + 0.01)
+    const track = bearingDeg(cell.originNM, after)
+    expect(Math.abs(track - 70)).toBeLessThanOrEqual(30.01)
+  })
+
+  it('does not move every cell on the same vector', () => {
+    // The point of the spread: a group of cells has to spread out as it
+    // crosses, or it reads as one picture being slid across the scope.
+    const many = activeCells(makeWeather(makeRng(21), CONFIG), MIDWAY)
+    expect(many.length).toBeGreaterThan(2)
+    const tracks = many.map((c) => {
+      const to = cellCentreNM(c, weather, c.bornSeconds + 3600)
+      return bearingDeg(c.originNM, to)
+    })
+    const spread = Math.max(...tracks) - Math.min(...tracks)
+    expect(spread).toBeGreaterThan(1)
+  })
+
+  it('still moves nothing when the drift factor is nothing', () => {
+    const still = makeWeather(makeRng(5), { ...CONFIG, driftFactor: 0 })
+    for (const c of activeCells(still, MIDWAY)) {
+      expect(cellCentreNM(c, still, c.bornSeconds + 3600)).toEqual(c.originNM)
+    }
   })
 
   it('is linear in the time since it formed', () => {
@@ -304,21 +362,29 @@ describe('drift', () => {
 })
 
 describe('intensity', () => {
-  const weather = makeWeather(makeRng(9), CONFIG)
+  // A schedule with exactly one cell alive at MIDWAY, and that one well
+  // developed. These tests are about how intensity behaves within a single
+  // cell, and intensityAt takes the worst of all of them -- so a neighbour
+  // overlapping the probe point would be measuring something else. Overlap
+  // has its own test below.
+  const weather = makeWeather(makeRng(16), { ...CONFIG, cellsPerHour: 1 })
   const cell = activeCells(weather, MIDWAY)[0]!
   /** The strength it is at right now, which is what intensity is measured against. */
   const now = cell.peak * envelopeOf(cell, MIDWAY)
   const centre = cellCentreNM(cell, weather, MIDWAY)
 
+  /** Its age at the moment under test: the shape evolves, so this matters. */
+  const age = MIDWAY - cell.bornSeconds
+
   it('is worst at the core and nothing outside the edge', () => {
     expect(intensityAt(weather, centre, MIDWAY)).toBeCloseTo(now, 6)
-    const outside = advance(centre, 0, cellRadiusNM(cell, 0) + 1)
+    const outside = advance(centre, 0, cellRadiusNM(cell, 0, age) + 1)
     expect(intensityAt(weather, outside, MIDWAY)).toBe(0)
   })
 
   it('falls away from the core rather than stepping', () => {
     const towards = 30
-    const edge = cellRadiusNM(cell, towards) * radiusScaleOf(envelopeOf(cell, MIDWAY))
+    const edge = cellRadiusNM(cell, towards, age) * radiusScaleOf(envelopeOf(cell, MIDWAY))
     let last = Infinity
     for (const f of [0.1, 0.3, 0.5, 0.7, 0.9]) {
       const here = intensityAt(weather, advance(centre, towards, edge * f), MIDWAY)
@@ -376,6 +442,8 @@ describe('contourFraction', () => {
     lobes: [],
     bornSeconds: 0,
     lifeSeconds: 100,
+    driftOffsetDeg: 0,
+    driftFactor: 0.8,
   }
 
   it('nests the bands, worst innermost', () => {

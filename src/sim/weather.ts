@@ -51,6 +51,15 @@ export interface Lobe {
   readonly harmonic: number
   readonly amp: number
   readonly phase: number
+  /**
+   * How fast this term's phase turns, degrees per minute, signed.
+   *
+   * This is what stops a cell being a rigid blob sliding across the scope:
+   * with each harmonic turning at its own rate the outline swells on one
+   * side and pulls in on another as it goes. Small numbers -- a cell should
+   * evolve over its life, not shimmer.
+   */
+  readonly driftDegPerMin: number
 }
 
 export interface WeatherCell {
@@ -65,6 +74,16 @@ export interface WeatherCell {
   readonly bornSeconds: number
   /** How long it lasts, forming to collapse. */
   readonly lifeSeconds: number
+  /**
+   * How far this cell's track differs from the mean wind, in degrees.
+   *
+   * Without this every cell moves on exactly the same vector and the whole
+   * field translates as one piece, which reads as a picture being panned
+   * rather than as weather. Given a spread, they fan out and separate.
+   */
+  readonly driftOffsetDeg: number
+  /** And its own share of the drift speed, so they do not move in step. */
+  readonly driftFactor: number
 }
 
 export interface WeatherConfig {
@@ -91,8 +110,14 @@ export interface WeatherConfig {
   readonly heavyChance: number
   readonly minRadiusNM: number
   readonly maxRadiusNM: number
-  /** Cells drift at this fraction of the wind speed. */
+  /** Cells drift at this fraction of the wind speed, on average. */
   readonly driftFactor: number
+  /** How far either side of the wind an individual cell's track can lie. */
+  readonly driftSpreadDeg: number
+  /** And how much faster or slower than the mean it can move, as a fraction. */
+  readonly driftSpeedSpread: number
+  /** How fast an outline reshapes itself, degrees of phase per minute. */
+  readonly shapeDriftDegPerMin: number
   /** Cells form within this range of the field. */
   readonly spreadNM: number
 }
@@ -184,9 +209,15 @@ function cellsBornIn(weather: Weather, slot: number): WeatherCell[] {
         // Shallower for the finer harmonics, or the outline turns to fur.
         amp: (0.18 / (n + 1)) * rng.next(),
         phase: rng.range(0, 359),
+        // Faster for the finer harmonics: the small detail on a cell churns
+        // while its overall shape holds, which is the way cloud behaves.
+        driftDegPerMin: config.shapeDriftDegPerMin * (n + 1) * (rng.next() * 2 - 1),
       })),
       bornSeconds: slot * SECONDS_PER_HOUR + rng.next() * SECONDS_PER_HOUR,
       lifeSeconds: (minLife + rng.next() * (maxLife - minLife)) * 60,
+      driftOffsetDeg: (rng.next() * 2 - 1) * config.driftSpreadDeg,
+      driftFactor:
+        config.driftFactor * (1 + (rng.next() * 2 - 1) * config.driftSpeedSpread),
     })
   }
   return cells
@@ -263,7 +294,13 @@ export function cellCentreNM(
   elapsedSeconds: number,
 ): Vec2NM {
   const hours = Math.max(0, elapsedSeconds - cell.bornSeconds) / SECONDS_PER_HOUR
-  const drift = windVector(weather.wind, weather.driftFactor * hours)
+  // Its own track and its own speed, rather than the mean wind, so a group
+  // of cells spreads out as it crosses instead of moving as one board.
+  const own: Wind = {
+    fromDeg: normalizeHeading(weather.wind.fromDeg + cell.driftOffsetDeg),
+    speedKts: weather.wind.speedKts,
+  }
+  const drift = windVector(own, cell.driftFactor * hours)
   return { x: cell.originNM.x + drift.x, y: cell.originNM.y + drift.y }
 }
 
@@ -274,10 +311,16 @@ export function cellCentreNM(
  * rather than as a drawn shape, which a circle never does. Scale by
  * `radiusScaleOf` for the size it is at a given moment.
  */
-export function cellRadiusNM(cell: WeatherCell, towardsDeg: number): number {
+export function cellRadiusNM(
+  cell: WeatherCell,
+  towardsDeg: number,
+  ageSeconds = 0,
+): number {
+  const minutes = Math.max(0, ageSeconds) / 60
   let wobble = 1
   for (const lobe of cell.lobes) {
-    wobble += lobe.amp * Math.cos(degToRad(lobe.harmonic * towardsDeg + lobe.phase))
+    const phase = lobe.phase + lobe.driftDegPerMin * minutes
+    wobble += lobe.amp * Math.cos(degToRad(lobe.harmonic * towardsDeg + phase))
   }
   return cell.radiusNM * Math.max(0.25, wobble)
 }
@@ -291,7 +334,9 @@ export function intensityAt(weather: Weather, at: Vec2NM, elapsedSeconds: number
     if (now <= 0) continue
     const centre = cellCentreNM(cell, weather, elapsedSeconds)
     const away = distanceNM(centre, at)
-    const edge = cellRadiusNM(cell, bearingDeg(centre, at)) * radiusScaleOf(envelope)
+    const age = elapsedSeconds - cell.bornSeconds
+    const edge =
+      cellRadiusNM(cell, bearingDeg(centre, at), age) * radiusScaleOf(envelope)
     if (away >= edge) continue
     // Domed rather than linear, so the core is a core and not a point.
     const fraction = away / edge

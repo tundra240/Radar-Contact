@@ -78,15 +78,19 @@ world it does not fit.
 
 ### Weather
 
-**You will usually log on to a clear scope.** Cells form roughly once an hour, last ten or twenty
-minutes and then go, so weather is something that happens during a shift rather than something
-the shift starts with. A red core is in front of you at the start of about one session in a
-hundred; one turns up somewhere in about one hour in nine. An empty scope is not a bug, and a
-scope with a red core on it is a day worth remembering.
+**Weather comes and goes all shift.** A cell forms every fifteen minutes or so, builds, drifts,
+changes shape and collapses within a quarter of an hour. So there is often something green on the
+scope -- a bit over half of sessions have some when you log on -- and it is rarely the same
+something for long.
+
+**Red is the rare one.** A red core is in front of you when you log on about **one session in
+twenty-seven**, and one develops somewhere within the hour in about two sessions in five. Green
+and amber are weather; red is an event.
 
 Because they come and go, **waiting is a real option**. A cell sitting on a base leg will not be
 there in a quarter of an hour, so holding one aircraft for a few minutes is sometimes cheaper
-than vectoring six of them around it.
+than vectoring six of them around it. Reading which way a cell is going matters too: they do not
+all travel the same way, so the gap between two of them may be opening or closing.
 
 **WX** on the scope, next to the menu button, shows and hides the precipitation. It is on to
 start with, because on the days there is any, you have to fly round it.

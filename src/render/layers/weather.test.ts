@@ -95,6 +95,9 @@ const CONFIG: WeatherConfig = {
   minRadiusNM: 5,
   maxRadiusNM: 9,
   driftFactor: 0.8,
+  driftSpreadDeg: 30,
+  driftSpeedSpread: 0.35,
+  shapeDriftDegPerMin: 6,
   spreadNM: 15,
 }
 
@@ -136,6 +139,8 @@ const one = (
         lobes: [],
         bornSeconds: 0,
         lifeSeconds: 100,
+        driftOffsetDeg: 0,
+        driftFactor: 1,
         ...cell,
       },
     ],

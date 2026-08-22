@@ -135,10 +135,12 @@ how far through the current gap the spawner is -- and a load puts it back and pa
 read the picture first. One slot; a save from another airport or another version is refused
 rather than loaded.
 
-**Sometimes there is weather.** Cells form about once an hour, run for ten or twenty minutes and
-are gone -- so you log on to a clear scope four times in five, a red core is in front of you at
-the start of about one session in a hundred, and weather that does turn up is a passing event
-rather than a fixture. Weather on every session would not be weather, it would be terrain.
+**The weather is alive.** A cell forms every fifteen minutes or so, grows, drifts, reshapes
+itself and collapses inside a quarter of an hour. Most of it is a green shower; a **red core is in
+front of you when you log on about one session in twenty-seven**, which is what makes one worth
+noticing. Cells do not move as a block either -- each has its own track, up to thirty degrees off
+the mean wind and a third faster or slower, so a group spreads out as it crosses instead of
+sliding across like a panned picture.
 Precipitation is drawn in three contours -- green, amber, red -- growing as a cell builds, fading
 as it collapses and drifting
 downwind meanwhile, with a **WX** button on the scope to show and hide them. Fly into moderate

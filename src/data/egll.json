@@ -32,13 +32,16 @@
       "speedKts": 18
     },
     "windEffect": 0.35,
-    "cellsPerHour": 1,
+    "cellsPerHour": 4,
     "minLifeMinutes": 7,
     "maxLifeMinutes": 18,
     "heavyChance": 0.12,
     "minRadiusNM": 4,
     "maxRadiusNM": 12,
     "driftFactor": 0.8,
+    "driftSpreadDeg": 30,
+    "driftSpeedSpread": 0.35,
+    "shapeDriftDegPerMin": 6,
     "spreadNM": 22
   },
   "render": {
