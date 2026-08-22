@@ -30,6 +30,15 @@ export interface Palette {
   readonly airspaceLocal: string
   readonly airspaceLabel: string
 
+  /**
+   * The outline of the area of responsibility.
+   *
+   * Its own colour rather than one of the airspace classes, because on a
+   * real position the sector you are working is the brightest line on the
+   * map -- brighter than the runways, brighter than the coast -- and every
+   * other boundary is drawn quietly behind it. It is the edge of the job.
+   */
+  readonly sector: string
   readonly runway: string
   readonly runwayLabel: string
   readonly centreline: string
@@ -164,6 +173,7 @@ export const palettes = {
     airspaceLocal: '#6b6a00',
     airspaceLabel: '#46422f',
 
+    sector: '#2a2418',
     runway: '#1a1a14',
     runwayLabel: '#2b2a1e',
     centreline: '#6b6552',
@@ -229,6 +239,7 @@ export const palettes = {
     airspaceLocal: '#b0a030',
     airspaceLabel: '#8092a0',
 
+    sector: '#e6f0f4',
     runway: '#e8f8ff',
     runwayLabel: '#9fd4e6',
     centreline: '#1b4152',
@@ -271,69 +282,6 @@ export const palettes = {
     chromeTitleBar: '#123c52',
     chromeTitleText: '#cfe6f2',
   },
-  /**
-   * An amber phosphor tube. Monochrome by intent, which means the airspace
-   * classes cannot be told apart by hue -- they are separated by brightness
-   * instead, the way a single-gun display had to. The brightest thing on
-   * the scope is what traffic is holding at.
-   */
-  amber: {
-    bg: '#140d03',
-    chromeStyle: 'bevel',
-
-    ringFaint: '#241804',
-    ring: '#3d2a08',
-    ringStrong: '#5c400e',
-    cardinal: '#4e360b',
-    ringLabel: '#a87516',
-
-    airspaceHigh: '#8a6412',
-    airspaceControl: '#c28a1a',
-    airspaceLocal: '#805c12',
-    airspaceLabel: '#a87c28',
-
-    runway: '#ffd9a0',
-    runwayLabel: '#e6b055',
-    centreline: '#4a3308',
-    centrelineTick: '#96690f',
-    fafTick: '#ffb000',
-
-    navaid: '#e89600',
-    navaidLabel: '#ffc860',
-    navaidFreq: '#96702a',
-    hold: '#fff2cc',
-
-    // A brightness ladder rather than three hues.
-    wxLight: '#946820',
-    wxModerate: '#bd8720',
-    wxHeavy: '#f5b43e',
-
-    target: '#ffe9bd',
-    trail: '#a87516',
-
-    neighbour: '#96702a',
-    neighbourLabel: '#c2913a',
-
-    // Monochrome, so the two are separated by brightness: the shoreline
-    // sits with the grid furniture, the FIR limit well above it.
-    coast: '#5c4210',
-    fir: '#b8801a',
-
-    text: '#ffcf80',
-    textDim: '#b3822c',
-    accent: '#ffb000',
-    warn: '#ff6a1a',
-
-    chromeFace: '#2b1d07',
-    chromeEdge: '#4a3418',
-    chromeLight: '#634516',
-    chromeShadow: '#0d0801',
-    chromeText: '#ffcf80',
-    chromeDim: '#bb8c32',
-    chromeWell: '#170f03',
-    chromeTitleBar: '#5c3f0d',
-    chromeTitleText: '#ffe4ad',
-  },
 
   /**
    * A 2010s terminal radar position, and the only scheme here that is not
@@ -368,6 +316,7 @@ export const palettes = {
     airspaceLocal: '#8f9a58',
     airspaceLabel: '#7f9aa0',
 
+    sector: '#eaf7f3',
     runway: '#dff3f0',
     runwayLabel: '#8fd8c4',
     centreline: '#1b3a42',
@@ -441,6 +390,7 @@ export const palettes = {
     airspaceLocal: '#55601c',
     airspaceLabel: '#3a565d',
 
+    sector: '#08181d',
     runway: '#0c2429',
     runwayLabel: '#125946',
     centreline: '#b3c7ce',
@@ -500,7 +450,6 @@ export const PALETTE_ORDER: readonly PaletteName[] = [
   'traconLight',
   'beige',
   'dark',
-  'amber',
 ]
 
 /**
@@ -517,7 +466,6 @@ export const PALETTE_LABEL: Record<PaletteName, string> = {
   traconLight: 'TRACON Light',
   beige: 'Classic Light',
   dark: 'Classic Dark',
-  amber: 'Classic Amber',
 }
 
 export function isPaletteName(value: unknown): value is PaletteName {

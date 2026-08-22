@@ -248,15 +248,33 @@ describe('drawTargets', () => {
     setPalette('beige')
   })
 
-  it('changes the ink for the selected target rather than adding a mark', () => {
+  it('rings the selected target and changes its ink', () => {
+    // A real position marks the selected aircraft with a circle as well as
+    // recolouring it. On a scope with thirty targets on it a change of ink
+    // is something you have to go looking for; a ring is something you see.
     const two = [plane({ callsign: 'BAW123' }), plane({ callsign: 'VIR7', pos: { x: 3, y: 3 } })]
     const plain = render(two)
     const picked = render(two, 'BAW123')
 
-    // Same geometry, one square each, whatever is selected.
+    // The target itself is unchanged in size and shape -- one square each,
+    // whatever is selected. The ring is drawn round it, not instead of it.
     expect(picked.rects).toHaveLength(plain.rects.length)
+    expect(picked.dots.length).toBe(plain.dots.length + 1)
     expect(picked.labels.some((l) => l.s === 'BAW123' && l.style === theme.accent)).toBe(true)
     expect(picked.labels.some((l) => l.s === 'VIR7' && l.style === theme.target)).toBe(true)
+  })
+
+  it('rings only the one that is selected', () => {
+    const two = [plane({ callsign: 'BAW123' }), plane({ callsign: 'VIR7', pos: { x: 3, y: 3 } })]
+    expect(render(two).dots).toHaveLength(0)
+    expect(render(two, 'BAW123').dots).toHaveLength(1)
+    expect(render(two, 'NOPE').dots).toHaveLength(0)
+  })
+
+  it('draws the ring big enough to clear the target square', () => {
+    const ring = render([plane({ callsign: 'BAW123' })], 'BAW123').dots[0]
+    expect(ring).toBeDefined()
+    expect(ring!.r).toBeGreaterThan(4)
   })
 
   it('draws every trail before any target, so no block is buried', () => {

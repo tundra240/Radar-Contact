@@ -727,7 +727,7 @@ function drawSectorBoundary(
   airport: Airport,
 ): void {
   g.lineWidth = 1.4
-  g.strokeStyle = theme.ringStrong
+  g.strokeStyle = theme.sector
   for (const ring of airport.controlFootprint) {
     g.beginPath()
     tracePath(g, cam, ring)

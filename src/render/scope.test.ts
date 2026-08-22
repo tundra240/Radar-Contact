@@ -1051,9 +1051,9 @@ describe('the map underneath', () => {
   })
 
   it('follows the palette', () => {
-    setPalette('amber')
+    setPalette('dark')
     const wide = render(1000, 600, 80)
-    expect(coastStrokes(wide, palettes.amber).length).toBeGreaterThan(0)
+    expect(coastStrokes(wide, palettes.dark).length).toBeGreaterThan(0)
     expect(coastStrokes(wide, palettes.beige)).toHaveLength(0)
     setPalette('beige')
   })
@@ -1217,9 +1217,9 @@ describe('hold patterns', () => {
   })
 
   it('follows the palette', () => {
-    setPalette('amber')
+    setPalette('dark')
     const r = render(1000, 600, 30)
-    expect(r.strokes.some((s) => s.style === palettes.amber.hold && s.points.length > 8)).toBe(true)
+    expect(r.strokes.some((s) => s.style === palettes.dark.hold && s.points.length > 8)).toBe(true)
     setPalette('beige')
   })
 })
@@ -1356,8 +1356,8 @@ describe('the area of responsibility', () => {
   })
 
   it('follows the palette, so the wash is never the wrong ground', () => {
-    setPalette('amber')
-    const wash = draw().washes.find((w) => w.alpha < 1 && w.style === palettes.amber.bg)
+    setPalette('dark')
+    const wash = draw().washes.find((w) => w.alpha < 1 && w.style === palettes.dark.bg)
     expect(wash).toBeDefined()
     setPalette('beige')
   })

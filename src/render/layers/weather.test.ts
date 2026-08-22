@@ -216,8 +216,8 @@ describe('the bands', () => {
   })
 
   it('follows the palette', () => {
-    setPalette('amber')
-    expect(one({ peak: 0.2 }).fills[0]?.style).toBe(palettes.amber.wxLight)
+    setPalette('dark')
+    expect(one({ peak: 0.2 }).fills[0]?.style).toBe(palettes.dark.wxLight)
     setPalette('beige')
   })
 })

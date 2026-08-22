@@ -242,8 +242,8 @@ describe('display scheme', () => {
 
   it('reports the scheme that was picked', () => {
     const { mount, palettes } = mountMenu()
-    keyed(mount, PALETTE_LABEL.amber).click()
-    expect(palettes).toEqual(['amber'])
+    keyed(mount, PALETTE_LABEL.dark).click()
+    expect(palettes).toEqual(['dark'])
   })
 
   it('shows the active scheme pressed in', () => {
@@ -258,8 +258,8 @@ describe('display scheme', () => {
     // be what decides the display -- not the last button pressed here.
     const { mount, menu } = mountMenu()
     keyed(mount, PALETTE_LABEL.beige).click()
-    menu.paint(state({ palette: 'amber' }))
-    expect(keyed(mount, PALETTE_LABEL.amber).classList.contains('is-active')).toBe(true)
+    menu.paint(state({ palette: 'dark' }))
+    expect(keyed(mount, PALETTE_LABEL.dark).classList.contains('is-active')).toBe(true)
     expect(keyed(mount, PALETTE_LABEL.beige).classList.contains('is-active')).toBe(false)
   })
 })

@@ -84,7 +84,6 @@ describe('palettes', () => {
     expect(cyclePalette()).toBe('traconLight')
     expect(cyclePalette()).toBe('beige')
     expect(cyclePalette()).toBe('dark')
-    expect(cyclePalette()).toBe('amber')
     expect(cyclePalette()).toBe('traconDark')
     expect(theme.bg).toBe(palettes.traconDark.bg)
   })
@@ -97,19 +96,11 @@ describe('palettes', () => {
     // Modern: one of each.
     expect(lum(palettes.traconLight.bg)).toBeGreaterThan(0.6)
     expect(lum(palettes.traconDark.bg)).toBeLessThan(0.15)
-    // Period: one of each, and the amber tube alongside them.
+    // Period: one of each.
     expect(lum(palettes.beige.bg)).toBeGreaterThan(0.6)
     expect(lum(palettes.dark.bg)).toBeLessThan(0.15)
-    expect(lum(palettes.amber.bg)).toBeLessThan(0.15)
   })
 
-  it('gives the amber tube a warm cast rather than a neutral one', () => {
-    // A monochrome scheme that is not actually tinted is just a dark theme.
-    const n = parseInt(palettes.amber.bg.slice(1), 16)
-    expect((n >> 16) & 255).toBeGreaterThan(n & 255)
-    const a = parseInt(palettes.amber.accent.slice(1), 16)
-    expect((a >> 16) & 255).toBeGreaterThan(a & 255)
-  })
 })
 
 describe('airspaceColour', () => {
@@ -159,6 +150,9 @@ describe('palette legibility', () => {
   // Symbology the controller reads values off. 3:1 is the threshold for a
   // graphical object; anything below it is a display you squint at.
   const SYMBOLOGY = [
+    // The sector outline is the edge of the job and the brightest line on
+    // the map, so it is held to the symbology threshold like the rest.
+    'sector',
     'runway',
     'runwayLabel',
     'navaid',

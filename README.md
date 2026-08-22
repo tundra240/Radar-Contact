@@ -278,7 +278,7 @@ fast-forward is the same simulation sooner rather than a different one. The stat
 the clock and the current rate on the scope itself, so you can see whether time is running
 without opening anything. Interface sound is switched here too; controls click when it is on.
 
-**Display scheme.** Five palettes in two families.
+**Display scheme.** Four palettes in two families.
 
 **TRACON Dark** is the shipped look: a present-day terminal radar position taken from
 photographs of real control rooms -- a dark blue-slate ground, mint-green symbology, and flat
@@ -287,10 +287,9 @@ lighting. It is not an inversion: a dark scope glows and a light one is ink on p
 symbology goes dark and the ground goes pale while the hues stay put, mint for the navaids and
 traffic and warm for the holds. The two read as one instrument in two lighting conditions.
 
-**Classic Light**, **Classic Dark** and **Classic Amber** are the period schemes, kept exactly as
-they were for anyone who preferred them: a Windows-2000-era desktop with a tan tube, a colour CRT,
-and a monochrome amber phosphor tube. They keep their bevelled furniture; only the two TRACON
-schemes are flat.
+**Classic Light** and **Classic Dark** are the period schemes, kept exactly as they were for
+anyone who preferred them: a Windows-2000-era desktop with a tan tube, and a colour CRT. They keep
+their bevelled furniture; only the two TRACON schemes are flat.
 
 The two modern schemes sit together at the front of the cycle, so changing the lighting does not
 mean walking through three period tubes to get from one to the other. `D` still cycles them

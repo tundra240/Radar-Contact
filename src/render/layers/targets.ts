@@ -55,6 +55,16 @@ const BLOCK_FONT_PX = 10
 const BLOCK_LINE_PX = 11
 /** Gap between the target symbol and the first character of the block. */
 const BLOCK_LEAD_PX = 11
+
+/**
+ * Radius of the ring drawn round the selected target.
+ *
+ * A real position marks the aircraft under the cursor with a circle rather
+ * than only by recolouring it: on a scope with thirty targets on it, a
+ * change of ink is something you have to go looking for, and a ring is
+ * something you see.
+ */
+const SELECT_RING_PX = 9
 /** How close to the right edge a target has to be before its block flips. */
 const BLOCK_FLIP_MARGIN_PX = 90
 /** Monospace advance as a fraction of the font size, as scope.ts assumes. */
@@ -129,6 +139,15 @@ function drawTarget(
   // asking to get out of the weather overrides both: it is the one thing on
   // the display that wants doing something about.
   const ink = alerting ? theme.warn : isSelected ? theme.accent : theme.target
+
+  // The ring goes down first so the target and its vector sit inside it.
+  if (isSelected) {
+    g.strokeStyle = ink
+    g.lineWidth = 1
+    g.beginPath()
+    g.arc(p.x, p.y, SELECT_RING_PX, 0, Math.PI * 2)
+    g.stroke()
+  }
 
   // Where it will be in a minute. This is the single most useful mark on
   // an approach scope: two vectors that cross are two aircraft that will.

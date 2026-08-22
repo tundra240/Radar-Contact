@@ -366,10 +366,13 @@ taken from the VGA system colours -- navy for class A, purple for the control zo
 for class G, teal for navaids, burnt amber for holds. Those are dark and saturated, which is
 what survives on a light ground; a modern neon turns to mud there. `dark` is the same
 instrument as a colour CRT: near-black with bright cyan symbology and phosphor amber for the
-holds. `amber` is a monochrome phosphor tube, and being monochrome is the constraint that
-makes it interesting: the airspace classes cannot be separated by hue, so they are separated
-by brightness the way a single-gun display had to, and the brightest thing on the scope is
-whatever traffic is holding at.
+holds.
+
+A monochrome amber tube used to sit alongside them. It was interesting to build -- with only one
+gun the airspace classes cannot be separated by hue, so they had to be separated by brightness
+the way such a display actually did it -- and it has been dropped anyway. Being interesting to
+build is not the same as being worth looking at, and nothing else in the interface depended on
+it: a scheme is a palette plus one array entry, in both directions.
 
 Schemes cycle rather than toggle -- `PALETTE_ORDER` is the single place that order is
 stated, and the control, the keyboard shortcut and the stored preference all read from it, so
