@@ -1276,12 +1276,35 @@ function start(
 
   // Release an arrival on command, for when the scope is quiet or to line
   // up a particular situation without waiting for the cadence.
-  // Release an arrival on command, for when the scope is quiet or to line
-  // up a particular situation without waiting for the cadence.
   const spawnNow = (): void => {
     const arrivals = spawner.spawnNow(loop.clock, traffic)
     if (arrivals.length === 0) return
     traffic = [...traffic, ...arrivals]
+    syncStrips()
+    requestDraw()
+  }
+
+  /**
+   * And a transit, the same way.
+   *
+   * Worth having for the same reason the arrival one is -- setting up a
+   * particular situation without waiting for it -- and worth saying out
+   * loud when it does nothing, because a key that silently declines is
+   * indistinguishable from a key that is not wired up.
+   */
+  const spawnTransitNow = (): void => {
+    const crossing = overflights.spawnNow(loop.clock, traffic)
+    if (crossing.length === 0) {
+      announce('no transit available -- the sector is at its limit', 'reject')
+      return
+    }
+    for (const a of crossing) {
+      announce(
+        `${a.callsign} crossing${a.destination === null ? '' : ` for ${a.destination}`} at ${a.altFt} ft`,
+        'readback',
+      )
+    }
+    traffic = [...traffic, ...crossing]
     syncStrips()
     requestDraw()
   }
@@ -1536,6 +1559,12 @@ function start(
       case 'n':
         // A dev shortcut, so it waits until someone is working the sector.
         if (controller !== null) spawnNow()
+        return
+      case 't':
+        // The same, for traffic that is only passing through. T rather than
+        // a second press of N: which kind you wanted is the whole question,
+        // and a shortcut that cycled would make it a guess.
+        if (controller !== null) spawnTransitNow()
         return
       default:
         return

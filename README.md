@@ -209,7 +209,9 @@ npm run dev        # http://localhost:5173
 | `npm run typecheck` | Type-check only |
 
 On the scope: drag to pan, wheel to zoom, `R` to reset the view, space to pause, `D` to cycle
-the display schemes, and `M` to open the menu (`O` does too).
+the display schemes, and `M` to open the menu (`O` does too). `N` releases an arrival and `T` a
+transit, both without waiting for the cadence -- for setting up a particular situation rather
+than sitting through the one the timer was going to give you.
 
 Arrivals are released by `sim/spawner.ts` on a timer that tightens as the session goes on, and
 **which stack each one arrives over follows where it has flown from**: transatlantic over
@@ -220,6 +222,17 @@ airline carries a `preferredFixes` table in the config, so an American 777 arriv
 one appears twelve miles out along its hold's inbound leg, tracks **direct to its VOR, and
 enters the hold when it gets there** -- so traffic parks itself over the four fixes, stacked in
 1,000 ft layers, and waits for you. Nothing crosses the sector unless you send it somewhere.
+
+**Except the traffic that is not yours.** `sim/overflight.ts` releases neighbours' inbounds
+crossing a corner of the airspace and continental flights over the top of it, on corridors of
+published navaids set out in the airport config. They appear already flying a route, navigate
+themselves across it, and leave the far side without anybody having to say anything -- so they
+cost you the airspace and the attention rather than the workload. Drawn in an ink of their own
+rather than a dimmer one, because dimness on this display already means "outside your area of
+responsibility", which is a different thing from "yours and not landing". Vector one round a
+storm and hand it back its flight plan with `RESUME NAV`, on its menu or typed as `NAV`. A
+transit leaving is worth nothing rather than the fifty an arrival costs you: it was never
+yours to land.
 
 The spawner picks a fix *and* a level, so two aircraft holding over the same VOR are never at
 the same altitude, and vectoring one out frees its level for the next arrival. A sector nobody

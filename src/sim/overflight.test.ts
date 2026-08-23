@@ -193,6 +193,67 @@ describe('releasing transits', () => {
   })
 })
 
+describe('releasing one on command', () => {
+  it('produces a transit straight away, without waiting for the cadence', () => {
+    // The automatic flow does not release its first for a couple of
+    // minutes. The whole point of the key is not to wait for it.
+    const out = generator().spawnNow(clockAt(0), [])
+    expect(out).toHaveLength(1)
+    const a = out[0] as Aircraft
+    expect(a.role).toBe('overflight')
+    expect(a.navMode).toBe('LNAV')
+    expect(a.route.length).toBeGreaterThan(1)
+    expect(a.destination).not.toBeNull()
+  })
+
+  it('ignores the corridor cooldown, which only exists to space the flow', () => {
+    // Pressed repeatedly it keeps producing, where the automatic flow would
+    // rest each corridor for five minutes after using it.
+    const gen = generator()
+    let made = 0
+    for (let i = 0; i < 4; i += 1) made += gen.spawnNow(clockAt(i), []).length
+    expect(made).toBe(4)
+  })
+
+  it('still refuses to exceed the cap', () => {
+    // A deliberate press is not a licence to fill the sector: the traffic
+    // the controller did not ask for should not be able to bury the traffic
+    // they did.
+    const gen = generator()
+    const full: Aircraft[] = []
+    for (let i = 0; i < (config?.maxConcurrent ?? 5); i += 1) {
+      full.push(...gen.spawnNow(clockAt(i), full))
+    }
+    expect(full).toHaveLength(config?.maxConcurrent ?? 5)
+    expect(gen.spawnNow(clockAt(99), full)).toEqual([])
+  })
+
+  it('counts arrivals separately from transits when judging the cap', () => {
+    // The cap is on transits, not on everything: a busy arrival stream must
+    // not stop one crossing.
+    const arrivals: Aircraft[] = []
+    for (let i = 0; i < 20; i += 1) {
+      arrivals.push({ callsign: `BAW${i}`, role: 'arrival' } as Aircraft)
+    }
+    expect(generator().spawnNow(clockAt(0), arrivals)).toHaveLength(1)
+  })
+
+  it('starts it outside the airspace like any other', () => {
+    // Released on command is not released differently: it still flies in
+    // from beyond the boundary rather than appearing over the field.
+    const a = generator().spawnNow(clockAt(0), [])[0] as Aircraft
+    expect(a.entered).toBe(false)
+    expect(isInSector(a, airport.controlZone)).toBe(false)
+  })
+
+  it('draws from the same seeded stream, so a session stays reproducible', () => {
+    const one = generator(31).spawnNow(clockAt(0), [])[0] as Aircraft
+    const two = generator(31).spawnNow(clockAt(0), [])[0] as Aircraft
+    expect(two.callsign).toBe(one.callsign)
+    expect(two.altFt).toBe(one.altFt)
+  })
+})
+
 describe('a transit crossing the sector', () => {
   /** Fly one until the world lets go of it, or give up. */
   function crossing(a: Aircraft): { readonly at: Aircraft; readonly why: string | null } {

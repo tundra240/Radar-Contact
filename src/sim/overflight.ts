@@ -266,6 +266,34 @@ export class Overflights {
     return [this.release(corridor, clock, traffic)]
   }
 
+  /**
+   * Release a transit now, on command, without waiting for the cadence.
+   *
+   * The counterpart to the arrival spawner's, and it makes the same two
+   * choices for the same reasons. The corridor cooldown is skipped, since
+   * that exists only to space the automatic flow and a deliberate press is
+   * not the automatic flow. The concurrency cap is not: a manual trigger
+   * should not be able to fill the sector with traffic the controller had
+   * no hand in asking for.
+   *
+   * Returns an empty array when it cannot place one, so the caller can tell
+   * "none available" from "here is one" without a second question.
+   */
+  spawnNow(clock: Clock, existing: readonly Aircraft[]): Aircraft[] {
+    const config = this.airport.overflights
+    if (config === null || this.corridors.length === 0) return []
+
+    const airborne = existing.filter((a) => a.role === 'overflight').length
+    if (airborne >= config.maxConcurrent) return []
+
+    // Every corridor, cooldown ignored -- but still weighted, so pressing
+    // the key repeatedly gives the same mix as leaving it alone would.
+    const corridor = this.rng.weighted(this.corridors, (c) => c.weight)
+    this.lastUsedAt.set(corridor.id, clock.elapsedSeconds)
+    this.spawnCount += 1
+    return [this.release(corridor, clock, existing)]
+  }
+
   /** The corridors not resting, weighted, or null if they are all resting. */
   private pick(nowSeconds: number): Corridor | null {
     const free = this.corridors.filter((c) => {
