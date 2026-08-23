@@ -28,7 +28,7 @@ function step(over: Partial<TutorialStep> = {}): TutorialStep {
 }
 
 function lesson(...steps: readonly TutorialStep[]): TutorialModule {
-  return { id: 'test', title: 'Test lesson', summary: 'For testing.', steps }
+  return { id: 'test', airport: 'EGLL', title: 'Test lesson', summary: 'For testing.', steps }
 }
 
 function ac(over: Partial<Aircraft> = {}): Aircraft {

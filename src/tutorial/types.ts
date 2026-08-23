@@ -33,8 +33,24 @@ export type Spotlight =
   | { readonly kind: 'elements'; readonly selectors: readonly string[] }
   /** A scripted aircraft, by the ref the step gave it. */
   | { readonly kind: 'aircraft'; readonly ref: string }
-  /** A published navaid, by name. */
-  | { readonly kind: 'fix'; readonly name: string }
+  /**
+   * A published navaid, by name.
+   *
+   * `radiusNM` widens the hole to cover something drawn around the fix
+   * rather than the symbol itself -- a weather cell over it, or the hold.
+   * In miles rather than pixels because that is what the thing being
+   * pointed at is measured in, and the hole then stays the right size
+   * however far the scope is zoomed.
+   */
+  | { readonly kind: 'fix'; readonly name: string; readonly radiusNM?: number }
+  /**
+   * A column of the readout table along the top of the glass.
+   *
+   * Those are painted on the canvas, not built from elements, so there is
+   * nothing to point a CSS selector at. The renderer records where it put
+   * each one; see readoutBox in render/scope.ts.
+   */
+  | { readonly kind: 'readout'; readonly label: string }
   /** The whole picture, which is a hole with nothing dark in it. */
   | { readonly kind: 'scope' }
   /**
@@ -172,6 +188,16 @@ export interface TutorialStep {
 
 export interface TutorialModule {
   readonly id: string
+  /**
+   * The field this lesson is written for, as an ICAO code.
+   *
+   * A lesson names fixes, corridors, runways and headings, and every one of
+   * those is a fact about one airport. Taught at another field it would be
+   * confidently wrong -- pointing at holds that are not there and vectoring
+   * onto a runway that does not exist -- so the requirement is stated and
+   * checked rather than assumed.
+   */
+  readonly airport: string
   readonly title: string
   /** One line, for a menu of lessons. */
   readonly summary: string

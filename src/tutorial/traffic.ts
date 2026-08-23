@@ -28,6 +28,19 @@ const ARP: Vec2NM = { x: 0, y: 0 }
 const DEFAULT_TYPE = 'A320'
 
 /**
+ * How far apart two scripted arrivals on the same fix are placed.
+ *
+ * Every arrival for a given fix appears at the same point -- the spawner
+ * releases one at a time, so it never needs to think about it. A lesson
+ * asking for two over one fix would otherwise put them at the identical
+ * position at different levels, which draws as a single blip with one data
+ * block on top of another and reads as a broken display. They go down the
+ * same radial instead, in trail, which is also how they would really
+ * arrive.
+ */
+const IN_TRAIL_NM = 9
+
+/**
  * Where a scripted arrival appears: the spawner's own entry point, out
  * along the radial through its fix and clear of the airspace.
  *
@@ -71,11 +84,17 @@ function buildArrival(
   spec: ScriptedAircraft,
   elapsedSeconds: number,
   index: number,
+  /** How many earlier aircraft this lesson already put on the same fix. */
+  aheadOnFix: number,
 ): Aircraft | null {
   const fix = airport.navaids.find((n) => n.name === spec.fix)
   if (fix === undefined) return null
 
-  const at = entryPointFor(airport, fix, spec.beforeNM)
+  const at = entryPointFor(
+    airport,
+    fix,
+    (spec.beforeNM ?? airport.traffic.entryDistanceNM) + aheadOnFix * IN_TRAIL_NM,
+  )
   const hold = holdFor(fix)
   const { type, wake } = typeOf(airport, spec.type)
 
@@ -163,12 +182,21 @@ export function buildTraffic(
   elapsedSeconds: number,
 ): readonly Aircraft[] {
   const out: Aircraft[] = []
+  /** Aircraft already placed on each fix, so the next goes in behind. */
+  const onFix = new Map<string, number>()
+
   specs.forEach((spec, i) => {
-    const built =
-      spec.kind === 'overflight'
-        ? buildOverflight(airport, spec, elapsedSeconds, i)
-        : buildArrival(airport, spec, elapsedSeconds, i)
-    if (built !== null) out.push(built)
+    if (spec.kind === 'overflight') {
+      const built = buildOverflight(airport, spec, elapsedSeconds, i)
+      if (built !== null) out.push(built)
+      return
+    }
+    const ahead = onFix.get(spec.fix ?? '') ?? 0
+    const built = buildArrival(airport, spec, elapsedSeconds, i, ahead)
+    if (built !== null) {
+      onFix.set(spec.fix ?? '', ahead + 1)
+      out.push(built)
+    }
   })
   return out
 }

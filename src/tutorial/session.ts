@@ -14,6 +14,7 @@ import {
   type EngineState,
   type TutorialEvent,
 } from './engine'
+import { readoutBox } from '../render/scope'
 import { holeAround, holeOfElement, TutorialOverlay, type Hole } from './overlay'
 import { buildTraffic, buildWeather, refsOf } from './traffic'
 import type { Failure, Spotlight, TutorialModule, TutorialStep } from './types'
@@ -109,6 +110,19 @@ export class TutorialSession {
     return this.overlay.element
   }
 
+  /**
+   * The scale of the picture, in pixels per mile.
+   *
+   * Taken by projecting two points a mile apart rather than read off the
+   * camera, because the session is given a projection and not a camera --
+   * which keeps everything the lesson can do to the world in one list.
+   */
+  private pixelsPerNM(): number {
+    const origin = this.world.screenOf({ x: 0, y: 0 })
+    const mile = this.world.screenOf({ x: 1, y: 0 })
+    return Math.max(1, Math.hypot(mile.x - origin.x, mile.y - origin.y))
+  }
+
   get stepIndex(): number {
     return this.state.step
   }
@@ -117,7 +131,25 @@ export class TutorialSession {
     return this.state.resets
   }
 
+  /**
+   * Whether this lesson can be taught at the field in front of us.
+   *
+   * See TutorialModule.airport. Today there is one airport and this is
+   * always true; it exists so that adding a second cannot quietly produce a
+   * lesson vectoring onto a runway that is not there.
+   */
+  get fitsThisAirport(): boolean {
+    return this.module.airport === this.world.airport.icao
+  }
+
   start(): void {
+    if (!this.fitsThisAirport) {
+      this.world.announce(
+        `${this.module.title} is taught at ${this.module.airport}, not ${this.world.airport.icao}`,
+        'reject',
+      )
+      return
+    }
     this.active = true
     this.state = beginLesson()
     this.onRunning(true)
@@ -325,7 +357,21 @@ export class TutorialSession {
       case 'fix': {
         const navaid = this.world.airport.navaids.find((n) => n.name === spotlight.name)
         if (navaid === undefined) return []
-        return [holeAround(this.world.screenOf(navaid.posNM), FIX_HOLE_PX)]
+        const size =
+          spotlight.radiusNM === undefined
+            ? FIX_HOLE_PX
+            : // Measured off the camera rather than assumed, so the hole
+              // covers the same miles at any zoom.
+              spotlight.radiusNM * 2 * this.pixelsPerNM()
+        return [holeAround(this.world.screenOf(navaid.posNM), Math.max(FIX_HOLE_PX, size))]
+      }
+
+      case 'readout': {
+        const box = readoutBox(spotlight.label)
+        if (box === null) return []
+        // Canvas pixels are viewport pixels here: the canvas is at the top
+        // left of the display and is not scaled.
+        return [{ x: box.x, y: box.y, w: box.w, h: box.h, r: 2 }]
       }
 
       case 'group':

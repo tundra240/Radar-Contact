@@ -1082,6 +1082,34 @@ interface Cell {
   readonly value: string
 }
 
+/** A rectangle on the display, in canvas pixels. */
+export interface ReadoutBox {
+  readonly x: number
+  readonly y: number
+  readonly w: number
+  readonly h: number
+}
+
+/**
+ * Where each readout column was last drawn.
+ *
+ * The readouts are painted on the canvas, so there is no element to measure
+ * and nothing outside this file knows how wide RATE came out this frame --
+ * the width depends on the value, which changes. Anything that needs to
+ * point at one, and the tutorial's spotlight does, has to be told.
+ *
+ * Recorded on the way past rather than computed a second time somewhere
+ * else: a copy of the layout maths would be a copy to keep in step, and the
+ * one thing worse than a spotlight in the wrong place is one that is right
+ * until somebody changes a padding.
+ */
+const readoutAt = new Map<string, ReadoutBox>()
+
+/** The rectangle a named readout occupies, or null if it is not drawn. */
+export function readoutBox(label: string): ReadoutBox | null {
+  return readoutAt.get(label) ?? null
+}
+
 function drawHud(
   g: CanvasRenderingContext2D,
   cam: Camera,
@@ -1089,6 +1117,10 @@ function drawHud(
   overlays: Overlays,
   status: ScopeStatus,
 ): void {
+  // Cleared each frame: the readouts are re-laid out every time, and a
+  // column that no longer fits should report no position rather than the
+  // one it had when it did.
+  readoutAt.clear()
   if (theme.chromeStyle === 'flat') {
     drawPositionStrip(g, airport, status)
     // Started where the position block ends and stopped where the clock
@@ -1237,6 +1269,7 @@ function drawDataTable(
     g.fillStyle = theme.accent
     g.fillText(cell.value, x + padX, top + valueTop)
 
+    readoutAt.set(cell.label, { x, y: top, w, h })
     x += w
   }
 }
@@ -1443,6 +1476,7 @@ function drawStatusBar(
     g.fillStyle = theme.accent
     g.fillText(cell.value, x + 6 + Math.ceil(cw * (cell.label.length + 1)), mid)
 
+    readoutAt.set(cell.label, { x, y: cellY, w: cellW, h: cellH })
     x += cellW + 4
   }
 
