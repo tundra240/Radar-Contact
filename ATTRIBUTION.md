@@ -88,15 +88,47 @@ this repository is already encumbered by that licence. Taking the coastline from
 dataset instead means one less GPL-derived block to disentangle if option 2 or 3 above is
 ever chosen.
 
-Processing, all in `tools/build-geography.mjs`: clipped to a box roughly 180 NM around
-Heathrow, simplified with Douglas-Peucker to a 0.1 NM tolerance, and split into chunks spanning
-at most 12 NM so the renderer can reject an off-screen chunk on its bounding box. 2595 points
-in 209 chunks.
+Processing: clipped to a box roughly 180 NM around the field, simplified with Douglas-Peucker
+to a 0.1 NM tolerance, and split into chunks spanning at most 12 NM so the renderer can reject
+an off-screen chunk on its bounding box. The code is in `tools/lib/lines.mjs`, which
+`tools/build-geography.mjs` and `tools/build-field-map.mjs` both run through -- there is no
+version of "the coastline is prepared differently at Nice" that is not a bug.
 
-Accuracy was measured rather than assumed. Distance from the drawn line to nine known coastal
-points: Brighton 0.02 NM, Southend 0.04 NM, North Foreland 0.05 NM, Bournemouth 0.04 NM,
-Dover 0.20 NM, Harwich 0.24 NM, Beachy Head 0.61 NM, Ostend 0.78 NM, Calais 1.09 NM. The
-larger residuals are town-centre coordinates sitting inland of the shore, not line error.
+All four fields are drawn on it: 209 chunks at Heathrow, 85 at Faro, 94 at Nice, 109 at
+Barcelona. The projection is flat and centred on the aerodrome, so each field's copy is its own
+numbers rather than a shared one.
+
+Accuracy was measured rather than assumed, per field. Distance from the drawn line to known
+coastal points:
+
+- **Heathrow** -- Brighton 0.02 NM, Southend 0.04 NM, North Foreland 0.05 NM, Bournemouth
+  0.04 NM, Dover 0.20 NM, Harwich 0.24 NM, Beachy Head 0.61 NM, Ostend 0.78 NM, Calais 1.09 NM.
+- **Faro** -- Cape St Vincent 0.10 NM, Portimao 0.12 NM, Vila Real de Santo Antonio 0.14 NM,
+  Faro waterfront 0.15 NM, Huelva 1.05 NM.
+- **Nice** -- Toulon 0.27 NM, Nice 0.42 NM, Cannes 0.59 NM, Sanremo 0.60 NM, Monaco 1.18 NM,
+  Saint-Tropez 1.26 NM.
+- **Barcelona** -- Blanes 0.24 NM, Cap de Creus 0.26 NM, Sitges 0.54 NM, Barcelona harbour
+  1.07 NM, Tarragona 1.62 NM.
+
+The larger residuals are town-centre coordinates sitting inland of the shore, not line error.
+`src/data/fieldmap.test.ts` asserts a subset of these, which is what catches a shoreline
+projected with the wrong sign or clipped to the wrong box -- either still draws a plausible
+squiggle.
+
+## Natural Earth -- rivers
+
+- **Source:** https://www.naturalearthdata.com/
+  (`ne_10m_rivers_lake_centerlines.geojson`, same repository as above)
+- **Terms:** public domain
+- **Retrieved:** 2026-08-24
+
+One river, the Guadiana at Faro: the Portuguese border, 28 NM east of the field, and the fix
+Faro's eastern gate is named after. It carries no width, and the renderer strokes a widthless
+river as a plain line.
+
+The Llobregat at Barcelona and the Var at Nice both run past the end of their runway and would
+be worth having. Neither is in this dataset -- at ten-million scale they are below its
+resolution -- so their absence is the data's rather than an omission.
 
 ## OurAirports -- positions and runways
 
@@ -107,6 +139,17 @@ larger residuals are town-centre coordinates sitting inland of the shore, not li
 Airport reference points, runway thresholds, elevations, displaced thresholds, navaid
 positions and frequencies in `src/data/egll.json` come from `airports.csv`, `runways.csv` and
 `navaids.csv`.
+
+The neighbouring aerodromes and the navigation aids at Faro, Barcelona and Nice come from the
+same three files, through `tools/build-field-map.mjs`: every large airport within 140 NM,
+every medium one within 90 NM and every small one within 30 NM with a runway of at least
+2000 ft, plus every VOR, VOR-DME and VORTAC within 55 NM to a limit of twelve. Bare ILS DMEs
+and low-powered NDB locators are excluded -- Nice alone has three inside seven miles, on top of
+the two VOR-DMEs anybody is actually navigating by.
+
+The five-letter entry gates at those three fields are NOT from this dataset. They are invented
+gameplay furniture and always have been; the build keeps them and puts the real stations around
+them.
 
 The surrounding aerodrome list was extended from the original fifteen within 40 NM out to
 forty, by `tools/build-airports.mjs`: every large airport within 100 NM and every medium one
@@ -120,6 +163,22 @@ Spot checks against reality: Southend 05/23 comes out 054, Southampton 02/20 at 
 Bournemouth 08/26 at 075, Birmingham 15/33 at 146.
 
 ## Derived rather than sourced
+
+**The airspace at Faro, Barcelona and Nice is constructed and is not from any AIP or sector
+file.** There is no open equivalent of the VATSIM UK sector file for Portugal, Spain or France,
+and this is the one part of those three fields that could not be taken from data. What is
+there, built by `tools/build-airspace.mjs`: a control zone and a terminal area outline (both
+rule-derived, both unchanged from the original pair), approach corridors along the extended
+centrelines, and terminal sub-areas whose bases step up away from the arrival direction and
+over the terrain in the same file. Every constructed volume carries `derivation: "approx"`,
+which the loader turns into `approximate: true`.
+
+Two constraints on it are worth writing down. None of the added areas encloses its aerodrome,
+because `sim/airspace.ts` builds the area of responsibility out of whichever controlled volumes
+do -- so an added area that enclosed the field would silently move the boundary a controller is
+working to. And no sub-area is based above a holding fix inside it, because an arrival released
+at that gate would appear beneath controlled airspace at the moment it was handed over. Both
+are asserted in `src/data/fieldmap.test.ts`.
 
 Aerodrome traffic zones for fields the sector file does not cover are computed from the UK
 rule -- 2 NM radius where the longest runway is 1850 m or less, 2.5 NM otherwise, extending

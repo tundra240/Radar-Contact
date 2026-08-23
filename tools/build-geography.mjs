@@ -19,10 +19,15 @@
  * Usage:
  *   node tools/build-geography.mjs COASTLINE.geojson EGTT.txt RIVERS.txt OUT.json
  *
+ * The other three fields have no sector file to draw on and are built by
+ * tools/build-field-map.mjs instead, through the same line tools.
+ *
  * Paste the result over the `geography` array in src/data/egll.json. Running
  * it against the same inputs reproduces the committed data exactly.
  */
 import fs from 'node:fs'
+
+import { DEFAULTS, lineWorks } from './lib/lines.mjs'
 
 const ARP = { lat: 51.470748, lon: -0.459909 }
 
@@ -30,243 +35,26 @@ const ARP = { lat: 51.470748, lon: -0.459909 }
 // half-width, and the camera can be panned further still.
 const BOX = { minLat: 48.5, maxLat: 54.6, minLon: -6.6, maxLon: 4.6 }
 
-const TOLERANCE_NM = 0.1
-const MIN_PATH_NM = 1.5
-const DP = 4
-
-const D2R = Math.PI / 180
-const kx = 60 * Math.cos(ARP.lat * D2R) // NM per degree of longitude
-const ky = 60 // NM per degree of latitude
-
-const toNM = ([lon, lat]) => [(lon - ARP.lon) * kx, (lat - ARP.lat) * ky]
-
-/* ------------------------------------------------------------- clipping */
-
-/** Liang-Barsky: the portion of a-b inside the box, or null. */
-function clipSegment(a, b) {
-  let t0 = 0
-  let t1 = 1
-  const dx = b[0] - a[0]
-  const dy = b[1] - a[1]
-
-  const edges = [
-    [-dx, a[0] - BOX.minLon],
-    [dx, BOX.maxLon - a[0]],
-    [-dy, a[1] - BOX.minLat],
-    [dy, BOX.maxLat - a[1]],
-  ]
-
-  for (const [p, q] of edges) {
-    if (p === 0) {
-      if (q < 0) return null
-      continue
-    }
-    const r = q / p
-    if (p < 0) {
-      if (r > t1) return null
-      if (r > t0) t0 = r
-    } else {
-      if (r < t0) return null
-      if (r < t1) t1 = r
-    }
-  }
-
-  return [
-    [a[0] + t0 * dx, a[1] + t0 * dy],
-    [a[0] + t1 * dx, a[1] + t1 * dy],
-  ]
-}
-
-/** Splits a polyline into the contiguous runs that fall inside the box. */
-function clipPath(points) {
-  const runs = []
-  let current = null
-
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const seg = clipSegment(points[i], points[i + 1])
-    if (!seg) {
-      current = null
-      continue
-    }
-    const [s, e] = seg
-    if (current && near(current[current.length - 1], s)) {
-      current.push(e)
-    } else {
-      current = [s, e]
-      runs.push(current)
-    }
-  }
-  return runs
-}
-
-const near = (a, b) => Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9
-
-/* ---------------------------------------------------------- simplifying */
-
-function perpNM(p, a, b) {
-  const [px, py] = toNM(p)
-  const [ax, ay] = toNM(a)
-  const [bx, by] = toNM(b)
-  const dx = bx - ax
-  const dy = by - ay
-  const len2 = dx * dx + dy * dy
-  if (len2 === 0) return Math.hypot(px - ax, py - ay)
-  let t = ((px - ax) * dx + (py - ay) * dy) / len2
-  t = Math.max(0, Math.min(1, t))
-  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy))
-}
-
-/** Douglas-Peucker, iterative so a long coastline cannot blow the stack. */
-function simplify(points, tolNM) {
-  if (points.length < 3) return points
-  const keep = new Array(points.length).fill(false)
-  keep[0] = true
-  keep[points.length - 1] = true
-  const stack = [[0, points.length - 1]]
-
-  while (stack.length > 0) {
-    const [lo, hi] = stack.pop()
-    let worst = 0
-    let at = -1
-    for (let i = lo + 1; i < hi; i += 1) {
-      const d = perpNM(points[i], points[lo], points[hi])
-      if (d > worst) {
-        worst = d
-        at = i
-      }
-    }
-    if (at >= 0 && worst > tolNM) {
-      keep[at] = true
-      stack.push([lo, at], [at, hi])
-    }
-  }
-  return points.filter((_, i) => keep[i])
-}
-
-function lengthNM(points) {
-  let total = 0
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const [ax, ay] = toNM(points[i])
-    const [bx, by] = toNM(points[i + 1])
-    total += Math.hypot(bx - ax, by - ay)
-  }
-  return total
-}
-
 /*
- * Splits a long polyline into spatially compact chunks.
+ * Clipping, simplification and chunking live in tools/lib/lines.mjs, which
+ * every field's map is built through. They were here first and were lifted
+ * out when Faro, Barcelona and Nice needed the same work done: there is no
+ * version of "the coastline is prepared differently at Nice" that is not a
+ * bug. What stays here is what is genuinely Heathrow's -- the sector file
+ * formats, finding the Thames in an unlabelled pile of rivers, and the
+ * width profile along it.
  *
- * The renderer culls a whole path on its bounding box, and one path running
- * from the Bristol Channel round the south coast to East Anglia has a box
- * that contains Heathrow -- so it would never be culled, however far the
- * scope is zoomed in. Chunking keeps the boxes tight enough for the test to
- * mean something. Chunks share their joining point so the line stays
- * continuous across the split.
+ * The Heathrow coastline committed in egll.json is reproduced exactly by
+ * the shared code; airport.test.ts asserts it against the same Natural
+ * Earth input.
  */
-/*
- * Adds colinear points along any segment longer than maxSegNM.
- *
- * Purely so chunking has somewhere to cut: the FIR boundary is published as
- * a handful of very long straight legs, and a two-point chunk spanning
- * 136 NM has a bounding box that contains Heathrow, which defeats the
- * renderer's cull. The drawn line is identical -- the extra points are on
- * it.
- */
-function densify(points, maxSegNM) {
-  const out = [points[0]]
-  for (let i = 1; i < points.length; i += 1) {
-    const a = points[i - 1]
-    const b = points[i]
-    const [ax, ay] = toNM(a)
-    const [bx, by] = toNM(b)
-    const d = Math.hypot(bx - ax, by - ay)
-    const steps = Math.ceil(d / maxSegNM)
-    for (let k = 1; k < steps; k += 1) {
-      out.push([a[0] + ((b[0] - a[0]) * k) / steps, a[1] + ((b[1] - a[1]) * k) / steps])
-    }
-    out.push(b)
-  }
-  return out
-}
+const { toNM, clipPath, simplify, densify, chunk, asObjects, prepare, coastline } = lineWorks({
+  arp: ARP,
+  box: BOX,
+})
 
-const MAX_SEGMENT_NM = 8
-const MAX_CHUNK_NM = 12
-const MAX_CHUNK_POINTS = 80
-
-function chunk(points) {
-  if (points.length <= 2) return [points]
-  const out = []
-  let current = [points[0]]
-  let minX = points[0][0]
-  let maxX = points[0][0]
-  let minY = points[0][1]
-  let maxY = points[0][1]
-
-  for (let i = 1; i < points.length; i += 1) {
-    const p = points[i]
-    const nx0 = Math.min(minX, p[0])
-    const nx1 = Math.max(maxX, p[0])
-    const ny0 = Math.min(minY, p[1])
-    const ny1 = Math.max(maxY, p[1])
-    const wouldSpan = Math.max((nx1 - nx0) * kx, (ny1 - ny0) * ky)
-
-    if (current.length >= 2 && (wouldSpan > MAX_CHUNK_NM || current.length >= MAX_CHUNK_POINTS)) {
-      out.push(current)
-      // Start the next chunk at the last point of this one, so no gap.
-      const last = current[current.length - 1]
-      current = [last, p]
-      minX = Math.min(last[0], p[0])
-      maxX = Math.max(last[0], p[0])
-      minY = Math.min(last[1], p[1])
-      maxY = Math.max(last[1], p[1])
-      continue
-    }
-
-    current.push(p)
-    minX = nx0
-    maxX = nx1
-    minY = ny0
-    maxY = ny1
-  }
-  if (current.length >= 2) out.push(current)
-  return out
-}
-
-const round = (v) => Number(v.toFixed(DP))
-const asObjects = (points) =>
-  points.map(([lon, lat, w]) =>
-    w === undefined
-      ? { lat: round(lat), lon: round(lon) }
-      : { lat: round(lat), lon: round(lon), w: Math.round(w) },
-  )
-
-/** Clip, simplify, drop the specks. Shared by both sources. */
-function prepare(rawPaths) {
-  const out = []
-  for (const path of rawPaths) {
-    for (const run of clipPath(path)) {
-      const simplified = simplify(run, TOLERANCE_NM)
-      if (simplified.length < 2) continue
-      if (lengthNM(simplified) < MIN_PATH_NM) continue
-      out.push(...chunk(densify(simplified, MAX_SEGMENT_NM)))
-    }
-  }
-  return out
-}
-
-/* -------------------------------------------------------------- sources */
-
-function coastline(file) {
-  const gj = JSON.parse(fs.readFileSync(file, 'utf8'))
-  const raw = []
-  for (const f of gj.features) {
-    const geom = f.geometry
-    if (!geom) continue
-    if (geom.type === 'LineString') raw.push(geom.coordinates)
-    else if (geom.type === 'MultiLineString') raw.push(...geom.coordinates)
-  }
-  return prepare(raw)
-}
+const TOLERANCE_NM = DEFAULTS.toleranceNM
+const MAX_SEGMENT_NM = DEFAULTS.maxSegmentNM
 
 /** N051.28.00.000 -> signed decimal degrees */
 function parseDms(s) {
