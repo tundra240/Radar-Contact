@@ -282,7 +282,6 @@ describe('the basics lesson', () => {
       '.atis-box',
       '.tagmenu',
       '.strip-bay',
-      '.lesson-button',
     ])
     for (const step of BASICS.steps) {
       const light = step.spotlight

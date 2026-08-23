@@ -1796,6 +1796,24 @@ canvas {
    a lesson that would not let you pan the scope while reading about it
    would be a worse lesson than one that would.                          */
 
+/* Out of the flow entirely.
+ *
+ * This is not decoration. #app is a flex row -- the scope in one column and
+ * the strip bay in the other -- so a wrapper appended to it with no
+ * positioning becomes a third flex item and takes width off both of them.
+ * Showing the lesson rearranged the whole display. Every other overlay in
+ * here escapes the flow through its own rule and this one had nothing but
+ * rules for its children.
+ *
+ * pointer-events go back on for the card alone: the mask must not eat a
+ * click meant for the control it is drawing a ring around. */
+.tutorial {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  pointer-events: none;
+}
+
 .tutorial[hidden] {
   display: none;
 }
@@ -1829,6 +1847,7 @@ canvas {
    not a panel belonging to a control. */
 .tutorial-card {
   position: fixed;
+  pointer-events: auto;
   left: 44px;
   bottom: 46px;
   z-index: 910;

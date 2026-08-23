@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import stylesheet from '../style.css?raw'
 import { holeAround, holeOfElement, TutorialOverlay } from './overlay'
 
 function mount(): {
@@ -228,5 +229,47 @@ describe('working out where a hole goes', () => {
     // Round, because a target is round and a square hole round one reads as
     // a box drawn on the picture.
     expect(hole.r).toBe(48)
+  })
+})
+
+describe('staying out of the way of the display', () => {
+  /**
+   * The stylesheet, read as text.
+   *
+   * jsdom computes no layout, so the only way to hold this rule is to
+   * assert the declaration exists. Worth doing: the bug it guards took the
+   * whole interface apart the first time the lesson was opened.
+   */
+  const css = stylesheet
+
+  it('takes the overlay out of the flow', () => {
+    // #app is a flex row -- the scope in one column, the strip bay in the
+    // other. A wrapper appended to it with no positioning becomes a third
+    // flex item and takes width off both of them, which is exactly what
+    // happened: showing the lesson rearranged the display.
+    const rule = /\.tutorial\s*\{[^}]*\}/.exec(css)?.[0] ?? ''
+    expect(rule).toMatch(/position:\s*fixed/)
+    expect(rule).toMatch(/pointer-events:\s*none/)
+  })
+
+  it('lets the card be clicked even though the mask cannot be', () => {
+    // The mask must not eat a click meant for the control it is drawing a
+    // ring around, and the card's own button still has to work.
+    const rule = /\.tutorial-card\s*\{[^}]*\}/.exec(css)?.[0] ?? ''
+    expect(rule).toMatch(/pointer-events:\s*auto/)
+  })
+
+  it('adds exactly one element to whatever it is mounted in', () => {
+    // However the overlay is built inside itself, the host sees one child.
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const before = host.childElementCount
+    const overlay = new TutorialOverlay({
+      mount: host,
+      onContinue: () => {},
+      onExit: () => {},
+    })
+    overlay.show({ title: 't', counter: 'Step 1 of 1', text: 'x', button: null })
+    expect(host.childElementCount).toBe(before + 1)
   })
 })

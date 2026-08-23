@@ -22,6 +22,11 @@ export default defineConfig({
     // autopilot), so no DOM environment is needed. Add 'jsdom' here if
     // that ever changes.
     environment: 'node',
+    // The stylesheet is read as text by one test -- the tutorial overlay has
+    // a positioning rule that, if it regresses, rearranges the whole
+    // display. Without this, a '?raw' import of a .css file resolves to an
+    // empty string and the guard silently passes.
+    css: true,
     include: ['src/**/*.test.ts'],
   },
 })

@@ -12,6 +12,7 @@ interface Harness {
   logon: Logon
   mount: HTMLElement
   logons: LogonDetails[]
+  tutorials: LogonDetails[]
   settings: number
 }
 
@@ -27,6 +28,7 @@ function mountLogon(over: { initials?: string; enforceAirspace?: boolean } = {})
     logon: null as unknown as Logon,
     mount,
     logons: [],
+    tutorials: [],
     settings: 0,
   }
 
@@ -39,6 +41,7 @@ function mountLogon(over: { initials?: string; enforceAirspace?: boolean } = {})
     initials,
     enforceAirspace: over.enforceAirspace ?? true,
     onLogon: (d) => h.logons.push(d),
+    onTutorial: (d) => h.tutorials.push(d),
     onSettings: () => {
       h.settings += 1
     },
@@ -225,5 +228,46 @@ describe('the airspace rule', () => {
     const row = mount.querySelector('.logon-check')
     expect(row?.getAttribute('title') ?? '').toMatch(/dimmed/i)
     expect(mount.querySelector('.logon-note')?.textContent ?? '').toMatch(/inside/i)
+  })
+})
+
+describe('starting the tutorial from the menu', () => {
+  it('offers it beside logging on', () => {
+    // The choice belongs here rather than on the tool rail: it is a decision
+    // about what this sitting is for, and that is answered before there is
+    // any traffic rather than half way through working it.
+    const { mount } = mountLogon({ initials: 'NF' })
+    expect(mount.querySelector('.logon-tutorial')).not.toBeNull()
+  })
+
+  it('comes on position the same way a free session does', () => {
+    // The lesson stops the clock, replaces the traffic and expects
+    // clearances to be accepted, so it is a way INTO a session rather than
+    // an alternative to one.
+    const h = mountLogon({ initials: 'nf' })
+    button(h.mount, '.logon-tutorial').click()
+    expect(h.tutorials).toHaveLength(1)
+    expect(h.tutorials[0]?.initials).toBe('NF')
+    expect(h.tutorials[0]?.position).toBe('EGLL_APP')
+    // And not down the other path: one press is one session.
+    expect(h.logons).toHaveLength(0)
+  })
+
+  it('carries the airspace choice into the lesson', () => {
+    const h = mountLogon({ initials: 'NF', enforceAirspace: true })
+    const box = h.mount.querySelector<HTMLInputElement>('.logon-toggle')
+    if (box === null) throw new Error('no airspace toggle')
+    box.checked = false
+    button(h.mount, '.logon-tutorial').click()
+    expect(h.tutorials[0]?.enforceAirspace).toBe(false)
+  })
+
+  it('checks the initials like the other way in', () => {
+    // One validation path. A lesson started without initials would be a
+    // session with nobody on position.
+    const h = mountLogon({ initials: 'X' })
+    button(h.mount, '.logon-tutorial').click()
+    expect(h.tutorials).toHaveLength(0)
+    expect(h.mount.querySelector<HTMLElement>('.logon-error')?.hidden).toBe(false)
   })
 })

@@ -50,6 +50,14 @@ export interface LogonOptions {
   /** Remembered airspace setting, preselected. */
   readonly enforceAirspace: boolean
   readonly onLogon: (details: LogonDetails) => void
+  /**
+   * Log on and start the tutorial instead of a free session.
+   *
+   * Offered here rather than on the tool rail because it is a choice about
+   * what this sitting is for, and that is a question you answer before you
+   * have traffic rather than half way through working it.
+   */
+  readonly onTutorial: (details: LogonDetails) => void
   readonly onSettings: () => void
 }
 
@@ -179,6 +187,14 @@ export class Logon {
     this.goButton.addEventListener('click', () => this.submit())
     actions.appendChild(this.goButton)
 
+    const tutorial = document.createElement('button')
+    tutorial.type = 'button'
+    tutorial.className = 'logon-button logon-tutorial'
+    tutorial.textContent = 'Tutorial'
+    tutorial.title = 'A guided lesson: the scope, the hold, a vectored ILS and the weather'
+    tutorial.addEventListener('click', () => this.submit('tutorial'))
+    actions.appendChild(tutorial)
+
     const settings = document.createElement('button')
     settings.type = 'button'
     settings.className = 'logon-button logon-settings'
@@ -243,7 +259,7 @@ export class Logon {
     this.root.remove()
   }
 
-  private submit(): void {
+  private submit(into: 'session' | 'tutorial' = 'session'): void {
     const initials = validateInitials(this.input.value)
     if (initials === null) {
       this.showError(
@@ -253,11 +269,13 @@ export class Logon {
       return
     }
     this.clearError()
-    this.opts.onLogon({
+    const details = {
       initials,
       position: this.opts.position,
       enforceAirspace: this.airspace.checked,
-    })
+    }
+    if (into === 'tutorial') this.opts.onTutorial(details)
+    else this.opts.onLogon(details)
   }
 
   private showError(message: string): void {

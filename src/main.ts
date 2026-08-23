@@ -478,9 +478,6 @@ function start(
    * there is take them to the modern position rather than guess which era
    * they meant.
    */
-  /** The lesson. Last on the rail: it is the one you press once. */
-  const lessonButton = tool('lesson-button', () => startLesson())
-
   const themeButton = tool('theme-button', () => {
     applyPalette(paletteName() === 'traconDark' ? 'traconLight' : 'traconDark')
     paintMenu()
@@ -606,15 +603,6 @@ function start(
       loop.paused ? 'Start the clock' : 'Stop the clock',
     )
     setToolLabel(rateButton, 'rate', `Clock rate ${formatSpeed(loop.speed)} -- press to step`)
-
-    const onLesson = tutorial?.running === true
-    lessonButton.classList.toggle('is-on', onLesson)
-    lessonButton.setAttribute('aria-pressed', String(onLesson))
-    setToolLabel(
-      lessonButton,
-      'lesson',
-      onLesson ? 'End the lesson' : 'Start the tutorial',
-    )
 
     const lit = paletteName() === 'traconLight'
     setToolLabel(
@@ -1391,15 +1379,42 @@ function start(
     },
   })
 
+  /**
+   * Coming on position: the part that is the same whether the session is a
+   * free one or a lesson.
+   *
+   * Split out because it was written once inside the logon handler and then
+   * wanted twice. The two ways in differ in what happens after -- one starts
+   * the clock, the other starts the lesson -- and in nothing before.
+   */
+  const takePosition = (details: LogonDetails): void => {
+    controller = details
+    try {
+      window.localStorage.setItem(LOGON_STORAGE, details.initials)
+      window.localStorage.setItem(AIRSPACE_STORAGE, details.enforceAirspace ? '1' : '0')
+    } catch {
+      /* preference simply will not persist */
+    }
+    logon.hide()
+    menu.setOpen(false)
+    announce(`${details.initials} on position ${details.position}`, 'note')
+  }
+
+  /**
+   * Start the lesson, or end the one running.
+   *
+   * Reachable from the keyboard only. Which sort of sitting this is gets
+   * decided on the logon screen, and a control on the rail would be asking
+   * that question again in the middle of the traffic -- but a lesson ended
+   * by mistake should not need the page reloaded to take again, and there is
+   * no way back to the logon screen once you are on position.
+   */
   const startLesson = (): void => {
     if (tutorial === null) return
     if (tutorial.running) {
       tutorial.stop()
       return
     }
-    // A lesson needs somebody on position: it stops the clock, replaces the
-    // traffic and expects clearances to be accepted, none of which is true
-    // behind the logon screen.
     if (controller === null) {
       announce('log on before starting a lesson', 'reject')
       return
@@ -1492,17 +1507,8 @@ function start(
     enforceAirspace: storedAirspace(),
     onSettings: () => menu.setOpen(true),
     onLogon: (details) => {
-      controller = details
-      try {
-        window.localStorage.setItem(LOGON_STORAGE, details.initials)
-        window.localStorage.setItem(AIRSPACE_STORAGE, details.enforceAirspace ? '1' : '0')
-      } catch {
-        /* preference simply will not persist */
-      }
-      logon.hide()
-      menu.setOpen(false)
+      takePosition(details)
       loop.setPaused(false)
-      announce(`${details.initials} on position ${details.position}`, 'note')
       announce(
         `Traffic seed ${spawner.seed}. Add ?seed=${spawner.seed} to the address to fly it again.`,
         'note',
@@ -1511,6 +1517,16 @@ function start(
         'Clearances: right-click a target for its menu, or drag from one to vector it.',
         'note',
       )
+      paintMenu()
+      requestDraw()
+    },
+    onTutorial: (details) => {
+      // On position first, then the lesson. It stops the clock, replaces the
+      // traffic and expects clearances to be accepted, none of which works
+      // behind the logon screen -- so this is a way into a session rather
+      // than an alternative to one.
+      takePosition(details)
+      tutorial?.start()
       paintMenu()
       requestDraw()
     },
