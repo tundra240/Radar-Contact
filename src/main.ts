@@ -524,39 +524,10 @@ function start(
    * unprompted rather than as the one you asked for. Closed silently, or
    * each would report its own closing and call this again.
    */
-  /**
-   * Decide which side of the rail a panel opens on.
-   *
-   * The right of the button, which is where they belong with the rail on
-   * the left edge. The measurement is still worth taking: the rail can be
-   * moved, and a panel running off the edge of the glass is worse than one
-   * opening on the other side of its button. Only then is it marked
-   * `is-left`.
-   *
-   * Measured when the panel opens rather than assumed, because the rail
-   * moves with the layout and the three panels are not the same width.
-   */
-  const placePanel = (root: Element | null, panelSelector: string): void => {
-    const panel = root?.querySelector<HTMLElement>(panelSelector)
-    if (!root || !panel) return
-    // Cleared first, so the reading is of the panel rather than of wherever
-    // it was last put.
-    root.classList.remove('is-left')
-    const box = root.getBoundingClientRect()
-    const needed = panel.getBoundingClientRect().width + 8
-    // Room to the right is what is left of the window past the button.
-    const roomRight = window.innerWidth - box.right
-    root.classList.toggle('is-left', roomRight < needed && box.left >= needed)
-  }
-
   const soleOpen = (keep: 'menu' | 'atis' | 'guide'): void => {
     if (keep !== 'menu') menu.setOpen(false, true)
     if (keep !== 'atis') atisBar.setOpen(false, true)
     if (keep !== 'guide') guide.setOpen(false, true)
-
-    if (keep === 'menu') placePanel(controls.querySelector('.menu'), '.menu-panel')
-    else if (keep === 'atis') placePanel(controls.querySelector('.atis'), '.atis-box')
-    else placePanel(controls.querySelector('.guide'), '.guide-window')
   }
 
   const menu = new Menu({
@@ -1355,7 +1326,6 @@ function start(
   syncStrips()
   paintWx()
   paintAtis()
-  if (atisBar.open) placePanel(controls.querySelector('.atis'), '.atis-box')
   paintTools()
   paintMenu()
   resize()
