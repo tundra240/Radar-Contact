@@ -175,8 +175,17 @@ export interface FlightNumberRange {
  * real arrival rates and altitudes depend on the STAR, the flow and the
  * day. This is the first thing to tune if the traffic feels wrong.
  */
-/** How hard the field itself is, before any difficulty setting. */
-export type AirportTier = 'easy' | 'normal' | 'hard'
+/**
+ * How hard the field itself is, before any difficulty setting.
+ *
+ * The same four words the session settings use, and deliberately so: a
+ * player who has decided Pro is what they are after should be able to read
+ * one word on a sector and know whether it is that sort of place. They are
+ * still two different things -- the tier is the aerodrome, the difficulty
+ * is how much traffic you ask it for -- but there is no reason for them to
+ * be measured on different scales.
+ */
+export type AirportTier = 'easy' | 'normal' | 'hard' | 'pro'
 
 export interface TrafficConfig {
   /** Fixes the arrival stream, so a scenario can be repeated exactly. */
@@ -1047,8 +1056,10 @@ function parseProvenance(raw: unknown): Record<string, string> {
 
 function parseTier(raw: unknown): AirportTier {
   const value = str(raw, 'tier')
-  if (value === 'easy' || value === 'normal' || value === 'hard') return value
-  throw new ConfigError('tier', 'must be easy, normal or hard')
+  if (value === 'easy' || value === 'normal' || value === 'hard' || value === 'pro') {
+    return value
+  }
+  throw new ConfigError('tier', 'must be easy, normal, hard or pro')
 }
 
 function parseTraffic(

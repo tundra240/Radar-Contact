@@ -49,13 +49,23 @@ function ac(over: Partial<Aircraft> = {}): Aircraft {
 
 describe('the register of fields', () => {
   it('offers four, gentlest first', () => {
-    expect(AIRPORT_IDS).toEqual(['LPFR', 'EGLL', 'LFMN', 'LEBL'])
+    expect(AIRPORT_IDS).toEqual(['LPFR', 'EGLL', 'LEBL', 'LFMN'])
     expect(AIRPORT_IDS).toContain(DEFAULT_AIRPORT)
   })
 
-  it('runs easy, normal, normal, hard', () => {
-    // The progression the whole set exists to provide.
-    expect(airportSummaries().map((s) => s.tier)).toEqual(['easy', 'normal', 'normal', 'hard'])
+  it('runs easy, normal, hard, pro', () => {
+    // The progression the whole set exists to provide, and it has to be in
+    // that order: the list is offered gentlest first and a tier out of
+    // sequence would make the ladder a lie.
+    expect(airportSummaries().map((s) => s.tier)).toEqual(['easy', 'normal', 'hard', 'pro'])
+  })
+
+  it('never goes backwards down the ladder', () => {
+    const rank = { easy: 0, normal: 1, hard: 2, pro: 3 } as const
+    const tiers = airportSummaries().map((s) => rank[s.tier as keyof typeof rank])
+    for (let i = 1; i < tiers.length; i += 1) {
+      expect(tiers[i], AIRPORT_IDS[i]).toBeGreaterThan(tiers[i - 1] as number)
+    }
   })
 
   it('falls back rather than throwing on a field it does not have', () => {
@@ -177,6 +187,7 @@ describe('what makes each field itself', () => {
 
   it('gives Nice mountains that reach above the approach', () => {
     const nice = airportOf('LFMN')
+    expect(nice.tier).toBe('pro')
     expect(nice.terrain.length).toBeGreaterThan(0)
     const alps = nice.terrain.find((t) => t.id === 'maritime-alps')
     expect(alps).toBeDefined()

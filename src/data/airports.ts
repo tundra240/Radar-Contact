@@ -23,19 +23,21 @@ import lebl from './lebl.json'
 const PROFILES: Record<string, unknown> = {
   LPFR: lpfr,
   EGLL: egll,
-  LFMN: lfmn,
   LEBL: lebl,
+  LFMN: lfmn,
 }
 
 /**
  * In the order they are offered: gentlest first.
  *
  * A deliberate progression rather than alphabetical. Faro is one runway and
- * one stream, Heathrow is four stacks feeding two parallels, Nice is the
- * same volume with mountains taking half the airspace away, and Barcelona
- * is dependent runways with transits through the middle of the arrivals.
+ * one stream; Heathrow is four stacks feeding two parallels; Barcelona adds
+ * crossing runways, noise floors and transits through the arrivals; and
+ * Nice is hardest of all, because the terrain takes half the usable
+ * airspace away before you have started -- there is one side of the field
+ * you can work in, and the base leg it leaves you is very short.
  */
-export const AIRPORT_IDS: readonly string[] = ['LPFR', 'EGLL', 'LFMN', 'LEBL']
+export const AIRPORT_IDS: readonly string[] = ['LPFR', 'EGLL', 'LEBL', 'LFMN']
 
 export const DEFAULT_AIRPORT = 'EGLL'
 
