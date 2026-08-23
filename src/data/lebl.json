@@ -122,11 +122,11 @@
     {
       "id": "02",
       "threshold": {
-        "lat": 41.267595,
-        "lon": 2.064182
+        "lat": 41.286369,
+        "lon": 2.066665
       },
       "bearingTrue": 20,
-      "lengthFt": 8294,
+      "lengthFt": 8333,
       "thresholdElevationFt": 12,
       "ils": {
         "available": true,
@@ -138,11 +138,11 @@
     {
       "id": "20",
       "threshold": {
-        "lat": 41.288973,
-        "lon": 2.074536
+        "lat": 41.307847,
+        "lon": 2.077071
       },
       "bearingTrue": 200,
-      "lengthFt": 8294,
+      "lengthFt": 8333,
       "thresholdElevationFt": 12,
       "ils": {
         "available": true,

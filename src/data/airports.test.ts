@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { distanceNM } from '../core/geo'
+import { distanceNM, type Vec2NM } from '../core/geo'
 import { isControlled } from '../sim/airspace'
 import { headwindKts, TAILWIND_LIMIT_KTS } from '../sim/atis'
 import { DIFFICULTIES } from '../sim/difficulty'
 import { belowMinimumSafe, infringingNoise, inShape } from '../sim/zones'
 import type { Aircraft } from '../sim/types'
+import type { Runway } from './airport'
 import { AIRPORT_IDS, airportOf, airportSummaries, DEFAULT_AIRPORT } from './airports'
 
 /**
@@ -331,16 +332,81 @@ describe('the runways are laid out as strips', () => {
     }
   })
 
-  it('crosses Barcelona 02/20 over the parallels', () => {
-    // The dependency the field is known for, so the geometry has to show it.
+  /** A runway as a line segment in world space. */
+  function asSegment(r: Runway): { a: Vec2NM; b: Vec2NM } {
+    const rad = (r.bearingTrue * Math.PI) / 180
+    return {
+      a: r.thresholdNM,
+      b: {
+        x: r.thresholdNM.x + Math.sin(rad) * r.lengthNM,
+        y: r.thresholdNM.y + Math.cos(rad) * r.lengthNM,
+      },
+    }
+  }
+
+  /** Whether two segments actually intersect, rather than merely converge. */
+  function segmentsCross(
+    p: { a: Vec2NM; b: Vec2NM },
+    q: { a: Vec2NM; b: Vec2NM },
+  ): boolean {
+    const side = (o: Vec2NM, a: Vec2NM, b: Vec2NM): number =>
+      (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+    return (
+      side(p.a, p.b, q.a) * side(p.a, p.b, q.b) < 0 &&
+      side(q.a, q.b, p.a) * side(q.a, q.b, p.b) < 0
+    )
+  }
+
+  it('crosses Barcelona 02/20 over both parallels', () => {
+    // The dependency the field is known for, so the geometry has to show
+    // it -- and show it by actually intersecting. An angle test alone
+    // passed happily while the strip sat a third of a mile off the end of
+    // the parallels, touching nothing, which is what it was doing.
     const bcn = airportOf('LEBL')
     const cross = bcn.runways.find((r) => r.id === '02')
-    const main = bcn.runways.find((r) => r.id === '06L')
     expect(cross).toBeDefined()
-    const angle = Math.abs(((cross!.bearingTrue - main!.bearingTrue + 540) % 360) - 180)
-    // Genuinely crossing rather than nearly parallel.
-    expect(angle).toBeGreaterThan(30)
-    expect(angle).toBeLessThan(150)
+    for (const id of ['06L', '06R']) {
+      const parallel = bcn.runways.find((r) => r.id === id)
+      expect(parallel, id).toBeDefined()
+      expect(
+        segmentsCross(asSegment(cross!), asSegment(parallel!)),
+        `02/20 does not cross ${id}`,
+      ).toBe(true)
+    }
+  })
+
+  it('keeps Barcelona parallels parallel, so they never cross', () => {
+    const bcn = airportOf('LEBL')
+    const north = bcn.runways.find((r) => r.id === '06L')
+    const south = bcn.runways.find((r) => r.id === '06R')
+    expect(segmentsCross(asSegment(north!), asSegment(south!))).toBe(false)
+  })
+
+  it('spreads a parallel pair far enough to read as two runways', () => {
+    // Nice's real pair are about three hundred metres apart, which at scope
+    // range draws as one thick line. They are opened out, on purpose, and
+    // the provenance says so.
+    for (const [icao, a, b] of [
+      ['LFMN', '04L', '04R'],
+      ['LEBL', '06L', '06R'],
+    ] as const) {
+      const f = airportOf(icao)
+      const one = f.runways.find((r) => r.id === a)
+      const two = f.runways.find((r) => r.id === b)
+      // Perpendicular separation, which is what you actually see: the
+      // along-track offset between two thresholds is not the gap.
+      const rad = (one!.bearingTrue * Math.PI) / 180
+      const across = {
+        x: Math.sin(rad + Math.PI / 2),
+        y: Math.cos(rad + Math.PI / 2),
+      }
+      const delta = {
+        x: two!.thresholdNM.x - one!.thresholdNM.x,
+        y: two!.thresholdNM.y - one!.thresholdNM.y,
+      }
+      const gap = Math.abs(delta.x * across.x + delta.y * across.y)
+      expect(gap, `${icao} parallels are ${gap.toFixed(2)} nm apart`).toBeGreaterThan(0.3)
+    }
   })
 })
 
