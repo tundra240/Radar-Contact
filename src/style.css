@@ -120,6 +120,15 @@ canvas {
   position: relative;
 }
 
+/* The tool with something open goes above the rest of the rail, so no later
+   button paints over its panel. On the wrapper rather than the panel: the
+   button and the panel are one thing as far as stacking is concerned, and
+   raising the pair cannot be defeated by whatever the panel's own position
+   turns out to be. */
+.has-panel {
+  z-index: 55;
+}
+
 .mode-toggle {
   position: relative;
   width: 30px;

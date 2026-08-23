@@ -528,6 +528,19 @@ function start(
     if (keep !== 'menu') menu.setOpen(false, true)
     if (keep !== 'atis') atisBar.setOpen(false, true)
     if (keep !== 'guide') guide.setOpen(false, true)
+
+    // Lift the whole tool, not just its panel.
+    //
+    // A z-index on the panel alone should be enough, and reasoning about the
+    // stacking says it is: the rail makes a stacking context, the wrappers
+    // sit in it with no layer of their own, and a panel with a positive
+    // z-index paints above all of them. It was not enough in practice --
+    // the book stayed over the open options panel -- so the wrapper is
+    // raised instead, which is one rule about whole tools rather than an
+    // argument about where each panel lands inside one.
+    for (const name of ['menu', 'atis', 'guide'] as const) {
+      controls.querySelector(`.${name}`)?.classList.toggle('has-panel', name === keep)
+    }
   }
 
   const menu = new Menu({
