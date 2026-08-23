@@ -527,11 +527,11 @@ function start(
   /**
    * Decide which side of the rail a panel opens on.
    *
-   * Left of the button is what is wanted, and it is only possible when
-   * there is that much glass to the left of the rail -- which, with the
-   * rail against the edge, there is not. So the wrapper is marked
-   * `is-right` and the stylesheet puts the panel on the other side rather
-   * than off the screen.
+   * The right of the button, which is where they belong with the rail on
+   * the left edge. The measurement is still worth taking: the rail can be
+   * moved, and a panel running off the edge of the glass is worse than one
+   * opening on the other side of its button. Only then is it marked
+   * `is-left`.
    *
    * Measured when the panel opens rather than assumed, because the rail
    * moves with the layout and the three panels are not the same width.
@@ -541,9 +541,12 @@ function start(
     if (!root || !panel) return
     // Cleared first, so the reading is of the panel rather than of wherever
     // it was last put.
-    root.classList.remove('is-right')
+    root.classList.remove('is-left')
+    const box = root.getBoundingClientRect()
     const needed = panel.getBoundingClientRect().width + 8
-    root.classList.toggle('is-right', root.getBoundingClientRect().left < needed)
+    // Room to the right is what is left of the window past the button.
+    const roomRight = window.innerWidth - box.right
+    root.classList.toggle('is-left', roomRight < needed && box.left >= needed)
   }
 
   const soleOpen = (keep: 'menu' | 'atis' | 'guide'): void => {

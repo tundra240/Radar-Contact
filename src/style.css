@@ -1653,30 +1653,30 @@ canvas {
   border-bottom-width: 1px;
 }
 
-/* Panels open beside the rail, and to its left by default.
+/* Panels open beside the rail, to the right of the button.
 
-   Which side is settled when the panel opens rather than here, because it
-   depends on where the rail is. Left of the button is the ask, and it is
-   right whenever the rail has room beside it -- but with the rail hard
-   against the edge of the glass there is nothing over there to open into,
-   and a panel that obeyed anyway would be off the screen. So `is-right`
-   goes on the wrapper when the room is not there. See placePanel.
+   Which side is still settled when the panel opens rather than only here:
+   the rail can be moved, and a panel opening off the edge of the glass is
+   worse than one opening on the other side of its button. So the right is
+   the default and `is-left` goes on the wrapper when the room is not
+   there. See placePanel.
 
-   `right: auto` on the flipped case matters as much as the `left`: these
-   inherit `right: 0` from when they hung under a toolbar in a corner. */
+   `right: auto` matters as much as the `left`: these inherit `right: 0`
+   from when they hung under a toolbar in a corner, and leaving it set
+   anchors a two-hundred-pixel panel to a thirty-pixel button. */
 .menu-panel,
 .atis-box {
   top: 0;
-  left: auto;
-  right: calc(100% + 1px);
+  right: auto;
+  left: calc(100% + 1px);
   /* Never wider than the glass, whichever side it lands on. */
   max-width: calc(100vw - 44px);
 }
 
-.is-right .menu-panel,
-.is-right .atis-box {
-  right: auto;
-  left: calc(100% + 1px);
+.is-left .menu-panel,
+.is-left .atis-box {
+  left: auto;
+  right: calc(100% + 1px);
 }
 
 :root[data-chrome='flat'] .menu-panel {
@@ -1730,14 +1730,14 @@ canvas {
 }
 
 .guide-window {
-  right: calc(100% + 1px);
-  left: auto;
+  right: auto;
+  left: calc(100% + 1px);
   top: 0;
 }
 
-.is-right .guide-window {
-  right: auto;
-  left: calc(100% + 1px);
+.is-left .guide-window {
+  left: auto;
+  right: calc(100% + 1px);
 }
 
 /* Tighter type and spacing throughout the panels: a modern readout fits
