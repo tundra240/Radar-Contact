@@ -307,51 +307,1056 @@
   ],
   "terrain": [
     {
-      "id": "maritime-alps",
-      "label": "MARITIME ALPS",
+      "id": "coastal-ridge",
+      "label": "COASTAL RIDGE",
+      "massif": "maritime-alps",
       "kind": "polygon",
       "vertices": [
         {
-          "lat": 43.991744,
-          "lon": 6.417838
+          "lat": 43.22255,
+          "lon": 5.90726
         },
         {
-          "lat": 44.36318,
-          "lon": 6.861306
+          "lat": 43.3402,
+          "lon": 6.23814
         },
         {
-          "lat": 44.36318,
-          "lon": 7.570432
+          "lat": 43.46104,
+          "lon": 6.56585
         },
         {
-          "lat": 43.991744,
-          "lon": 8.0139
+          "lat": 43.46811,
+          "lon": 6.74822
         },
         {
-          "lat": 43.744447,
-          "lon": 7.385708
+          "lat": 43.53425,
+          "lon": 6.84247
         },
         {
-          "lat": 43.775078,
-          "lon": 7.215869
+          "lat": 43.57045,
+          "lon": 6.88428
         },
         {
-          "lat": 43.744447,
-          "lon": 7.04603
+          "lat": 43.61004,
+          "lon": 6.99339
+        },
+        {
+          "lat": 43.58631,
+          "lon": 7.06995
+        },
+        {
+          "lat": 43.63309,
+          "lon": 7.06064
+        },
+        {
+          "lat": 43.68418,
+          "lon": 7.11554
+        },
+        {
+          "lat": 43.71671,
+          "lon": 7.15464
+        },
+        {
+          "lat": 43.74098,
+          "lon": 7.24936
+        },
+        {
+          "lat": 43.7483,
+          "lon": 7.30128
+        },
+        {
+          "lat": 43.79346,
+          "lon": 7.36536
+        },
+        {
+          "lat": 43.83899,
+          "lon": 7.46252
+        },
+        {
+          "lat": 43.84139,
+          "lon": 7.58592
+        },
+        {
+          "lat": 43.86265,
+          "lon": 7.75967
+        },
+        {
+          "lat": 43.93072,
+          "lon": 7.92271
+        },
+        {
+          "lat": 43.98555,
+          "lon": 8.09813
+        },
+        {
+          "lat": 44.0962,
+          "lon": 8.37756
+        },
+        {
+          "lat": 44.25666,
+          "lon": 8.71334
+        },
+        {
+          "lat": 46.25196,
+          "lon": 6.7178
+        },
+        {
+          "lat": 46.13641,
+          "lon": 6.50374
+        },
+        {
+          "lat": 46.1272,
+          "lon": 6.48402
+        },
+        {
+          "lat": 46.156,
+          "lon": 6.5562
+        },
+        {
+          "lat": 46.20435,
+          "lon": 6.76066
+        },
+        {
+          "lat": 46.24246,
+          "lon": 6.92785
+        },
+        {
+          "lat": 46.07757,
+          "lon": 6.15146
+        },
+        {
+          "lat": 45.8069,
+          "lon": 5.48377
+        },
+        {
+          "lat": 46.03755,
+          "lon": 6.13358
+        },
+        {
+          "lat": 46.07289,
+          "lon": 6.20259
+        },
+        {
+          "lat": 45.57508,
+          "lon": 4.98529
+        },
+        {
+          "lat": 45.359,
+          "lon": 4.67172
+        },
+        {
+          "lat": 44.97545,
+          "lon": 4.24724
+        },
+        {
+          "lat": 45.66255,
+          "lon": 5.25109
+        },
+        {
+          "lat": 45.95801,
+          "lon": 6.0999
+        },
+        {
+          "lat": 45.47125,
+          "lon": 4.78468
+        },
+        {
+          "lat": 45.46136,
+          "lon": 4.79897
+        },
+        {
+          "lat": 45.77192,
+          "lon": 5.584
+        },
+        {
+          "lat": 45.71599,
+          "lon": 5.30435
+        },
+        {
+          "lat": 45.51053,
+          "lon": 4.72914
+        },
+        {
+          "lat": 45.3974,
+          "lon": 4.42094
         }
       ],
+      "summit": {
+        "lat": 43.78,
+        "lon": 7.22
+      },
+      "peakFt": 2600,
+      "minimumSafeFt": 4300
+    },
+    {
+      "id": "pre-alps",
+      "label": "PRE-ALPS",
+      "massif": "maritime-alps",
+      "kind": "polygon",
+      "vertices": [
+        {
+          "lat": 43.3244,
+          "lon": 5.83765
+        },
+        {
+          "lat": 43.44041,
+          "lon": 6.16847
+        },
+        {
+          "lat": 43.54442,
+          "lon": 6.51921
+        },
+        {
+          "lat": 43.59929,
+          "lon": 6.68192
+        },
+        {
+          "lat": 43.62313,
+          "lon": 6.74822
+        },
+        {
+          "lat": 43.65584,
+          "lon": 6.78995
+        },
+        {
+          "lat": 43.69492,
+          "lon": 6.96109
+        },
+        {
+          "lat": 43.7005,
+          "lon": 6.96991
+        },
+        {
+          "lat": 43.70316,
+          "lon": 6.91379
+        },
+        {
+          "lat": 43.76385,
+          "lon": 6.99928
+        },
+        {
+          "lat": 43.79084,
+          "lon": 7.0681
+        },
+        {
+          "lat": 43.85969,
+          "lon": 7.19607
+        },
+        {
+          "lat": 43.87417,
+          "lon": 7.23708
+        },
+        {
+          "lat": 43.88269,
+          "lon": 7.28198
+        },
+        {
+          "lat": 43.92734,
+          "lon": 7.41078
+        },
+        {
+          "lat": 43.94471,
+          "lon": 7.5576
+        },
+        {
+          "lat": 43.99562,
+          "lon": 7.70294
+        },
+        {
+          "lat": 44.02968,
+          "lon": 7.86194
+        },
+        {
+          "lat": 44.08051,
+          "lon": 8.02656
+        },
+        {
+          "lat": 44.18086,
+          "lon": 8.29982
+        },
+        {
+          "lat": 44.378,
+          "lon": 8.59199
+        },
+        {
+          "lat": 46.25196,
+          "lon": 6.7178
+        },
+        {
+          "lat": 46.13641,
+          "lon": 6.50374
+        },
+        {
+          "lat": 46.1272,
+          "lon": 6.48402
+        },
+        {
+          "lat": 46.156,
+          "lon": 6.5562
+        },
+        {
+          "lat": 46.20435,
+          "lon": 6.76066
+        },
+        {
+          "lat": 46.24246,
+          "lon": 6.92785
+        },
+        {
+          "lat": 46.07757,
+          "lon": 6.15146
+        },
+        {
+          "lat": 45.8069,
+          "lon": 5.48377
+        },
+        {
+          "lat": 46.03755,
+          "lon": 6.13358
+        },
+        {
+          "lat": 46.07289,
+          "lon": 6.20259
+        },
+        {
+          "lat": 45.57508,
+          "lon": 4.98529
+        },
+        {
+          "lat": 45.359,
+          "lon": 4.67172
+        },
+        {
+          "lat": 44.97545,
+          "lon": 4.24724
+        },
+        {
+          "lat": 45.66255,
+          "lon": 5.25109
+        },
+        {
+          "lat": 45.95801,
+          "lon": 6.0999
+        },
+        {
+          "lat": 45.47125,
+          "lon": 4.78468
+        },
+        {
+          "lat": 45.46136,
+          "lon": 4.79897
+        },
+        {
+          "lat": 45.77192,
+          "lon": 5.584
+        },
+        {
+          "lat": 45.71599,
+          "lon": 5.30435
+        },
+        {
+          "lat": 45.51053,
+          "lon": 4.72914
+        },
+        {
+          "lat": 45.3974,
+          "lon": 4.42094
+        }
+      ],
+      "summit": {
+        "lat": 43.86,
+        "lon": 7.05
+      },
+      "peakFt": 5400,
+      "minimumSafeFt": 7200
+    },
+    {
+      "id": "maritime-alps",
+      "label": "MARITIME ALPS",
+      "massif": "maritime-alps",
+      "kind": "polygon",
+      "vertices": [
+        {
+          "lat": 43.45914,
+          "lon": 5.74557
+        },
+        {
+          "lat": 43.55445,
+          "lon": 6.08918
+        },
+        {
+          "lat": 43.71904,
+          "lon": 6.42151
+        },
+        {
+          "lat": 43.74628,
+          "lon": 6.60764
+        },
+        {
+          "lat": 43.7386,
+          "lon": 6.62578
+        },
+        {
+          "lat": 43.7605,
+          "lon": 6.67435
+        },
+        {
+          "lat": 43.8711,
+          "lon": 6.89405
+        },
+        {
+          "lat": 43.85386,
+          "lon": 6.83556
+        },
+        {
+          "lat": 43.78484,
+          "lon": 6.7426
+        },
+        {
+          "lat": 43.86234,
+          "lon": 6.85557
+        },
+        {
+          "lat": 43.91532,
+          "lon": 6.92279
+        },
+        {
+          "lat": 44.03886,
+          "lon": 7.11565
+        },
+        {
+          "lat": 44.00133,
+          "lon": 7.17222
+        },
+        {
+          "lat": 44.00007,
+          "lon": 7.17228
+        },
+        {
+          "lat": 44.05886,
+          "lon": 7.33375
+        },
+        {
+          "lat": 44.13965,
+          "lon": 7.50417
+        },
+        {
+          "lat": 44.13254,
+          "lon": 7.64453
+        },
+        {
+          "lat": 44.17188,
+          "lon": 7.77462
+        },
+        {
+          "lat": 44.20438,
+          "lon": 7.9332
+        },
+        {
+          "lat": 44.35225,
+          "lon": 8.1424
+        },
+        {
+          "lat": 44.5004,
+          "lon": 8.46956
+        },
+        {
+          "lat": 46.25196,
+          "lon": 6.7178
+        },
+        {
+          "lat": 46.13641,
+          "lon": 6.50374
+        },
+        {
+          "lat": 46.1272,
+          "lon": 6.48402
+        },
+        {
+          "lat": 46.156,
+          "lon": 6.5562
+        },
+        {
+          "lat": 46.20435,
+          "lon": 6.76066
+        },
+        {
+          "lat": 46.24246,
+          "lon": 6.92785
+        },
+        {
+          "lat": 46.07757,
+          "lon": 6.15146
+        },
+        {
+          "lat": 45.8069,
+          "lon": 5.48377
+        },
+        {
+          "lat": 46.03755,
+          "lon": 6.13358
+        },
+        {
+          "lat": 46.07289,
+          "lon": 6.20259
+        },
+        {
+          "lat": 45.57508,
+          "lon": 4.98529
+        },
+        {
+          "lat": 45.359,
+          "lon": 4.67172
+        },
+        {
+          "lat": 44.97545,
+          "lon": 4.24724
+        },
+        {
+          "lat": 45.66255,
+          "lon": 5.25109
+        },
+        {
+          "lat": 45.95801,
+          "lon": 6.0999
+        },
+        {
+          "lat": 45.47125,
+          "lon": 4.78468
+        },
+        {
+          "lat": 45.46136,
+          "lon": 4.79897
+        },
+        {
+          "lat": 45.77192,
+          "lon": 5.584
+        },
+        {
+          "lat": 45.71599,
+          "lon": 5.30435
+        },
+        {
+          "lat": 45.51053,
+          "lon": 4.72914
+        },
+        {
+          "lat": 45.3974,
+          "lon": 4.42094
+        }
+      ],
+      "summit": {
+        "lat": 44.09,
+        "lon": 7.06
+      },
       "peakFt": 9800,
       "minimumSafeFt": 11500
     },
     {
+      "id": "mont-agel",
+      "label": "MONT AGEL",
+      "massif": "mont-agel",
+      "kind": "polygon",
+      "vertices": [
+        {
+          "lat": 43.79026,
+          "lon": 7.49404
+        },
+        {
+          "lat": 43.78424,
+          "lon": 7.48995
+        },
+        {
+          "lat": 43.78021,
+          "lon": 7.49212
+        },
+        {
+          "lat": 43.77536,
+          "lon": 7.49024
+        },
+        {
+          "lat": 43.77046,
+          "lon": 7.48594
+        },
+        {
+          "lat": 43.76587,
+          "lon": 7.47679
+        },
+        {
+          "lat": 43.76169,
+          "lon": 7.47433
+        },
+        {
+          "lat": 43.75663,
+          "lon": 7.47557
+        },
+        {
+          "lat": 43.75118,
+          "lon": 7.47354
+        },
+        {
+          "lat": 43.74667,
+          "lon": 7.46663
+        },
+        {
+          "lat": 43.74325,
+          "lon": 7.45776
+        },
+        {
+          "lat": 43.73831,
+          "lon": 7.45102
+        },
+        {
+          "lat": 43.73569,
+          "lon": 7.44157
+        },
+        {
+          "lat": 43.73477,
+          "lon": 7.43188
+        },
+        {
+          "lat": 43.73726,
+          "lon": 7.42296
+        },
+        {
+          "lat": 43.73431,
+          "lon": 7.41501
+        },
+        {
+          "lat": 43.73193,
+          "lon": 7.40641
+        },
+        {
+          "lat": 43.72829,
+          "lon": 7.3961
+        },
+        {
+          "lat": 43.73059,
+          "lon": 7.38955
+        },
+        {
+          "lat": 43.72902,
+          "lon": 7.37931
+        },
+        {
+          "lat": 43.73012,
+          "lon": 7.37141
+        },
+        {
+          "lat": 43.73098,
+          "lon": 7.36264
+        },
+        {
+          "lat": 43.73824,
+          "lon": 7.3657
+        },
+        {
+          "lat": 43.74264,
+          "lon": 7.3651
+        },
+        {
+          "lat": 43.74659,
+          "lon": 7.36436
+        },
+        {
+          "lat": 43.74843,
+          "lon": 7.35654
+        },
+        {
+          "lat": 43.75288,
+          "lon": 7.35726
+        },
+        {
+          "lat": 43.75698,
+          "lon": 7.35624
+        },
+        {
+          "lat": 43.76134,
+          "lon": 7.3551
+        },
+        {
+          "lat": 43.76617,
+          "lon": 7.35135
+        },
+        {
+          "lat": 43.7714,
+          "lon": 7.35643
+        },
+        {
+          "lat": 43.77558,
+          "lon": 7.36722
+        },
+        {
+          "lat": 43.77905,
+          "lon": 7.37661
+        },
+        {
+          "lat": 43.78299,
+          "lon": 7.38276
+        },
+        {
+          "lat": 43.78739,
+          "lon": 7.38839
+        },
+        {
+          "lat": 43.78952,
+          "lon": 7.39735
+        },
+        {
+          "lat": 43.79309,
+          "lon": 7.40451
+        },
+        {
+          "lat": 43.79738,
+          "lon": 7.41207
+        },
+        {
+          "lat": 43.80401,
+          "lon": 7.42073
+        },
+        {
+          "lat": 43.80406,
+          "lon": 7.4304
+        },
+        {
+          "lat": 43.80347,
+          "lon": 7.43915
+        },
+        {
+          "lat": 43.80042,
+          "lon": 7.44564
+        },
+        {
+          "lat": 43.80205,
+          "lon": 7.45504
+        },
+        {
+          "lat": 43.7986,
+          "lon": 7.45963
+        },
+        {
+          "lat": 43.79664,
+          "lon": 7.46519
+        },
+        {
+          "lat": 43.79329,
+          "lon": 7.46827
+        },
+        {
+          "lat": 43.79528,
+          "lon": 7.48137
+        },
+        {
+          "lat": 43.79343,
+          "lon": 7.48883
+        }
+      ],
+      "summit": {
+        "lat": 43.766,
+        "lon": 7.422
+      },
+      "peakFt": 3600,
+      "minimumSafeFt": 5500
+    },
+    {
       "id": "esterel-hills",
       "label": "ESTEREL",
-      "kind": "circle",
-      "centre": {
-        "lat": 43.61202,
-        "lon": 6.759609
+      "massif": "esterel",
+      "kind": "polygon",
+      "vertices": [
+        {
+          "lat": 43.5664,
+          "lon": 6.97739
+        },
+        {
+          "lat": 43.55842,
+          "lon": 6.97554
+        },
+        {
+          "lat": 43.5495,
+          "lon": 6.96319
+        },
+        {
+          "lat": 43.54248,
+          "lon": 6.96343
+        },
+        {
+          "lat": 43.53528,
+          "lon": 6.96266
+        },
+        {
+          "lat": 43.52801,
+          "lon": 6.95398
+        },
+        {
+          "lat": 43.52083,
+          "lon": 6.95078
+        },
+        {
+          "lat": 43.51426,
+          "lon": 6.93985
+        },
+        {
+          "lat": 43.50989,
+          "lon": 6.91793
+        },
+        {
+          "lat": 43.50456,
+          "lon": 6.9083
+        },
+        {
+          "lat": 43.49728,
+          "lon": 6.90656
+        },
+        {
+          "lat": 43.49047,
+          "lon": 6.90072
+        },
+        {
+          "lat": 43.48116,
+          "lon": 6.89893
+        },
+        {
+          "lat": 43.47158,
+          "lon": 6.89404
+        },
+        {
+          "lat": 43.46812,
+          "lon": 6.87742
+        },
+        {
+          "lat": 43.46479,
+          "lon": 6.8618
+        },
+        {
+          "lat": 43.45839,
+          "lon": 6.84944
+        },
+        {
+          "lat": 43.4553,
+          "lon": 6.83398
+        },
+        {
+          "lat": 43.45163,
+          "lon": 6.81896
+        },
+        {
+          "lat": 43.44658,
+          "lon": 6.80389
+        },
+        {
+          "lat": 43.45022,
+          "lon": 6.788
+        },
+        {
+          "lat": 43.45698,
+          "lon": 6.77477
+        },
+        {
+          "lat": 43.4578,
+          "lon": 6.76203
+        },
+        {
+          "lat": 43.45891,
+          "lon": 6.74989
+        },
+        {
+          "lat": 43.45827,
+          "lon": 6.7368
+        },
+        {
+          "lat": 43.45153,
+          "lon": 6.71759
+        },
+        {
+          "lat": 43.45007,
+          "lon": 6.70125
+        },
+        {
+          "lat": 43.45477,
+          "lon": 6.6916
+        },
+        {
+          "lat": 43.45597,
+          "lon": 6.67751
+        },
+        {
+          "lat": 43.45801,
+          "lon": 6.66401
+        },
+        {
+          "lat": 43.46235,
+          "lon": 6.65423
+        },
+        {
+          "lat": 43.46308,
+          "lon": 6.63614
+        },
+        {
+          "lat": 43.46678,
+          "lon": 6.62309
+        },
+        {
+          "lat": 43.47701,
+          "lon": 6.62837
+        },
+        {
+          "lat": 43.48597,
+          "lon": 6.63319
+        },
+        {
+          "lat": 43.49359,
+          "lon": 6.6361
+        },
+        {
+          "lat": 43.5017,
+          "lon": 6.64432
+        },
+        {
+          "lat": 43.50687,
+          "lon": 6.63897
+        },
+        {
+          "lat": 43.5115,
+          "lon": 6.62567
+        },
+        {
+          "lat": 43.51831,
+          "lon": 6.62754
+        },
+        {
+          "lat": 43.52513,
+          "lon": 6.63095
+        },
+        {
+          "lat": 43.53196,
+          "lon": 6.62898
+        },
+        {
+          "lat": 43.53885,
+          "lon": 6.63496
+        },
+        {
+          "lat": 43.54621,
+          "lon": 6.63562
+        },
+        {
+          "lat": 43.55553,
+          "lon": 6.6276
+        },
+        {
+          "lat": 43.56353,
+          "lon": 6.63408
+        },
+        {
+          "lat": 43.56915,
+          "lon": 6.65054
+        },
+        {
+          "lat": 43.57468,
+          "lon": 6.66484
+        },
+        {
+          "lat": 43.57708,
+          "lon": 6.68499
+        },
+        {
+          "lat": 43.57847,
+          "lon": 6.70367
+        },
+        {
+          "lat": 43.58517,
+          "lon": 6.71206
+        },
+        {
+          "lat": 43.5911,
+          "lon": 6.72273
+        },
+        {
+          "lat": 43.59302,
+          "lon": 6.73769
+        },
+        {
+          "lat": 43.59721,
+          "lon": 6.75042
+        },
+        {
+          "lat": 43.59974,
+          "lon": 6.76423
+        },
+        {
+          "lat": 43.59976,
+          "lon": 6.77839
+        },
+        {
+          "lat": 43.60731,
+          "lon": 6.79193
+        },
+        {
+          "lat": 43.61678,
+          "lon": 6.8081
+        },
+        {
+          "lat": 43.6191,
+          "lon": 6.82451
+        },
+        {
+          "lat": 43.62049,
+          "lon": 6.84105
+        },
+        {
+          "lat": 43.61889,
+          "lon": 6.85593
+        },
+        {
+          "lat": 43.60997,
+          "lon": 6.86379
+        },
+        {
+          "lat": 43.60512,
+          "lon": 6.87341
+        },
+        {
+          "lat": 43.60525,
+          "lon": 6.88842
+        },
+        {
+          "lat": 43.60074,
+          "lon": 6.89748
+        },
+        {
+          "lat": 43.59597,
+          "lon": 6.90545
+        },
+        {
+          "lat": 43.59244,
+          "lon": 6.91531
+        },
+        {
+          "lat": 43.58431,
+          "lon": 6.91487
+        },
+        {
+          "lat": 43.57824,
+          "lon": 6.91735
+        },
+        {
+          "lat": 43.57784,
+          "lon": 6.93592
+        },
+        {
+          "lat": 43.57541,
+          "lon": 6.9517
+        },
+        {
+          "lat": 43.57096,
+          "lon": 6.96313
+        }
+      ],
+      "summit": {
+        "lat": 43.494,
+        "lon": 6.782
       },
-      "radiusNM": 8,
       "peakFt": 2000,
       "minimumSafeFt": 4000
     }
@@ -572,7 +1577,7 @@
   },
   "provenance": {
     "positions": "CONSTRUCTED, NOT SURVEYED.",
-    "notes": "The aerodrome reference point, the runway designators and bearings, and the field elevation are real to the best of the author knowledge. EVERYTHING ELSE IS CONSTRUCTED: the entry fixes and their names, the airspace boundary, the terrain and noise areas and the traffic mix are invented to give the sector a shape to control, and are NOT taken from any AIP. Do not use for anything but this game. Contrast egll.json, whose positions are surveyed. Runway thresholds are derived from the strip: a centre on the reference point, the published bearing, and the published length, with the two ends half a length either side. Only the aerodrome VOR carries a frequency; the entry gates are plain waypoints. The two parallels are opened out to about seven hundred metres rather than the real three hundred, so that they read as two runways at scope range."
+    "notes": "The aerodrome reference point, the runway designators and bearings, and the field elevation are real to the best of the author knowledge. EVERYTHING ELSE IS CONSTRUCTED: the entry fixes and their names, the airspace boundary, the terrain and noise areas and the traffic mix are invented to give the sector a shape to control, and are NOT taken from any AIP. Do not use for anything but this game. Contrast egll.json, whose positions are surveyed. Runway thresholds are derived from the strip: a centre on the reference point, the published bearing, and the published length, with the two ends half a length either side. Only the aerodrome VOR carries a frequency; the entry gates are plain waypoints. The two parallels are opened out to about seven hundred metres rather than the real three hundred, so that they read as two runways at scope range. Terrain is drawn as nested contour bands, each the ground above a height, with the summits at their real positions and heights; the outlines between them are shaped by hand to sit right against the coast and are not surveyed."
   },
   "shortName": "Nice",
   "challenge": "Mountains take half the airspace, so every vector is over water and every base is short."

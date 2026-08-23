@@ -30,6 +30,29 @@ export interface TerrainZone {
   readonly label: string
   readonly shape: ZoneShape
   /**
+   * Which hill this band belongs to, where a hill is drawn as several.
+   *
+   * High ground is contoured rather than outlined once: the Maritime Alps
+   * are the ground above four thousand three hundred feet, and the ground
+   * above seven thousand two hundred inside that, and so on up. Each band
+   * is its own zone -- which is what makes the sim work without knowing
+   * anything about contours, since the rule is only ever "the highest
+   * minimum over this point" -- and the massif is what lets the display
+   * letter the set of them once instead of seven times.
+   *
+   * Absent on a hill that is only one band, which is then its own group.
+   */
+  readonly massif?: string
+  /**
+   * The high point, where it is worth recording separately.
+   *
+   * A band traced from a coastline closes itself well inland, so its
+   * centroid is out in the next country and is no place to hang a name. It
+   * is also simply better data: the summit of Montserrat is a surveyed
+   * point, and the outline round it is not.
+   */
+  readonly summitNM?: Vec2NM
+  /**
    * The lowest an aircraft may be over this ground.
    *
    * Not the height of the hill: the height of the hill plus the margin a
@@ -54,7 +77,46 @@ export interface NoiseZone {
 /** Whether a point is inside a zone's footprint, ignoring height. */
 export function inShape(shape: ZoneShape, at: Vec2NM): boolean {
   if (shape.kind === 'circle') return distanceNM(at, shape.centreNM) <= shape.radiusNM
+  const box = boundsOf(shape.verticesNM)
+  // Contoured terrain runs to a few hundred points a band, and every
+  // aircraft is tested against every band twenty times a second. Nearly all
+  // of those tests are of somewhere obviously elsewhere, and a rectangle
+  // answers those without walking the outline.
+  if (at.x < box.minX || at.x > box.maxX || at.y < box.minY || at.y > box.maxY) return false
   return inPolygon(shape.verticesNM, at)
+}
+
+interface Bounds {
+  readonly minX: number
+  readonly minY: number
+  readonly maxX: number
+  readonly maxY: number
+}
+
+/**
+ * The rectangle round a ring, worked out once.
+ *
+ * Keyed on the array itself, so it lives exactly as long as the zone does
+ * and no cache needs clearing when an airport is swapped.
+ */
+const boxes = new WeakMap<readonly Vec2NM[], Bounds>()
+
+function boundsOf(ring: readonly Vec2NM[]): Bounds {
+  const had = boxes.get(ring)
+  if (had !== undefined) return had
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const p of ring) {
+    minX = Math.min(minX, p.x)
+    minY = Math.min(minY, p.y)
+    maxX = Math.max(maxX, p.x)
+    maxY = Math.max(maxY, p.y)
+  }
+  const box = { minX, minY, maxX, maxY }
+  boxes.set(ring, box)
+  return box
 }
 
 /**

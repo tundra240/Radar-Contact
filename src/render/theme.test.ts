@@ -197,6 +197,10 @@ describe('palette legibility', () => {
     // The FIR limit is a real airspace boundary, so it is read rather than
     // merely sensed.
     'fir',
+    // The top of the terrain ramp. By the time the ground is this high the
+    // shape is telling you something you have to act on, so it is held to
+    // the same threshold as anything else carrying a value.
+    'terrainHigh',
   ] as const
 
   // Grid furniture is meant to recede. An upper bound matters as much as a
@@ -204,7 +208,17 @@ describe('palette legibility', () => {
   // The coastline belongs here rather than with the symbology: it is a
   // backdrop for orientation, and 2400 points of shoreline drawn loudly
   // would bury the traffic it is supposed to give context to.
-  const FURNITURE = ['ring', 'ringStrong', 'cardinal', 'centreline', 'coast'] as const
+  // Low ground belongs here rather than with the symbology: it is a wash
+  // under the traffic, and a hill six hundred feet high that shouts is a
+  // hill you have to look past.
+  const FURNITURE = [
+    'ring',
+    'ringStrong',
+    'cardinal',
+    'centreline',
+    'coast',
+    'terrainLow',
+  ] as const
 
   for (const name of PALETTE_ORDER) {
     describe(name, () => {
@@ -262,6 +276,23 @@ describe('palette legibility', () => {
           expect(r, `${key} too invisible`).toBeGreaterThan(1.25)
           expect(r, `${key} too loud`).toBeLessThan(4)
         }
+      })
+
+      it('rises up the terrain ramp rather than sitting still', () => {
+        // A ramp that does not climb is one colour drawn twice, and the
+        // height information the bands carry is thrown away again.
+        expect(
+          contrast(p.terrainHigh, p.bg),
+          'the ramp does not climb',
+        ).toBeGreaterThan(contrast(p.terrainLow, p.bg))
+        // And it has to climb in hue as well as in loudness. On the light
+        // schemes a wash can only get so much louder before it competes
+        // with the traffic, so what carries the top of the ramp there is
+        // that it has gone warm.
+        expect(hueOf(p.terrainHigh), 'the ramp keeps one hue').not.toBeCloseTo(
+          hueOf(p.terrainLow),
+          -1,
+        )
       })
 
       it('keeps the chrome readable against its own faces', () => {

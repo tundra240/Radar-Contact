@@ -16,11 +16,12 @@ import {
   type Runway,
 } from '../data/airport'
 import type { Aircraft } from '../sim/types'
-import type { TerrainZone, ZoneShape } from '../sim/zones'
+import type { ZoneShape } from '../sim/zones'
 import { drawTargets, drawVectorDrag, type VectorDrag } from './layers/targets'
 import { drawWeather } from './layers/weather'
 import type { Weather } from '../sim/weather'
 import { OVERLAY_ITEMS, countEnabled, densityOf, type Overlays } from './overlays'
+import { drawTerrain } from './terrain'
 import { airspaceColour, fonts, formatLevel, theme } from './theme'
 
 /**
@@ -1145,36 +1146,12 @@ function drawZones(
   airport: Airport,
   overlays: Overlays,
 ): void {
-  const terrain = overlays.terrain ? airport.terrain : []
   const noise = overlays.noiseZones ? airport.noise : []
-  if (terrain.length === 0 && noise.length === 0) return
+  if (overlays.terrain) drawTerrain(g, cam, airport.terrain)
+  if (noise.length === 0) return
 
   g.save()
   g.lineWidth = 1
-
-  for (const zone of terrain) {
-    // Filled, faintly, as well as outlined. An outline alone reads as one
-    // more boundary on a display that already has a dozen of them, and the
-    // thing that matters about terrain is which SIDE of the line you are
-    // on. A wash says "this area", where a line only says "this edge".
-    traceZone(g, cam, zone.shape)
-    g.globalAlpha = 0.08
-    g.fillStyle = theme.warn
-    g.fill()
-
-    // A second, denser pass along the boundary itself: high ground has an
-    // edge you can be a mile the wrong side of, and it should be the
-    // sharpest part of the shading.
-    g.globalAlpha = 0.55
-    g.strokeStyle = theme.warn
-    g.stroke()
-
-    g.globalAlpha = 0.9
-    // The minimum, not the summit: the number a controller uses. Both,
-    // where there is room, because the summit is what makes the minimum
-    // believable.
-    labelTerrain(g, cam, zone)
-  }
 
   for (const zone of noise) {
     g.strokeStyle = theme.ringStrong
@@ -1191,26 +1168,6 @@ function drawZones(
   }
 
   g.restore()
-}
-
-/**
- * A terrain area's name, its minimum and its summit.
- *
- * Two lines rather than one: the minimum is the number that gets used and
- * the summit is what explains it, and a controller reading "11500 MSA" over
- * a blank shape has to take it on trust.
- */
-function labelTerrain(g: CanvasRenderingContext2D, cam: Camera, zone: TerrainZone): void {
-  const at = centreOf(zone.shape)
-  const p = cam.worldToScreen(at)
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  g.fillStyle = theme.warn
-  g.font = fonts.bold(9)
-  g.fillText(`${zone.label} ${zone.minimumSafeFt} MSA`, p.x, p.y - 6)
-  g.font = fonts.label(8)
-  g.globalAlpha = 0.65
-  g.fillText(`terrain to ${zone.peakFt} ft`, p.x, p.y + 6)
 }
 
 /** The outline of a zone, whichever shape it is. */

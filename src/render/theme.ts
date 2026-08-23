@@ -100,6 +100,22 @@ export interface Palette {
   readonly warn: string
 
   /**
+   * The two ends of the terrain ramp: low ground and the highest.
+   *
+   * A ramp rather than one colour, because the useful question about a
+   * mountain is not whether it is there. Height is the whole content, and
+   * a single ink throws it away -- every hill from a six-hundred-foot ridge
+   * to the Alps comes out identical, and the display can only say "avoid".
+   *
+   * Low ground sits with the furniture: it is a wash you should sense
+   * rather than look at. The top of the ramp is held to the symbology
+   * threshold, because by then the shape is telling you something you have
+   * to act on.
+   */
+  readonly terrainLow: string
+  readonly terrainHigh: string
+
+  /**
    * Which idiom the interface is drawn in -- everything about the era that
    * a colour cannot express.
    *
@@ -224,6 +240,8 @@ export const palettes = {
     textDim: '#4e4939',
     accent: '#006e74',
     warn: '#a00000',
+    terrainLow: '#8a7f52',
+    terrainHigh: '#8f2a11',
 
     // The canonical button face of the era, with a white highlight and a
     // mid-grey shadow. Nothing dates an interface faster than getting
@@ -288,6 +306,8 @@ export const palettes = {
     textDim: '#5c7382',
     accent: '#00e5ff',
     warn: '#ff5252',
+    terrainLow: '#5c6b3a',
+    terrainHigh: '#e0663c',
 
     chromeFace: '#18222b',
     chromeEdge: '#3a4a52',
@@ -365,6 +385,8 @@ export const palettes = {
     textDim: '#7fa39e',
     accent: '#4fe3ab',
     warn: '#ff5b5b',
+    terrainLow: '#4a6b4e',
+    terrainHigh: '#e07a4a',
 
     // Flat: the face is a shade above the ground and the light is a
     // hairline border, not a highlight. The shadow is kept darker than the
@@ -440,6 +462,8 @@ export const palettes = {
     textDim: '#3d5d64',
     accent: '#0a6650',
     warn: '#ab1f28',
+    terrainLow: '#7d8f74',
+    terrainHigh: '#a5462a',
 
     chromeFace: '#eaf0f2',
     chromeEdge: '#9db2ba',

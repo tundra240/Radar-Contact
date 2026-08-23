@@ -1019,10 +1019,16 @@ function parseTerrain(raw: unknown, projection: Projection): TerrainZone[] {
       // is not a minimum safe altitude, it is a hill with a number on it.
       throw new ConfigError(`${p}.minimumSafeFt`, 'must be above peakFt')
     }
+    const massif = o['massif']
+    const summit = o['summit']
     return {
       id: str(o['id'], `${p}.id`),
       label: str(o['label'], `${p}.label`),
       shape: parseZoneShape(o, p, projection),
+      ...(massif === undefined ? {} : { massif: str(massif, `${p}.massif`) }),
+      ...(summit === undefined
+        ? {}
+        : { summitNM: projection.toWorld(latLon(summit, `${p}.summit`)) }),
       minimumSafeFt,
       peakFt,
     }
