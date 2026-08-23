@@ -44,6 +44,7 @@ function mountLogon(over: { initials?: string; enforceAirspace?: boolean } = {})
     enforceAirspace: over.enforceAirspace ?? true,
     difficulty: 'normal',
     mode: 'career',
+    startPaused: true,
     airports: [
       {
         icao: 'LPFR',
@@ -148,7 +149,16 @@ describe('the main menu', () => {
     const h = mountLogon()
     type(input(h.mount), 'NF')
     button(h.mount, '.logon-go').click()
-    expect(h.logons).toEqual([{ initials: 'NF', position: 'EGLL_APP', enforceAirspace: true, difficulty: 'normal', mode: 'career' }])
+    expect(h.logons).toEqual([
+      {
+        initials: 'NF',
+        position: 'EGLL_APP',
+        enforceAirspace: true,
+        difficulty: 'normal',
+        mode: 'career',
+        startPaused: true,
+      },
+    ])
   })
 
   it('upper-cases and filters as you type', () => {
@@ -189,6 +199,7 @@ describe('the main menu', () => {
         enforceAirspace: true,
         difficulty: 'normal',
         mode: 'career',
+        startPaused: true,
       },
     ])
   })
@@ -203,12 +214,13 @@ describe('the main menu', () => {
     const h = mountLogon()
     button(h.mount, '.logon-settings').click()
     expect(h.settings).toBe(1)
-    // The one checkbox it does carry is the airspace rule, which is a
-    // decision about the shift rather than about the display -- and cannot
-    // be changed part way through one.
-    const boxes = h.mount.querySelectorAll('input[type="checkbox"]')
-    expect(boxes).toHaveLength(1)
-    expect(boxes[0]?.className).toContain('logon-toggle')
+    // The checkboxes it does carry are decisions about the shift rather
+    // than about the display: the airspace rule, which cannot be changed
+    // part way through one, and whether the clock is running when you
+    // arrive, which can only be answered before it is.
+    const boxes = h.mount.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
+    expect(boxes).toHaveLength(2)
+    for (const box of boxes) expect(box.className).toContain('logon-toggle')
   })
 
   it('stays up until it is dismissed', () => {

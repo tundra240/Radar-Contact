@@ -58,8 +58,8 @@
     {
       "id": "10",
       "threshold": {
-        "lat": 37.01647,
-        "lon": -7.980222
+        "lat": 37.01639,
+        "lon": -7.979651
       },
       "bearingTrue": 100,
       "lengthFt": 8169,
@@ -74,8 +74,8 @@
     {
       "id": "28",
       "threshold": {
-        "lat": 37.012418,
-        "lon": -7.951444
+        "lat": 37.012498,
+        "lon": -7.952015
       },
       "bearingTrue": 280,
       "lengthFt": 8169,
@@ -94,10 +94,6 @@
       "fullName": "Sagres gate",
       "lat": 37.183491,
       "lon": -8.419847,
-      "navaid": {
-        "type": "VOR-DME",
-        "freqMHz": 112.5
-      },
       "hold": {
         "turns": "right",
         "legMins": 1
@@ -112,10 +108,6 @@
       "fullName": "Guadiana gate",
       "lat": 37.109344,
       "lon": -7.522276,
-      "navaid": {
-        "type": "VOR-DME",
-        "freqMHz": 113.9
-      },
       "hold": {
         "turns": "right",
         "legMins": 1
@@ -436,7 +428,7 @@
   },
   "provenance": {
     "positions": "CONSTRUCTED, NOT SURVEYED.",
-    "notes": "The aerodrome reference point, the runway designators and bearings, and the field elevation are real to the best of the author knowledge. EVERYTHING ELSE IS CONSTRUCTED: the entry fixes and their names, the airspace boundary, the terrain and noise areas and the traffic mix are invented to give the sector a shape to control, and are NOT taken from any AIP. Do not use for anything but this game. Contrast egll.json, whose positions are surveyed."
+    "notes": "The aerodrome reference point, the runway designators and bearings, and the field elevation are real to the best of the author knowledge. EVERYTHING ELSE IS CONSTRUCTED: the entry fixes and their names, the airspace boundary, the terrain and noise areas and the traffic mix are invented to give the sector a shape to control, and are NOT taken from any AIP. Do not use for anything but this game. Contrast egll.json, whose positions are surveyed. Runway thresholds are derived from the strip: a centre on the reference point, the published bearing, and the published length, with the two ends half a length either side. Only the aerodrome VOR carries a frequency; the entry gates are plain waypoints."
   },
   "shortName": "Faro",
   "challenge": "One runway, two gates and open sea. Spacing rather than sorting."

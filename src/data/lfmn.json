@@ -58,8 +58,8 @@
     {
       "id": "04L",
       "threshold": {
-        "lat": 43.647441,
-        "lon": 7.201729
+        "lat": 43.64867,
+        "lon": 7.203314
       },
       "bearingTrue": 43,
       "lengthFt": 9711,
@@ -74,8 +74,8 @@
     {
       "id": "22R",
       "threshold": {
-        "lat": 43.669381,
-        "lon": 7.230009
+        "lat": 43.668152,
+        "lon": 7.228424
       },
       "bearingTrue": 223,
       "lengthFt": 9711,
@@ -90,8 +90,8 @@
     {
       "id": "04R",
       "threshold": {
-        "lat": 43.642534,
-        "lon": 7.203199
+        "lat": 43.648134,
+        "lon": 7.207664
       },
       "bearingTrue": 43,
       "lengthFt": 8432,
@@ -106,8 +106,8 @@
     {
       "id": "22L",
       "threshold": {
-        "lat": 43.674288,
-        "lon": 7.228539
+        "lat": 43.66505,
+        "lon": 7.229466
       },
       "bearingTrue": 223,
       "lengthFt": 8432,
@@ -126,10 +126,6 @@
       "fullName": "Antibes gate",
       "lat": 43.34518,
       "lon": 7.058285,
-      "navaid": {
-        "type": "VOR-DME",
-        "freqMHz": 114.2
-      },
       "hold": {
         "turns": "right",
         "legMins": 1
@@ -144,10 +140,6 @@
       "fullName": "Menton gate",
       "lat": 43.59474,
       "lon": 7.714987,
-      "navaid": {
-        "type": "VOR-DME",
-        "freqMHz": 115.4
-      },
       "hold": {
         "turns": "right",
         "legMins": 1
@@ -162,10 +154,6 @@
       "fullName": "Esterel gate",
       "lat": 43.521603,
       "lon": 6.69632,
-      "navaid": {
-        "type": "VOR-DME",
-        "freqMHz": 116.1
-      },
       "hold": {
         "turns": "right",
         "legMins": 1
@@ -584,7 +572,7 @@
   },
   "provenance": {
     "positions": "CONSTRUCTED, NOT SURVEYED.",
-    "notes": "The aerodrome reference point, the runway designators and bearings, and the field elevation are real to the best of the author knowledge. EVERYTHING ELSE IS CONSTRUCTED: the entry fixes and their names, the airspace boundary, the terrain and noise areas and the traffic mix are invented to give the sector a shape to control, and are NOT taken from any AIP. Do not use for anything but this game. Contrast egll.json, whose positions are surveyed."
+    "notes": "The aerodrome reference point, the runway designators and bearings, and the field elevation are real to the best of the author knowledge. EVERYTHING ELSE IS CONSTRUCTED: the entry fixes and their names, the airspace boundary, the terrain and noise areas and the traffic mix are invented to give the sector a shape to control, and are NOT taken from any AIP. Do not use for anything but this game. Contrast egll.json, whose positions are surveyed. Runway thresholds are derived from the strip: a centre on the reference point, the published bearing, and the published length, with the two ends half a length either side. Only the aerodrome VOR carries a frequency; the entry gates are plain waypoints."
   },
   "shortName": "Nice",
   "challenge": "Mountains take half the airspace, so every vector is over water and every base is short."

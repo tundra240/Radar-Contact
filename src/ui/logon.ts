@@ -66,6 +66,15 @@ export interface LogonDetails {
   readonly enforceAirspace: boolean
   readonly difficulty: DifficultyName
   readonly mode: SessionMode
+  /**
+   * Whether the clock is stopped when the session opens.
+   *
+   * Worth having as a choice rather than a fixed behaviour. Coming on
+   * position to a picture that is already moving is realistic and is also
+   * the worst moment to be reading a scope for the first time -- and on the
+   * busier settings the first arrivals are released within seconds.
+   */
+  readonly startPaused: boolean
 }
 
 export interface LogonOptions {
@@ -80,6 +89,8 @@ export interface LogonOptions {
   readonly initials: string
   /** Remembered airspace setting, preselected. */
   readonly enforceAirspace: boolean
+  /** Remembered clock choice, preselected. */
+  readonly startPaused: boolean
   /** Remembered difficulty, preselected. */
   readonly difficulty: DifficultyName
   readonly mode: SessionMode
@@ -124,6 +135,7 @@ export class Logon {
   private readonly levelButtons: HTMLButtonElement[] = []
   private readonly fieldButtons: HTMLButtonElement[] = []
   private fieldNote!: HTMLParagraphElement
+  private pausedBox!: HTMLInputElement
   private readonly modeButtons: HTMLButtonElement[] = []
   private levelNote!: HTMLParagraphElement
   private readonly opts: LogonOptions
@@ -231,6 +243,13 @@ export class Logon {
     this.error.hidden = true
     this.error.setAttribute('role', 'alert')
     body.appendChild(this.error)
+
+    this.pausedBox = this.checkRow(
+      fields,
+      'Clock',
+      'Start with the clock stopped',
+      opts.startPaused,
+    )
 
     body.appendChild(this.buildAirports())
     body.appendChild(this.buildDifficulty())
@@ -468,6 +487,38 @@ export class Logon {
       (this.mode === 'career' ? ' Fixed for the session.' : ' Changeable as you go.')
   }
 
+  /**
+   * A labelled checkbox in the field list, built the way the airspace one
+   * already is so the two sit together and look like one thing.
+   */
+  private checkRow(
+    parent: HTMLElement,
+    label: string,
+    text: string,
+    checked: boolean,
+  ): HTMLInputElement {
+    const row = document.createElement('label')
+    row.className = 'logon-field logon-check'
+
+    const name = document.createElement('span')
+    name.textContent = label
+    row.appendChild(name)
+
+    const box = document.createElement('input')
+    box.type = 'checkbox'
+    box.className = 'logon-toggle'
+    box.checked = checked
+    row.appendChild(box)
+
+    const note = document.createElement('span')
+    note.className = 'logon-note'
+    note.textContent = text
+    row.appendChild(note)
+
+    parent.appendChild(row)
+    return box
+  }
+
   private submit(into: 'session' | 'tutorial' = 'session'): void {
     const initials = validateInitials(this.input.value)
     if (initials === null) {
@@ -484,6 +535,7 @@ export class Logon {
       enforceAirspace: this.airspace.checked,
       difficulty: this.difficulty,
       mode: this.mode,
+      startPaused: this.pausedBox.checked,
     }
     if (into === 'tutorial') this.opts.onTutorial(details)
     else this.opts.onLogon(details)

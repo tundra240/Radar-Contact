@@ -58,11 +58,11 @@
     {
       "id": "06L",
       "threshold": {
-        "lat": 41.289098,
-        "lon": 2.04928
+        "lat": 41.298185,
+        "lon": 2.056563
       },
       "bearingTrue": 70,
-      "lengthFt": 8727,
+      "lengthFt": 10997,
       "thresholdElevationFt": 12,
       "ils": {
         "available": true,
@@ -74,8 +74,40 @@
     {
       "id": "24R",
       "threshold": {
-        "lat": 41.305058,
-        "lon": 2.107648
+        "lat": 41.308501,
+        "lon": 2.094295
+      },
+      "bearingTrue": 250,
+      "lengthFt": 10997,
+      "thresholdElevationFt": 12,
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
+    },
+    {
+      "id": "06R",
+      "threshold": {
+        "lat": 41.287816,
+        "lon": 2.065999
+      },
+      "bearingTrue": 70,
+      "lengthFt": 8727,
+      "thresholdElevationFt": 12,
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
+    },
+    {
+      "id": "24L",
+      "threshold": {
+        "lat": 41.296004,
+        "lon": 2.095937
       },
       "bearingTrue": 250,
       "lengthFt": 8727,
@@ -88,45 +120,13 @@
       }
     },
     {
-      "id": "06R",
-      "threshold": {
-        "lat": 41.283695,
-        "lon": 2.040264
-      },
-      "bearingTrue": 70,
-      "lengthFt": 10171,
-      "thresholdElevationFt": 12,
-      "ils": {
-        "available": true,
-        "glideslopeDeg": 3,
-        "fafDistNM": 10,
-        "minInterceptDeg": 30
-      }
-    },
-    {
-      "id": "24L",
-      "threshold": {
-        "lat": 41.310461,
-        "lon": 2.116664
-      },
-      "bearingTrue": 250,
-      "lengthFt": 10171,
-      "thresholdElevationFt": 12,
-      "ils": {
-        "available": true,
-        "glideslopeDeg": 3,
-        "fafDistNM": 10,
-        "minInterceptDeg": 30
-      }
-    },
-    {
       "id": "02",
       "threshold": {
-        "lat": 41.278284,
-        "lon": 2.069359
+        "lat": 41.267595,
+        "lon": 2.064182
       },
       "bearingTrue": 20,
-      "lengthFt": 8293,
+      "lengthFt": 8294,
       "thresholdElevationFt": 12,
       "ils": {
         "available": true,
@@ -138,11 +138,11 @@
     {
       "id": "20",
       "threshold": {
-        "lat": 41.315872,
-        "lon": 2.087569
+        "lat": 41.288973,
+        "lon": 2.074536
       },
       "bearingTrue": 200,
-      "lengthFt": 8293,
+      "lengthFt": 8294,
       "thresholdElevationFt": 12,
       "ils": {
         "available": true,
@@ -158,10 +158,6 @@
       "fullName": "Maresme gate",
       "lat": 41.545628,
       "lon": 2.550934,
-      "navaid": {
-        "type": "VOR-DME",
-        "freqMHz": 114.6
-      },
       "hold": {
         "turns": "right",
         "legMins": 1
@@ -176,10 +172,6 @@
       "fullName": "Garraf gate",
       "lat": 41.048528,
       "lon": 1.605994,
-      "navaid": {
-        "type": "VOR-DME",
-        "freqMHz": 115.8
-      },
       "hold": {
         "turns": "right",
         "legMins": 1
@@ -194,10 +186,6 @@
       "fullName": "Montserrat gate",
       "lat": 41.654565,
       "lon": 1.679198,
-      "navaid": {
-        "type": "VOR-DME",
-        "freqMHz": 116.7
-      },
       "hold": {
         "turns": "right",
         "legMins": 1
@@ -212,10 +200,6 @@
       "fullName": "Balearic gate",
       "lat": 40.914056,
       "lon": 2.506249,
-      "navaid": {
-        "type": "VOR-DME",
-        "freqMHz": 117.2
-      },
       "hold": {
         "turns": "right",
         "legMins": 1
@@ -720,7 +704,7 @@
   },
   "provenance": {
     "positions": "CONSTRUCTED, NOT SURVEYED.",
-    "notes": "The aerodrome reference point, the runway designators and bearings, and the field elevation are real to the best of the author knowledge. EVERYTHING ELSE IS CONSTRUCTED: the entry fixes and their names, the airspace boundary, the terrain and noise areas and the traffic mix are invented to give the sector a shape to control, and are NOT taken from any AIP. Do not use for anything but this game. Contrast egll.json, whose positions are surveyed."
+    "notes": "The aerodrome reference point, the runway designators and bearings, and the field elevation are real to the best of the author knowledge. EVERYTHING ELSE IS CONSTRUCTED: the entry fixes and their names, the airspace boundary, the terrain and noise areas and the traffic mix are invented to give the sector a shape to control, and are NOT taken from any AIP. Do not use for anything but this game. Contrast egll.json, whose positions are surveyed. Runway thresholds are derived from the strip: a centre on the reference point, the published bearing, and the published length, with the two ends half a length either side. Only the aerodrome VOR carries a frequency; the entry gates are plain waypoints."
   },
   "shortName": "Barcelona",
   "challenge": "Crossing runways, four gates, noise floors and transits through the arrivals."

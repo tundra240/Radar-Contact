@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { distanceNM } from '../core/geo'
 import { isControlled } from '../sim/airspace'
 import { headwindKts, TAILWIND_LIMIT_KTS } from '../sim/atis'
 import { DIFFICULTIES } from '../sim/difficulty'
@@ -249,5 +250,118 @@ describe('what makes each field itself', () => {
     expect(DIFFICULTIES.pro.arrivalsPerHour).toBeGreaterThan(
       DIFFICULTIES.easy.arrivalsPerHour,
     )
+  })
+})
+
+describe('the runways are laid out as strips', () => {
+  /**
+   * A runway has two ends and they are one piece of tarmac.
+   *
+   * The three constructed fields were generated end by end, each threshold
+   * on its own radial from the reference point -- so the two ends of a
+   * strip were not its length apart, and a parallel pair was not parallel.
+   * Nice drew as three runways and Barcelona as a tangle.
+   */
+  const FT_PER_NM = 6076.11548556
+
+  /** The reciprocal id of a runway end: 27R and 09L, 02 and 20. */
+  function reciprocalOf(id: string): string {
+    const digits = Number.parseInt(id.replace(/[^0-9]/g, ''), 10)
+    const side = id.replace(/[0-9]/g, '')
+    const other = ((digits + 17) % 36) + 1
+    const flipped = side === 'L' ? 'R' : side === 'R' ? 'L' : side
+    return `${String(other).padStart(2, '0')}${flipped}`
+  }
+
+  it('pairs every end with its reciprocal', () => {
+    for (const f of fields) {
+      const ids = new Set(f.runways.map((r) => r.id))
+      for (const r of f.runways) {
+        expect(ids, `${f.icao} ${r.id} has no other end`).toContain(reciprocalOf(r.id))
+      }
+      // An even number of ends, because they come in pairs.
+      expect(f.runways.length % 2, f.icao).toBe(0)
+    }
+  })
+
+  it('puts the two ends exactly a runway apart', () => {
+    for (const f of fields) {
+      for (const r of f.runways) {
+        const other = f.runways.find((x) => x.id === reciprocalOf(r.id))
+        if (other === undefined) continue
+        const apart = distanceNM(r.thresholdNM, other.thresholdNM)
+        // Within a hundred feet, which is the rounding in the coordinates.
+        expect(
+          Math.abs(apart - r.lengthNM) * FT_PER_NM,
+          `${f.icao} ${r.id}/${other.id} does not close`,
+        ).toBeLessThan(100)
+      }
+    }
+  })
+
+  it('points the two ends opposite ways', () => {
+    for (const f of fields) {
+      for (const r of f.runways) {
+        const other = f.runways.find((x) => x.id === reciprocalOf(r.id))
+        if (other === undefined) continue
+        // Reciprocal, so the difference is half a turn.
+        const apart = (((r.bearingTrue - other.bearingTrue) % 360) + 360) % 360
+        expect(apart, `${f.icao} ${r.id}/${other.id}`).toBeCloseTo(180, 0)
+      }
+    }
+  })
+
+  it('makes a parallel pair actually parallel', () => {
+    // Nice's two strips and Barcelona's two: same bearing, side by side.
+    for (const [icao, a, b] of [
+      ['LFMN', '04L', '04R'],
+      ['LEBL', '06L', '06R'],
+    ] as const) {
+      const f = airportOf(icao)
+      const one = f.runways.find((r) => r.id === a)
+      const two = f.runways.find((r) => r.id === b)
+      expect(one, `${icao} ${a}`).toBeDefined()
+      expect(two, `${icao} ${b}`).toBeDefined()
+      expect(Math.abs(one!.bearingTrue - two!.bearingTrue), icao).toBeLessThan(1)
+      // Beside each other rather than on top: a real separation, and not a
+      // mile of it either.
+      const apart = distanceNM(one!.thresholdNM, two!.thresholdNM)
+      expect(apart, icao).toBeGreaterThan(0.05)
+      expect(apart, icao).toBeLessThan(1.5)
+    }
+  })
+
+  it('crosses Barcelona 02/20 over the parallels', () => {
+    // The dependency the field is known for, so the geometry has to show it.
+    const bcn = airportOf('LEBL')
+    const cross = bcn.runways.find((r) => r.id === '02')
+    const main = bcn.runways.find((r) => r.id === '06L')
+    expect(cross).toBeDefined()
+    const angle = Math.abs(((cross!.bearingTrue - main!.bearingTrue + 540) % 360) - 180)
+    // Genuinely crossing rather than nearly parallel.
+    expect(angle).toBeGreaterThan(30)
+    expect(angle).toBeLessThan(150)
+  })
+})
+
+describe('waypoints are waypoints', () => {
+  it('only puts a frequency on an actual radio aid', () => {
+    // A five-letter fix is a name and a position. Giving one a VOR
+    // frequency says it is something it is not, and puts a number on the
+    // scope that tunes nothing.
+    for (const f of fields) {
+      for (const n of f.navaids) {
+        if (n.station === null) continue
+        // A station has a short identifier, the way a real one does.
+        expect(n.name.length, `${f.icao} ${n.name} has a frequency`).toBeLessThanOrEqual(3)
+      }
+    }
+  })
+
+  it('still gives each field one aid to tune', () => {
+    for (const f of fields) {
+      const stations = f.navaids.filter((n) => n.station !== null)
+      expect(stations.length, f.icao).toBeGreaterThan(0)
+    }
   })
 })

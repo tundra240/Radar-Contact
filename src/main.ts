@@ -28,6 +28,7 @@ import {
   SAVE_VERSION,
   parseSavedGame,
   serialise,
+  type SavedController,
   type SavedGame,
 } from './sim/savegame'
 import { Overflights } from './sim/overflight'
@@ -1124,7 +1125,15 @@ function start(
   // Who is working the position. Null until someone logs on, which is also
   // what keeps the clock stopped: the simulation is not running while the
   // main menu is up.
-  let controller: LogonDetails | null = null
+  /**
+   * Who is on position.
+   *
+   * The saved shape rather than the whole logon form: the form also carries
+   * how the session should START, and that is a choice about this sitting
+   * rather than a fact about the controller. A LogonDetails satisfies it,
+   * so the extra field is simply not kept.
+   */
+  let controller: SavedController | null = null
 
   /**
    * The score, and the two counts behind it. One value rather than three
@@ -1616,6 +1625,7 @@ function start(
       window.localStorage.setItem(AIRSPACE_STORAGE, details.enforceAirspace ? '1' : '0')
       window.localStorage.setItem(DIFFICULTY_STORAGE, details.difficulty)
       window.localStorage.setItem(MODE_STORAGE, details.mode)
+      window.localStorage.setItem(PAUSED_STORAGE, details.startPaused ? '1' : '0')
     } catch {
       /* preference simply will not persist */
     }
@@ -1691,6 +1701,7 @@ function start(
   const AIRSPACE_STORAGE = 'radar-contact:airspace'
   const DIFFICULTY_STORAGE = 'radar-contact:difficulty'
   const MODE_STORAGE = 'radar-contact:mode'
+  const PAUSED_STORAGE = 'radar-contact:start-paused'
 
   const storedInitials = (): string => {
     try {
@@ -1714,6 +1725,21 @@ function start(
       return window.localStorage.getItem(MODE_STORAGE) === 'sandbox' ? 'sandbox' : 'career'
     } catch {
       return 'career'
+    }
+  }
+
+  /**
+   * Stopped unless the last session said otherwise.
+   *
+   * The gentler default: a controller who has just chosen a sector has not
+   * looked at it yet, and on the busier settings the first arrivals are
+   * released within seconds of the clock starting.
+   */
+  const storedPaused = (): boolean => {
+    try {
+      return window.localStorage.getItem(PAUSED_STORAGE) !== '0'
+    } catch {
+      return true
     }
   }
 
@@ -1750,6 +1776,7 @@ function start(
     enforceAirspace: storedAirspace(),
     difficulty: storedDifficulty(),
     mode: storedMode(),
+    startPaused: storedPaused(),
     airports: airportSummaries(),
     airport: airport.icao,
     onAirport: (icao) => {
@@ -1767,7 +1794,13 @@ function start(
     onSettings: () => menu.setOpen(true),
     onLogon: (details) => {
       takePosition(details)
-      loop.setPaused(false)
+      // The one thing that differs between the two ways on to position: a
+      // lesson always starts stopped, and a free session starts however the
+      // controller asked for it.
+      loop.setPaused(details.startPaused)
+      if (details.startPaused) {
+        announce('clock stopped -- press the play button or space to start', 'note')
+      }
       announce(
         `Traffic seed ${spawner.seed}. Add ?seed=${spawner.seed} to the address to fly it again.`,
         'note',
