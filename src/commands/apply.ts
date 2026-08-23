@@ -2,6 +2,7 @@ import { normalizeHeading } from '../core/geo'
 import { isInSector } from '../sim/aircraft'
 import { isControlled, type ControlZone } from '../sim/airspace'
 import { onApproach } from '../sim/ils'
+import { rejoinLeg } from '../sim/route'
 import type { Aircraft, ApproachClearance, HoldClearance } from '../sim/types'
 import type { Command } from './types'
 
@@ -84,6 +85,8 @@ export function applyCommand(
       return speed(command.kts, aircraft, ctx)
     case 'hold':
       return hold(command.fix, aircraft, ctx)
+    case 'resumeNav':
+      return resumeNav(aircraft)
     case 'approach':
       return approach(command.runway, aircraft, ctx)
     // The handoff still needs somewhere to hand off to. Saying so is better
@@ -210,6 +213,56 @@ function hold(fix: string, a: Aircraft, ctx: ApplyContext): Outcome {
       clearedHdg: null,
     },
     readback: `${a.callsign} HOLD AT ${clearance.fix}`,
+  }
+}
+
+/**
+ * Hands an aircraft back to its own flight plan.
+ *
+ * The counterpart to a vector, and the reason a transit can be vectored at
+ * all: without a way to give the route back, taking an aeroplane off it
+ * would mean owning it for the rest of its time in the sector.
+ *
+ * Refused for anything with no route to resume, and said plainly rather
+ * than accepted and quietly ignored. An arrival has no flight plan here --
+ * it is being vectored to a runway, which is the whole job.
+ */
+function resumeNav(a: Aircraft): Outcome {
+  if (a.route.length === 0) {
+    return {
+      ok: false,
+      reason: `${a.callsign} has no route to resume -- it is being vectored`,
+    }
+  }
+  if (onApproach(a.navMode)) {
+    // Not while it is on a beam. Breaking one off is what a vector is for,
+    // and doing it silently as a side effect of RESUME NAV would be the
+    // kind of surprise this module exists to prevent.
+    return {
+      ok: false,
+      reason: `${a.callsign} is on the approach -- vector it off first`,
+    }
+  }
+
+  // Forwards only. The aircraft has been vectored, so the leg it was on may
+  // be behind it now, and rejoining that one would turn it round.
+  const routeLeg = rejoinLeg(a)
+  const next = a.route[routeLeg]
+  return {
+    ok: true,
+    aircraft: {
+      ...a,
+      navMode: 'LNAV',
+      routeLeg,
+      // The vector is over. Leaving it on the record would show a heading
+      // on the strip that nothing is flying.
+      clearedHdg: null,
+      hold: null,
+    },
+    readback:
+      next === undefined
+        ? `${a.callsign} OWN NAVIGATION`
+        : `${a.callsign} OWN NAVIGATION DIRECT ${next.fix}`,
   }
 }
 

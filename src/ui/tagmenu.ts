@@ -293,6 +293,12 @@ export class TagMenu {
       case 'root':
         return [
           ...ROOT_ITEMS.map((item) => this.row(item.label, () => this.go(item.page), true)),
+          // Only for something with a plan to go back to. On an arrival the
+          // button would be permanently refused, and a control that never
+          // works is worse than no control.
+          ...(a.route.length > 0
+            ? [this.row('RESUME NAV', () => this.issue({ kind: 'resumeNav', callsign: a.callsign }))]
+            : []),
           this.row('HANDOFF', () => this.issue({ kind: 'handoff', callsign: a.callsign })),
         ]
 

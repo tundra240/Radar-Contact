@@ -9,6 +9,7 @@ import { autopilot, STANDARD_RATES, type Rates } from './autopilot'
 import { isControlled, type ControlZone } from './airspace'
 import { holdSteer, patternReachNM } from './hold'
 import { ilsGuidance } from './ils'
+import { routeComplete, routeGuidance } from './route'
 import type { Aircraft } from './types'
 
 /**
@@ -115,8 +116,11 @@ export function stepAircraft(
   rates: Rates = STANDARD_RATES,
 ): Aircraft {
   // An aircraft on an approach is flown by the approach, one in a hold by
-  // the pattern, and anything else by whatever the controller last said.
-  // The approach comes first because it is the one that ends the flight.
+  // the pattern, one on its own flight plan by the route, and anything else
+  // by whatever the controller last said. The approach comes first because
+  // it is the one that ends the flight, and the route comes last of the
+  // three because it is the only one the controller did not ask for -- a
+  // vector must always be able to take an aircraft off it.
   const guided = ilsGuidance(a)
 
   // Down and stopped. It keeps its last position for the tick it takes the
@@ -130,8 +134,17 @@ export function stepAircraft(
   // hold. Level and speed are untouched, because a hold is a track and not
   // a different aeroplane.
   const steer = guided === null ? holdSteer(a) : null
+  // Self-navigation, for an aircraft crossing the sector on its flight
+  // plan. Only consulted when nothing the controller said is flying it.
+  const nav = guided === null && steer === null ? routeGuidance(a) : null
   const flying =
-    guided !== null ? { ...a, ...guided } : steer === null ? a : { ...a, clearedHdg: steer }
+    guided !== null
+      ? { ...a, ...guided }
+      : steer !== null
+        ? { ...a, clearedHdg: steer }
+        : nav !== null
+          ? { ...a, ...nav }
+          : a
   const flown = autopilot(flying, dtSeconds, rates)
   // Through the air first, then carried by it.
   const throughAir = advancePosition(a.pos, a.hdg, flown.hdg, flown.iasKts, dtSeconds)
@@ -150,6 +163,10 @@ export function stepAircraft(
     // Whatever the approach decided about mode, track and level stands on
     // the record, or the next tick would start it over from armed.
     ...(guided ?? {}),
+    // And whatever the route decided, likewise -- a leg sequenced on this
+    // tick must stay sequenced, or the aircraft would fly at a fix it has
+    // already passed for ever.
+    ...(nav ?? {}),
     hdg: flown.hdg,
     altFt: flown.altFt,
     vsFpm: flown.vsFpm,
@@ -162,8 +179,16 @@ export function stepAircraft(
 }
 
 /** Distance flown over a step, in nautical miles. */
-/** Why an aircraft has come off the scope, or null while it is still on it. */
-export type Departure = 'landed' | 'left'
+/**
+ * Why an aircraft has come off the scope, or null while it is still on it.
+ *
+ * Three reasons, not two, and the third is the one that made this an
+ * enumeration worth having. An arrival that leaves the sector is one the
+ * controller lost. A transit that leaves the sector has done exactly what
+ * it appeared in order to do, and scoring it the same way would punish the
+ * controller for every aeroplane that was never theirs to land.
+ */
+export type Departure = 'landed' | 'left' | 'transited'
 
 /**
  * Inside the area of responsibility, and therefore the controller's to
@@ -202,13 +227,37 @@ export function departureOf(
   outerLimitNM = Number.POSITIVE_INFINITY,
 ): Departure | null {
   if (a.navMode === 'LANDED') return 'landed'
-  if (a.entered && !isInSector(a, zone) && !inItsHold(a)) return 'left'
+  if (a.entered && !isInSector(a, zone) && !inItsHold(a)) return gone(a)
   // A backstop for the other direction. Inbound traffic that turns away
   // never enters, so the rule above can never fire for it and it would fly
   // outward for ever, counted in the cap and drawn on a zoomed-out scope.
   // Nothing exists beyond the ring arrivals are released on.
-  if (distanceNM(ORIGIN_NM, a.pos) > outerLimitNM) return 'left'
+  if (distanceNM(ORIGIN_NM, a.pos) > outerLimitNM) return gone(a)
   return null
+}
+
+/**
+ * What it means that this aircraft is off the scope.
+ *
+ * The same event read two ways, according to what the aircraft was here
+ * for. Kept as one function rather than repeated at both call sites so the
+ * two can never drift apart -- which they did, briefly, and it cost fifty
+ * points every time a transit crossed the sector correctly.
+ */
+function gone(a: Aircraft): Departure {
+  return a.role === 'overflight' ? 'transited' : 'left'
+}
+
+/**
+ * Whether a transit has finished the route it appeared with.
+ *
+ * Not used to remove it -- the boundary does that, as it does for
+ * everything -- but to tell the controller that an aircraft still on the
+ * display no longer has a plan to follow, which is the one state a transit
+ * can get into that needs saying out loud.
+ */
+export function driftingOffPlan(a: Aircraft): boolean {
+  return a.role === 'overflight' && a.navMode === 'LNAV' && routeComplete(a)
 }
 
 /**

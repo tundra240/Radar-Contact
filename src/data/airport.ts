@@ -206,6 +206,51 @@ export interface TrafficConfig {
   readonly airlines: readonly Airline[]
 }
 
+/**
+ * One transit corridor: a route across the sector that is not this
+ * airport's traffic.
+ *
+ * Held as a list of published fixes and nothing else. Where the aircraft
+ * appears and where it leaves are not in the config, because they are not
+ * facts about the corridor -- they follow from the boundary, and writing
+ * them down would mean maintaining them every time the airspace changed.
+ * sim/overflight.ts projects the first and last legs out past the edge.
+ */
+export interface Corridor {
+  readonly id: string
+  readonly label: string
+  /** Published navaids, in the order they are flown. At least two. */
+  readonly via: readonly string[]
+  /** Where it is going, as an ICAO code. Never this field. */
+  readonly destination: string
+  readonly minAltFt: number
+  readonly maxAltFt: number
+  readonly speedKts: number
+  readonly weight: number
+  /** Operators that plausibly fly it. Empty falls back to all of them. */
+  readonly operators: readonly string[]
+}
+
+/**
+ * Traffic that crosses the sector without landing on it.
+ *
+ * Optional in the config, and absent means a field with no transits rather
+ * than an error: a quiet regional airport genuinely has none, and requiring
+ * the section would make every new airport file carry an empty one.
+ */
+export interface OverflightConfig {
+  readonly seed: number
+  readonly firstSpawnSeconds: number
+  readonly intervalSeconds: number
+  readonly intervalJitter: number
+  readonly maxConcurrent: number
+  /** How far outside the boundary a transit appears, along its own track. */
+  readonly entryDistanceNM: number
+  /** And how far past it the final leg runs, so it flies out rather than stopping. */
+  readonly exitDistanceNM: number
+  readonly corridors: readonly Corridor[]
+}
+
 export interface Navaid {
   readonly name: string
   readonly fullName: string
@@ -376,6 +421,8 @@ export interface Airport {
   readonly sector: Sector
   readonly render: RenderSettings
   readonly traffic: TrafficConfig
+  /** Transit corridors, or null for a field configured without any. */
+  readonly overflights: OverflightConfig | null
   readonly runways: readonly Runway[]
   readonly navaids: readonly Navaid[]
   readonly airports: readonly NeighbourAirport[]
@@ -559,6 +606,12 @@ export function loadAirport(raw: unknown): Airport {
     ),
   )
 
+  const overflights = parseOverflights(
+    root['overflights'],
+    new Set(rawNavaids.map((n) => n.name)),
+    new Set(traffic.airlines.map((a) => a.code)),
+  )
+
   assertUnique(runways.map((r) => r.id), 'runways[].id')
   assertUnique(rawNavaids.map((n) => n.name), 'navaids[].name')
   assertUnique(airports.map((a) => a.icao), 'airports[].icao')
@@ -622,6 +675,7 @@ export function loadAirport(raw: unknown): Airport {
     sector,
     render,
     traffic,
+    overflights,
     runways,
     navaids,
     airports,
@@ -752,6 +806,84 @@ function parseWeather(raw: unknown): WeatherSettings {
     driftSpeedSpread,
     shapeDriftDegPerMin,
     spreadNM,
+  }
+}
+
+/**
+ * The transit corridors, or null when the file carries none.
+ *
+ * Validated against the navaids for the same reason the airline routing
+ * tables are: a mistyped fix here would otherwise become a corridor that
+ * silently never generates, which is the worst way for a typo to behave.
+ */
+function parseOverflights(
+  raw: unknown,
+  knownNavaids: ReadonlySet<string>,
+  knownAirlines: ReadonlySet<string>,
+): OverflightConfig | null {
+  if (raw === undefined || raw === null) return null
+  const o = obj(raw, 'overflights')
+
+  const jitter = num(o['intervalJitter'], 'overflights.intervalJitter')
+  if (jitter < 0 || jitter >= 1) {
+    throw new ConfigError('overflights.intervalJitter', 'must be within 0..1')
+  }
+  const interval = num(o['intervalSeconds'], 'overflights.intervalSeconds')
+  if (interval <= 0) throw new ConfigError('overflights.intervalSeconds', 'must be positive')
+
+  const corridors = arr(o['corridors'], 'overflights.corridors').map((c, i) => {
+    const p = `overflights.corridors[${i}]`
+    const co = obj(c, p)
+
+    const via = arr(co['via'], `${p}.via`).map((v, j) => str(v, `${p}.via[${j}]`))
+    if (via.length < 2) {
+      // One fix is a point, not a route: there would be no track to
+      // project the entry and the exit from.
+      throw new ConfigError(`${p}.via`, 'must name at least two fixes')
+    }
+    for (const fix of via) {
+      if (!knownNavaids.has(fix)) {
+        throw new ConfigError(`${p}.via`, `references unknown navaid "${fix}"`)
+      }
+    }
+
+    const minAltFt = num(co['minAltFt'], `${p}.minAltFt`)
+    const maxAltFt = num(co['maxAltFt'], `${p}.maxAltFt`)
+    if (maxAltFt < minAltFt) {
+      throw new ConfigError(`${p}.maxAltFt`, 'must not be below minAltFt')
+    }
+
+    const operators = arr(co['operators'], `${p}.operators`).map((v, j) =>
+      str(v, `${p}.operators[${j}]`),
+    )
+    for (const code of operators) {
+      if (!knownAirlines.has(code)) {
+        throw new ConfigError(`${p}.operators`, `references unknown airline "${code}"`)
+      }
+    }
+
+    return {
+      id: str(co['id'], `${p}.id`),
+      label: str(co['label'], `${p}.label`),
+      via,
+      destination: str(co['destination'], `${p}.destination`),
+      minAltFt,
+      maxAltFt,
+      speedKts: num(co['speedKts'], `${p}.speedKts`),
+      weight: num(co['weight'], `${p}.weight`),
+      operators,
+    }
+  })
+
+  return {
+    seed: num(o['seed'], 'overflights.seed'),
+    firstSpawnSeconds: num(o['firstSpawnSeconds'], 'overflights.firstSpawnSeconds'),
+    intervalSeconds: interval,
+    intervalJitter: jitter,
+    maxConcurrent: num(o['maxConcurrent'], 'overflights.maxConcurrent'),
+    entryDistanceNM: num(o['entryDistanceNM'], 'overflights.entryDistanceNM'),
+    exitDistanceNM: num(o['exitDistanceNM'], 'overflights.exitDistanceNM'),
+    corridors,
   }
 }
 

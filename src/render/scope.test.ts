@@ -1183,6 +1183,10 @@ describe('traffic on the scope', () => {
         { x: 10, y: 10 },
       ],
       trailAt: 0,
+      role: 'arrival',
+      route: [],
+      routeLeg: 0,
+      destination: null,
       spawnedAt: 0,
       ...over,
     }
@@ -1332,6 +1336,10 @@ describe('a vector being dragged', () => {
       entered: true,
       trail: [],
       trailAt: 0,
+      role: 'arrival',
+      route: [],
+      routeLeg: 0,
+      destination: null,
       spawnedAt: 0,
       ...over,
     }

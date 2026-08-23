@@ -2,12 +2,15 @@ import type { Clock } from '../core/loop'
 import type { Vec2NM } from '../core/geo'
 import type { Atis } from './atis'
 import type { Score } from './score'
+import type { OverflightState } from './overflight'
 import type { SpawnerState } from './spawner'
+import { ROLES } from './types'
 import type {
   Aircraft,
   ApproachClearance,
   HoldClearance,
   NavMode,
+  RouteLeg,
 } from './types'
 import type { WakeCategory } from '../data/airport'
 
@@ -37,7 +40,7 @@ import type { WakeCategory } from '../data/airport'
  * Bumped whenever the shape changes. An older save is refused rather than
  * guessed at -- there is no migration path worth the bugs it would carry.
  */
-export const SAVE_VERSION = 4
+export const SAVE_VERSION = 5
 
 export interface SavedController {
   readonly initials: string
@@ -72,6 +75,12 @@ export interface SavedGame {
   readonly selected: string | null
   readonly traffic: readonly Aircraft[]
   readonly spawner: SpawnerState
+  /**
+   * The transit flow, or null for a save taken at a field with no
+   * corridors. Null rather than absent so a reader can tell "this airport
+   * has none" from "this save predates them", which version 5 also does.
+   */
+  readonly overflights: OverflightState | null
 }
 
 export type LoadResult =
@@ -79,6 +88,7 @@ export type LoadResult =
   | { readonly ok: false; readonly reason: string }
 
 const NAV_MODES: readonly NavMode[] = [
+  'LNAV',
   'HOLD',
   'VECTOR',
   'LOC_ARMED',
@@ -165,12 +175,22 @@ function parseApproach(v: unknown, path: string): ApproachClearance | null {
   }
 }
 
+/** One fix on a saved route: the name, and where it is. */
+function parseRouteLeg(v: unknown, path: string): RouteLeg {
+  const o = obj(v, path)
+  return {
+    fix: str(o['fix'], `${path}.fix`),
+    posNM: vec(o['posNM'], `${path}.posNM`),
+  }
+}
+
 function parseAircraft(v: unknown, path: string): Aircraft {
   const o = obj(v, path)
   return {
     callsign: str(o['callsign'], `${path}.callsign`),
     type: str(o['type'], `${path}.type`),
     wake: oneOf(o['wake'], `${path}.wake`, WAKES),
+    role: oneOf(o['role'], `${path}.role`, ROLES),
     pos: vec(o['pos'], `${path}.pos`),
     altFt: num(o['altFt'], `${path}.altFt`),
     hdg: num(o['hdg'], `${path}.hdg`),
@@ -183,7 +203,12 @@ function parseAircraft(v: unknown, path: string): Aircraft {
     navMode: oneOf(o['navMode'], `${path}.navMode`, NAV_MODES),
     clearedApproach: parseApproach(o['clearedApproach'], `${path}.clearedApproach`),
     hold: parseHold(o['hold'], `${path}.hold`),
+    route: arr(o['route'], `${path}.route`).map((l, i) =>
+      parseRouteLeg(l, `${path}.route[${i}]`),
+    ),
+    routeLeg: num(o['routeLeg'], `${path}.routeLeg`),
     originFix: nullableStr(o['originFix'], `${path}.originFix`),
+    destination: nullableStr(o['destination'], `${path}.destination`),
     entered: bool(o['entered'], `${path}.entered`),
     trail: arr(o['trail'], `${path}.trail`).map((p, i) => vec(p, `${path}.trail[${i}]`)),
     trailAt: num(o['trailAt'], `${path}.trailAt`),
@@ -216,6 +241,25 @@ function parseController(v: unknown): SavedController | null {
     initials: str(o['initials'], 'save.controller.initials'),
     position: str(o['position'], 'save.controller.position'),
     enforceAirspace: bool(o['enforceAirspace'], 'save.controller.enforceAirspace'),
+  }
+}
+
+function parseOverflights(v: unknown, path: string): OverflightState | null {
+  if (v === null || v === undefined) return null
+  const o = obj(v, path)
+  return {
+    seed: num(o['seed'], `${path}.seed`),
+    draws: num(o['draws'], `${path}.draws`),
+    sinceLastSpawn: num(o['sinceLastSpawn'], `${path}.sinceLastSpawn`),
+    waitSeconds: num(o['waitSeconds'], `${path}.waitSeconds`),
+    spawned: num(o['spawned'], `${path}.spawned`),
+    lastUsedAt: arr(o['lastUsedAt'], `${path}.lastUsedAt`).map((pair, i) => {
+      const p = `${path}.lastUsedAt[${i}]`
+      if (!Array.isArray(pair) || pair.length !== 2) {
+        return fail(p, 'must be a pair [id, seconds]') as never
+      }
+      return [str(pair[0], `${p}[0]`), num(pair[1], `${p}[1]`)] as const
+    }),
   }
 }
 
@@ -299,6 +343,7 @@ export function parseSavedGame(text: string, at: { readonly airport: string }): 
           points: num(score['points'], 'save.score.points'),
           landed: num(score['landed'], 'save.score.landed'),
           lost: num(score['lost'], 'save.score.lost'),
+          transited: num(score['transited'], 'save.score.transited'),
         },
         atis: parseAtis(o['atis'], 'save.atis'),
         controller: parseController(controller),
@@ -307,6 +352,7 @@ export function parseSavedGame(text: string, at: { readonly airport: string }): 
           parseAircraft(a, `save.traffic[${i}]`),
         ),
         spawner: parseSpawner(o['spawner'], 'save.spawner'),
+        overflights: parseOverflights(o['overflights'], 'save.overflights'),
       },
     }
   } catch (e) {

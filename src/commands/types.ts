@@ -16,6 +16,7 @@ export type Command =
   | { readonly kind: 'speed'; readonly callsign: string; readonly kts: number }
   | { readonly kind: 'approach'; readonly callsign: string; readonly runway: string }
   | { readonly kind: 'hold'; readonly callsign: string; readonly fix: string }
+  | { readonly kind: 'resumeNav'; readonly callsign: string }
   | { readonly kind: 'handoff'; readonly callsign: string }
 
 /** Where issued commands go. Day 2 points this at commands/apply.ts. */
@@ -34,6 +35,8 @@ export function describeCommand(c: Command): string {
       return `${c.callsign} CLEARED ILS ${c.runway}`
     case 'hold':
       return `${c.callsign} HOLD ${c.fix}`
+    case 'resumeNav':
+      return `${c.callsign} RESUME NAV`
     case 'handoff':
       return `${c.callsign} HANDOFF`
   }

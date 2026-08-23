@@ -86,6 +86,10 @@ function parked(
     entered: true,
     trail: [],
     trailAt: 0,
+    role: 'arrival',
+    route: [],
+    routeLeg: 0,
+    destination: null,
     spawnedAt: 0,
     ...over,
   }
@@ -621,6 +625,10 @@ describe('on command', () => {
         entered: true,
         trail: [],
         trailAt: 0,
+        role: 'arrival',
+        route: [],
+        routeLeg: 0,
+        destination: null,
         spawnedAt: 0,
       }),
     )

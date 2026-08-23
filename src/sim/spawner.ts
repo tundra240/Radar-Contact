@@ -78,7 +78,7 @@ export class Spawner {
   private readonly airport: Airport
   private rng: Rng
   private readonly fixes: readonly Navaid[]
-  private readonly flights: FlightGenerator
+  private readonly flightGen: FlightGenerator
 
   /** Simulated seconds banked since the last release. */
   private sinceLastSpawn = 0
@@ -100,10 +100,22 @@ export class Spawner {
     this.rng = opts.rng ?? makeRng(opts.seed ?? opts.airport.traffic.seed)
     // Only holds with an entry band: a navaid with neither is a fix on the
     // chart, not a place traffic arrives from.
-    this.flights = new FlightGenerator(opts.airport)
+    this.flightGen = new FlightGenerator(opts.airport)
     this.fixes = opts.airport.navaids.filter((n) => n.hold !== null && n.entry !== null)
     this.waitSeconds = opts.airport.traffic.firstSpawnSeconds
     this.airlines = new Map(opts.airport.traffic.airlines.map((a) => [a.code, a]))
+  }
+
+  /**
+   * The flight identity generator, shared rather than duplicated.
+   *
+   * Transits are generated elsewhere but drawn from the same pool of
+   * callsigns: two aircraft the controller cannot tell apart is the one
+   * failure a flight number has to avoid, and it does not care which
+   * module asked for it.
+   */
+  get flights(): FlightGenerator {
+    return this.flightGen
   }
 
   /**
@@ -135,7 +147,7 @@ export class Spawner {
       spawned: this.spawnCount,
       deferred: this.deferCount,
       lastUsedAt: [...this.lastUsedAt],
-      flights: this.flights.snapshot(),
+      flights: this.flightGen.snapshot(),
     }
   }
 
@@ -147,7 +159,7 @@ export class Spawner {
     this.deferCount = state.deferred
     this.lastUsedAt.clear()
     for (const [fix, at] of state.lastUsedAt) this.lastUsedAt.set(fix, at)
-    this.flights.restore(state.flights)
+    this.flightGen.restore(state.flights)
   }
 
   get spawned(): number {
@@ -247,7 +259,7 @@ export class Spawner {
     // Done only once a slot is known to exist, so a release that gets held
     // back never burns a callsign: the issued set is session-long, and a
     // name spent on a spawn that did not happen is a name gone for good.
-    const flight = this.flights.next(this.rng, new Set(existing.map((a) => a.callsign)))
+    const flight = this.flightGen.next(this.rng, new Set(existing.map((a) => a.callsign)))
     const slot = this.chooseSlot(slots, flight.airline)
 
     const aircraft = this.build(slot, flight, clock)
@@ -478,6 +490,11 @@ export class Spawner {
       navMode: hold === null ? 'VECTOR' : 'HOLD',
       clearedApproach: null,
       hold,
+      role: 'arrival',
+      // Arrivals are vectored, not self-navigating: no route to fly.
+      route: [],
+      routeLeg: 0,
+      destination: null,
       originFix: fix.name,
       // Released outside the boundary: it is not the controller's yet.
       entered: false,

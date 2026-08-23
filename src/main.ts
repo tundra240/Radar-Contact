@@ -25,6 +25,7 @@ import {
   serialise,
   type SavedGame,
 } from './sim/savegame'
+import { Overflights } from './sim/overflight'
 import { Spawner } from './sim/spawner'
 import type { Aircraft } from './sim/types'
 import type { Command } from './commands/types'
@@ -761,6 +762,15 @@ function start(
   // The spawner owns the arrival flow; this list is the world until there
   // is a world module to own it.
   const spawner = new Spawner({ airport, seed: seedFromUrl() ?? Date.now() })
+  // Traffic that is not this field's: neighbours' inbounds crossing a
+  // corner of the airspace, and continental flights over the top of it.
+  // Sharing the spawner's flight generator, so no transit can be issued a
+  // callsign an arrival is already using.
+  const overflights = new Overflights({
+    airport,
+    flights: spawner.flights,
+    seed: seedFromUrl() ?? Date.now(),
+  })
   let traffic: readonly Aircraft[] = []
 
   // Landing and handoff are Day 2 and 3 work. Until then, crossing the area
@@ -924,6 +934,7 @@ function start(
       selected,
       traffic: [...traffic],
       spawner: spawner.snapshot(),
+      overflights: overflights.snapshot(),
     }
 
     try {
@@ -969,6 +980,7 @@ function start(
     selected = game.selected
     controller = game.controller
     spawner.restore(game.spawner)
+    if (game.overflights !== null) overflights.restore(game.overflights)
     loop.setTicks(game.clock.ticks)
 
     // Loaded paused, always. Dropping a controller into moving traffic they
@@ -1191,6 +1203,14 @@ function start(
             `${a.callsign} landed ${a.clearedApproach?.runway ?? ''} ${worth}`.replace('  ', ' '),
             'readback',
           )
+        } else if (departure === 'transited') {
+          // Noted, not refused. A transit leaving is the whole of what a
+          // transit does, and a log that scolded the controller for it
+          // would be teaching them the wrong lesson.
+          announce(
+            `${a.callsign} cleared the sector${a.destination === null ? '' : ` for ${a.destination}`}`,
+            'readback',
+          )
         } else {
           // Refused rather than noted: an arrival that leaves the sector
           // unlanded is one you lost, and the log should read like it.
@@ -1201,7 +1221,11 @@ function start(
       // The spawner sees the world as it is after the step, so a fix that
       // has just been vacated is available again on the same tick.
       const arrivals = spawner.update(dt, clock, flown)
-      traffic = arrivals.length > 0 ? [...flown, ...arrivals] : flown
+      // And the transits see the arrivals, so their own cap counts what is
+      // really on the display.
+      const withArrivals = arrivals.length > 0 ? [...flown, ...arrivals] : flown
+      const crossing = overflights.update(dt, clock, withArrivals)
+      traffic = crossing.length > 0 ? [...withArrivals, ...crossing] : withArrivals
 
       // Do not keep pointing at an aircraft that has left.
       if (selected !== null && !traffic.some((a) => a.callsign === selected)) {

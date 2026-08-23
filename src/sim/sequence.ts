@@ -66,6 +66,12 @@ export function buildSequence(
   traffic: readonly Aircraft[],
   field: Vec2NM = FIELD,
 ): ArrivalSequence {
+  // Arrivals only. A transit is on the same display and in the same
+  // airspace, but it is not in the landing order, and letting one into
+  // this list would do real damage: it would take a place in the sequence,
+  // and the aircraft behind it would be spaced against an aeroplane that
+  // is not going to land.
+  traffic = traffic.filter((a) => a.role !== 'overflight')
   // `entered` rather than a distance: the bay must not need to know where
   // the boundary is, and the flag is already the answer to this question.
   const arriving = traffic.filter((a) => !a.entered)

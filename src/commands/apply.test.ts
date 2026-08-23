@@ -33,6 +33,10 @@ const base: Aircraft = {
   entered: true,
   trail: [],
   trailAt: 0,
+  role: 'arrival',
+  route: [],
+  routeLeg: 0,
+  destination: null,
   spawnedAt: 0,
 }
 
@@ -558,5 +562,84 @@ describe('a session with the airspace rule switched off', () => {
     }
     expect(why({ kind: 'altitude', callsign: 'BAW178', ft: 99000 })).toContain('cannot be cleared')
     expect(why({ kind: 'speed', callsign: 'BAW178', kts: 40 })).toContain('will not fly below')
+  })
+})
+
+describe('resuming own navigation', () => {
+  /** A transit on a route running east, currently being vectored off it. */
+  const transit: Aircraft = {
+    ...base,
+    callsign: 'EZY42',
+    role: 'overflight',
+    destination: 'EGKK',
+    navMode: 'VECTOR',
+    clearedHdg: 360,
+    route: [
+      { fix: 'ALPHA', posNM: { x: 0, y: 0 } },
+      { fix: 'BRAVO', posNM: { x: 10, y: 0 } },
+    ],
+    routeLeg: 0,
+    pos: { x: -8, y: 4 },
+  }
+
+  const nav = (a: Aircraft) =>
+    applyCommand({ kind: 'resumeNav', callsign: a.callsign }, a, ctx)
+
+  it('hands the aeroplane back to its flight plan', () => {
+    const out = nav(transit)
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(out.aircraft.navMode).toBe('LNAV')
+    // The vector is over, so nothing on the strip should still show one.
+    expect(out.aircraft.clearedHdg).toBeNull()
+    expect(out.readback).toContain('OWN NAVIGATION')
+    expect(out.readback).toContain('ALPHA')
+  })
+
+  it('rejoins forwards when the vector took it past a fix', () => {
+    // The one thing it must never do is turn the aeroplane round.
+    const past = { ...transit, pos: { x: 8, y: 2 } }
+    const out = nav(past)
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(out.aircraft.routeLeg).toBe(1)
+    expect(out.readback).toContain('BRAVO')
+  })
+
+  it('refuses an aircraft with no route, and says why', () => {
+    // An arrival is being vectored to a runway. That is the job, not a
+    // detour from a plan it could be given back.
+    const out = nav({ ...base, route: [] })
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect(out.reason).toContain('no route')
+  })
+
+  it('refuses one established on an approach', () => {
+    // Taking it off the beam as a side effect would be exactly the sort of
+    // surprise a refusal exists to prevent. Vector it off first.
+    const out = nav({ ...transit, navMode: 'GS_TRACKING' })
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect(out.reason).toContain('approach')
+  })
+
+  it('is refused outside the area of responsibility like anything else', () => {
+    const out = nav({ ...transit, entered: false, pos: { x: 200, y: 200 } })
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect(out.reason).toContain('not in your airspace')
+  })
+
+  it('can be typed as well as clicked', () => {
+    for (const line of ['EZY42 NAV', 'EZY42 RESUME', 'EZY42 OWNNAV']) {
+      const parsed = parseCommandLine(line, {
+        callsigns: ['EZY42'],
+        selected: null,
+      })
+      expect(parsed.ok, line).toBe(true)
+      if (!parsed.ok) continue
+      expect(parsed.commands[0]?.kind, line).toBe('resumeNav')
+    }
   })
 })

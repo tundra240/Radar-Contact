@@ -50,6 +50,19 @@ const UNCONTROLLED_ALPHA = 0.45
 
 const alphaFor = (a: Aircraft): number => (a.entered ? 1 : UNCONTROLLED_ALPHA)
 
+/**
+ * The ink a target is drawn in when nothing else is claiming it.
+ *
+ * Transits get a colour of their own rather than a fainter version of the
+ * arrival colour, because faintness on this display already means something
+ * else: it is how a target says it is outside the area of responsibility.
+ * Using it for a second thing would leave the controller unable to tell an
+ * aeroplane that is not theirs yet from one that is theirs and is not
+ * landing -- which are opposite situations calling for opposite responses.
+ */
+const inkFor = (a: Aircraft): string =>
+  a.role === 'overflight' ? theme.overflight : theme.target
+
 /* The data block's metrics, shared by the draw and the hit test. */
 const BLOCK_FONT_PX = 10
 const BLOCK_LINE_PX = 11
@@ -113,7 +126,9 @@ function drawTrail(
 ): void {
   if (a.trail.length === 0) return
 
-  g.fillStyle = theme.trail
+  // The history is drawn in the target's own ink, so a transit's trail
+  // does not read as an arrival's.
+  g.fillStyle = a.role === 'overflight' ? theme.overflight : theme.trail
   const oldest = a.trail.length
   for (let i = 0; i < a.trail.length; i += 1) {
     const age = (i + 1) / oldest
@@ -138,7 +153,7 @@ function drawTarget(
   // target stays the same size and shape as every other one. An aircraft
   // asking to get out of the weather overrides both: it is the one thing on
   // the display that wants doing something about.
-  const ink = alerting ? theme.warn : isSelected ? theme.accent : theme.target
+  const ink = alerting ? theme.warn : isSelected ? theme.accent : inkFor(a)
 
   // The ring goes down first so the target and its vector sit inside it.
   if (isSelected) {
@@ -194,7 +209,11 @@ export function blockLines(a: Aircraft, alerting = false): readonly string[] {
   // a glance and a line that appears and disappears moves everything under
   // it.
   const flags = `${isHeavy(a.wake) ? ' H' : ''}${alerting ? ' WX' : ''}`
-  return [`${a.callsign}${flags}`, level, `${speed} ${a.type}`]
+  // Where a transit is going, on the line that already carries the type.
+  // It is the whole reason the aeroplane is not the controller's problem,
+  // and the colour says "not yours" without saying whose.
+  const bound = a.destination === null ? '' : ` ${a.destination}`
+  return [`${a.callsign}${flags}`, level, `${speed} ${a.type}${bound}`]
 }
 
 /**

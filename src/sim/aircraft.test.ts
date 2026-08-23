@@ -43,6 +43,10 @@ const base: Aircraft = {
   entered: true,
   trail: [],
   trailAt: 0,
+  role: 'arrival',
+  route: [],
+  routeLeg: 0,
+  destination: null,
   spawnedAt: 0,
 }
 
@@ -577,6 +581,10 @@ describe('an aircraft flying the hold it was cleared to', () => {
     clearedApproach: null,
     entered: true,
     originFix: 'BNN',
+    role: 'arrival',
+    route: [],
+    routeLeg: 0,
+    destination: null,
     spawnedAt: 0,
     trail: [],
     trailAt: 0,

@@ -65,6 +65,21 @@ export interface Palette {
    * quieter, so a history never competes with the target it belongs to.
    */
   readonly target: string
+  /**
+   * Traffic crossing the sector that is not this field's.
+   *
+   * A different ink rather than a fainter one, and that is the whole point.
+   * Dimness already means something here -- it is how the display says an
+   * aircraft is outside the area of responsibility -- so dimming a transit
+   * would say "not yours yet" about an aeroplane that is yours and simply
+   * is not landing. Hue carries what alpha cannot.
+   *
+   * Still held to the same legibility as an arrival, because the level on a
+   * transit is read exactly as often: it is the number that says whether it
+   * matters. Quieter than an arrival all the same, since between the two of
+   * them the arrival is the job.
+   */
+  readonly overflight: string
   readonly trail: string
 
   readonly neighbour: string
@@ -193,6 +208,7 @@ export const palettes = {
     // VGA dark green: the one bold ink the rest of this palette leaves
     // free, so traffic cannot be mistaken for a runway or a boundary.
     target: '#0e4a1c',
+    overflight: '#3a4a75',
     trail: '#5f7a66',
 
     neighbour: '#46422f',
@@ -257,6 +273,7 @@ export const palettes = {
     wxHeavy: '#e0452f',
 
     target: '#40ff80',
+    overflight: '#8aa9c4',
     trail: '#217a42',
 
     neighbour: '#5a6b7a',
@@ -335,6 +352,7 @@ export const palettes = {
     wxHeavy: '#e05555',
 
     target: '#5cf0b8',
+    overflight: '#8fa8bc',
     trail: '#2a7f68',
 
     neighbour: '#5f8f92',
@@ -409,6 +427,7 @@ export const palettes = {
     wxHeavy: '#b0231f',
 
     target: '#052c34',
+    overflight: '#33465c',
     trail: '#7ba0a6',
 
     neighbour: '#456a6d',

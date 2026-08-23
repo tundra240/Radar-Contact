@@ -140,6 +140,24 @@ function luminance(hex: string): number {
   )
 }
 
+/**
+ * Hue in degrees, for asking whether two inks are actually different
+ * colours rather than two brightnesses of one.
+ */
+function hueOf(hex: string): number {
+  const n = parseInt(hex.slice(1), 16)
+  const r = ((n >> 16) & 255) / 255
+  const g = ((n >> 8) & 255) / 255
+  const b = (n & 255) / 255
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const d = max - min
+  if (d === 0) return 0
+  const h =
+    max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return (h * 60 + 360) % 360
+}
+
 function contrast(a: string, b: string): number {
   const la = luminance(a)
   const lb = luminance(b)
@@ -198,6 +216,26 @@ describe('palette legibility', () => {
         // Traffic is read more often than anything else on the display, so
         // it is held to the text threshold rather than the symbol one.
         expect(contrast(p.target, p.bg), 'target').toBeGreaterThanOrEqual(4.5)
+      })
+
+      it('draws traffic that is not yours in its own ink, not in a fainter one', () => {
+        // Held to the traffic threshold: a transit's level is read as often
+        // as an arrival's, because it is the number that says whether the
+        // aeroplane matters.
+        expect(contrast(p.overflight, p.bg), 'overflight').toBeGreaterThanOrEqual(4.5)
+        // And quieter than an arrival, because between the two of them the
+        // arrival is the job.
+        expect(
+          contrast(p.overflight, p.bg),
+          'overflight louder than target',
+        ).toBeLessThan(contrast(p.target, p.bg))
+        // Not merely a dimmer version of the same colour. Dimness already
+        // means "outside the area of responsibility" on this display, so a
+        // transit has to differ in hue or it says the wrong thing.
+        expect(hueOf(p.overflight), 'overflight shares the target hue').not.toBeCloseTo(
+          hueOf(p.target),
+          -1,
+        )
       })
 
       it('keeps the trail visible but quieter than the target', () => {

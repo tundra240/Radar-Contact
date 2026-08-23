@@ -15,15 +15,21 @@ import type { TurnDirection, WakeCategory } from '../data/airport'
  */
 
 /**
- * Where an aircraft is in its arrival, as a state machine rather than a
+ * Where an aircraft is in its flight, as a state machine rather than a
  * pile of booleans.
  *
  *   SPAWN -> HOLD <-> VECTOR -> LOC_ARMED -> LOC_CAPTURED
  *                                                |
  *                                                v
  *              GO_AROUND <----------- GS_TRACKING -> LANDED -> HANDOFF
+ *
+ * LNAV sits outside that chain, because it is the one state the controller
+ * does not put an aircraft into by talking to it. An aircraft crossing the
+ * sector on its own flight plan is in LNAV from the moment it appears; a
+ * vector takes it out, and RESUME NAV puts it back. See sim/route.ts.
  */
 export type NavMode =
+  | 'LNAV'
   | 'HOLD'
   | 'VECTOR'
   | 'LOC_ARMED'
@@ -77,6 +83,35 @@ export interface ApproachClearance {
 }
 
 /**
+ * One point on a route, with its position carried alongside its name.
+ *
+ * The position travels with the clearance for the same reason the hold's
+ * and the approach's do: it is what lets the flight model fly a route
+ * without knowing that a chart exists.
+ */
+export interface RouteLeg {
+  readonly fix: string
+  readonly posNM: Vec2NM
+}
+
+/** A flight plan, as far as this sector is concerned: fixes in order. */
+export type Route = readonly RouteLeg[]
+
+/**
+ * What an aircraft is here to do.
+ *
+ * The sector had one kind of traffic and therefore did not need this. It
+ * now has two, and almost every rule that matters differs between them: an
+ * arrival is sequenced, spaced and landed, and a transit is none of those
+ * things -- it crosses and leaves, and leaving is a success rather than
+ * the way you lose one.
+ */
+export type FlightRole = 'arrival' | 'overflight'
+
+/** Every role, for the save file's validator. */
+export const ROLES = ['arrival', 'overflight'] as const
+
+/**
  * Beyond this from its fix, an aircraft carrying a hold is still on its way
  * there rather than established in the pattern.
  *
@@ -95,6 +130,8 @@ export interface Aircraft {
   readonly callsign: string
   readonly type: string
   readonly wake: WakeCategory
+  /** Arrival or transit. See FlightRole. */
+  readonly role: FlightRole
 
   /* ACTUAL state -- what the radar sees */
   readonly pos: Vec2NM
@@ -124,10 +161,30 @@ export interface Aircraft {
   readonly clearedApproach: ApproachClearance | null
   /** The pattern being flown while `navMode` is HOLD, and null otherwise. */
   readonly hold: HoldClearance | null
+  /**
+   * The filed route. Empty for an arrival, which is vectored rather than
+   * self-navigating, and the whole crossing for a transit.
+   *
+   * Kept whole rather than consumed as it is flown, so the fixes already
+   * passed are still there to be read back -- and so RESUME NAV after a
+   * long vector has something to rejoin.
+   */
+  readonly route: Route
+  /** How far down `route` the aircraft has got. Its length once finished. */
+  readonly routeLeg: number
 
   /* bookkeeping */
   /** The feeder fix this arrival entered on. */
   readonly originFix: string | null
+  /**
+   * Where a transit is going, as an ICAO code, and null for an arrival --
+   * which is going here.
+   *
+   * On the strip and in the data block it is the whole reason the aircraft
+   * is not the controller's problem: "EGKK" says at a glance that this one
+   * is somebody else's arrival passing through.
+   */
+  readonly destination: string | null
   /**
    * Whether this aircraft has been inside the area of responsibility yet.
    *
@@ -173,6 +230,13 @@ export function modeC(altFt: number): string {
  */
 export function statusText(a: Aircraft): string {
   switch (a.navMode) {
+    case 'LNAV': {
+      // The fix it is going to, because that is the question asked of a
+      // transit: not what it was told, but where it will be.
+      const next = a.route[a.routeLeg]
+      if (next === undefined) return a.destination === null ? 'OWN NAV' : `OWN NAV ${a.destination}`
+      return `VIA ${next.fix}`
+    }
     case 'HOLD': {
       // The hold it was sent to, not the one it arrived over -- they are
       // usually the same fix and occasionally are not.

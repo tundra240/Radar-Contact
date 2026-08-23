@@ -40,6 +40,7 @@ const VERBS = {
   APPROACH: ['APPROACH', 'ILS'],
   HOLD: ['HOLD'],
   HANDOFF: ['HANDOFF', 'HO'],
+  RESUME_NAV: ['NAV', 'RESUME', 'OWNNAV'],
 } as const
 
 type Verb = keyof typeof VERBS
@@ -50,7 +51,7 @@ for (const [verb, spellings] of Object.entries(VERBS)) {
 }
 
 /** The instructions that take no argument. */
-const NULLARY = new Set<Verb>(['HANDOFF'])
+const NULLARY = new Set<Verb>(['HANDOFF', 'RESUME_NAV'])
 
 /**
  * Altitudes are written either as hundreds of feet or as feet, which is how
@@ -148,7 +149,13 @@ export function parseCommandLine(line: string, ctx: ParseContext): ParseResult {
     at += 1
 
     if (NULLARY.has(verb)) {
-      commands.push({ kind: 'handoff', callsign })
+      // Through the builder like everything else. This branch used to write
+      // the handoff command directly, which was harmless while HANDOFF was
+      // the only instruction taking no argument and turned every later one
+      // into a handoff the moment it was not.
+      const built = build(verb, '', callsign)
+      if (!built.ok) return built
+      commands.push(built.command)
       continue
     }
 
@@ -209,8 +216,13 @@ function build(
     case 'HOLD':
       return { ok: true, command: { kind: 'hold', callsign, fix: value } }
 
+    // No argument: handing an aircraft back to its own flight plan is the
+    // one clearance that does not need a number, because the number is
+    // already on the aeroplane.
+    case 'RESUME_NAV':
+      return { ok: true, command: { kind: 'resumeNav', callsign } }
+
     case 'HANDOFF':
-      // Handled by the caller, which knows it takes no value.
       return { ok: true, command: { kind: 'handoff', callsign } }
   }
 }

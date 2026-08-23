@@ -17310,7 +17310,8 @@
       "The River Thames is from the VATSIM UK Sector File, Misc Geo/Rivers.txt. That file is an unlabelled pile of 4438 segments -- every line ends in the colour name \"river\" and nothing identifies the watercourse -- so the segments were chained on shared endpoints into 35 polylines and the Thames was identified by geometry: exactly one chain passes within a mile of Windsor, Richmond, Westminster, Tower Bridge, Woolwich and Gravesend. The per-point widths in metres are APPROXIMATE, interpolated along the line from a table of real widths at fifteen known places (25 m at Oxford to 5 km off Canvey); the source carries no width at all.",
       "The aerodrome list was extended outwards from the original fifteen within 40 NM: every large airport within 100 NM and every medium one within 90 NM that OurAirports records a runway for, which adds twenty-five fields including London Southend, Southampton, Bournemouth, Cambridge, Birmingham and Bristol. Small aerodromes were deliberately left alone -- the close-in strips were curated by hand and there are hundreds of farm strips at that size. Each runway bearing is computed from the two published threshold coordinates rather than taken from the heading column, which is often blank and sometimes magnetic."
     ],
-    "airspace": "Airspace boundaries are from the VATSIM UK Sector File (github.com/VATSIM-UK/UK-Sector-File), licensed GPL-3.0. See ATTRIBUTION.md. Retrieved 2026-08-21."
+    "airspace": "Airspace boundaries are from the VATSIM UK Sector File (github.com/VATSIM-UK/UK-Sector-File), licensed GPL-3.0. See ATTRIBUTION.md. Retrieved 2026-08-21.",
+    "overflights": "The transit corridors are constructed for the simulation, not published routings. Every fix on them is a navaid published in this file; the sequence of fixes, the levels and the operators are invented to give the sector plausible neighbour traffic."
   },
   "traffic": {
     "seed": 20260821,
@@ -17785,5 +17786,132 @@
     ],
     "entrySpeedKts": 220,
     "entryDistanceNM": 8
+  },
+  "overflights": {
+    "seed": 20260823,
+    "firstSpawnSeconds": 150,
+    "intervalSeconds": 220,
+    "intervalJitter": 0.4,
+    "maxConcurrent": 5,
+    "entryDistanceNM": 6,
+    "exitDistanceNM": 10,
+    "corridors": [
+      {
+        "id": "KK-EAST",
+        "label": "Gatwick inbound, eastern side",
+        "via": [
+          "DET",
+          "MAY"
+        ],
+        "destination": "EGKK",
+        "minAltFt": 10000,
+        "maxAltFt": 14000,
+        "speedKts": 280,
+        "weight": 3,
+        "operators": [
+          "EZY",
+          "TOM",
+          "BAW"
+        ]
+      },
+      {
+        "id": "KK-WEST",
+        "label": "Gatwick inbound, western side",
+        "via": [
+          "BNN",
+          "OCK",
+          "MID"
+        ],
+        "destination": "EGKK",
+        "minAltFt": 11000,
+        "maxAltFt": 15000,
+        "speedKts": 280,
+        "weight": 3,
+        "operators": [
+          "EZY",
+          "TOM",
+          "BAW"
+        ]
+      },
+      {
+        "id": "GW-NORTH",
+        "label": "Luton inbound across the north",
+        "via": [
+          "BKY",
+          "BPK",
+          "BNN"
+        ],
+        "destination": "EGGW",
+        "minAltFt": 8000,
+        "maxAltFt": 12000,
+        "speedKts": 260,
+        "weight": 3,
+        "operators": [
+          "EZY",
+          "TOM"
+        ]
+      },
+      {
+        "id": "SS-NORTH",
+        "label": "Stansted inbound across the north",
+        "via": [
+          "BNN",
+          "BPK",
+          "LAM"
+        ],
+        "destination": "EGSS",
+        "minAltFt": 8000,
+        "maxAltFt": 12000,
+        "speedKts": 260,
+        "weight": 3,
+        "operators": [
+          "EZY",
+          "TOM"
+        ]
+      },
+      {
+        "id": "TRANSIT-EAST",
+        "label": "Continental transit, westerly to easterly",
+        "via": [
+          "CPT",
+          "LON",
+          "DET"
+        ],
+        "destination": "EBBR",
+        "minAltFt": 14000,
+        "maxAltFt": 19000,
+        "speedKts": 320,
+        "weight": 2,
+        "operators": [
+          "DLH",
+          "AFR",
+          "KLM",
+          "SWR",
+          "TAP",
+          "IBE"
+        ]
+      },
+      {
+        "id": "TRANSIT-WEST",
+        "label": "Continental transit, easterly to westerly",
+        "via": [
+          "DET",
+          "LON",
+          "CPT"
+        ],
+        "destination": "EIDW",
+        "minAltFt": 14000,
+        "maxAltFt": 19000,
+        "speedKts": 320,
+        "weight": 2,
+        "operators": [
+          "EIN",
+          "DLH",
+          "AFR",
+          "KLM",
+          "SWR"
+        ]
+      }
+    ]
   }
 }
