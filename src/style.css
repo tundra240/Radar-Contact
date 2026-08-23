@@ -1680,6 +1680,12 @@ canvas {
   top: 0;
   right: auto;
   left: calc(100% + 1px);
+  /* Above the rail. The tools are positioned siblings, so any of them later
+     in the markup paints over a panel that has not claimed a layer -- which
+     is why the guide button sat on top of the open options panel while the
+     ATIS board, which had a z-index of its own, was fine. Stated here so
+     every panel gets it rather than whichever one was debugged. */
+  z-index: 50;
   /* Never wider than the glass, whichever side it lands on. */
   max-width: calc(100vw - 44px);
 }
