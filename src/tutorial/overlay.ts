@@ -42,11 +42,20 @@ export interface CardView {
   readonly text: string
   /** The button's words, or null for a step that advances on an action. */
   readonly button: string | null
+  /**
+   * Whether to offer a way past this step without doing it.
+   *
+   * Only on the steps that ask for something. A step that advances on a
+   * button already has a control that moves you on, and a second one
+   * beside it doing the same thing is a choice with no answer.
+   */
+  readonly skippable: boolean
 }
 
 export interface OverlayOptions {
   readonly mount: HTMLElement
   readonly onContinue: () => void
+  readonly onSkip: () => void
   readonly onExit: () => void
 }
 
@@ -64,6 +73,7 @@ export class TutorialOverlay {
   private readonly counterEl: HTMLDivElement
   private readonly textEl: HTMLParagraphElement
   private readonly buttonEl: HTMLButtonElement
+  private readonly skipEl: HTMLButtonElement
   private readonly toastEl: HTMLDivElement
   private toastTimer: number | null = null
   private readonly maskId: string
@@ -138,16 +148,28 @@ export class TutorialOverlay {
     this.textEl = document.createElement('p')
     this.textEl.className = 'tutorial-text'
 
+    const actions = document.createElement('div')
+    actions.className = 'tutorial-actions'
+
     this.buttonEl = document.createElement('button')
     this.buttonEl.type = 'button'
     this.buttonEl.className = 'tutorial-continue'
     this.buttonEl.addEventListener('click', () => opts.onContinue())
 
+    this.skipEl = document.createElement('button')
+    this.skipEl.type = 'button'
+    this.skipEl.className = 'tutorial-skip'
+    this.skipEl.textContent = 'Skip this step'
+    this.skipEl.title = 'Carry this step out and move on'
+    this.skipEl.addEventListener('click', () => opts.onSkip())
+
+    actions.append(this.buttonEl, this.skipEl)
+
     this.toastEl = document.createElement('div')
     this.toastEl.className = 'tutorial-toast'
     this.toastEl.hidden = true
 
-    this.card.append(head, this.titleEl, this.textEl, this.buttonEl, this.toastEl)
+    this.card.append(head, this.titleEl, this.textEl, actions, this.toastEl)
     this.root.append(this.svg, this.card)
     opts.mount.appendChild(this.root)
   }
@@ -181,6 +203,7 @@ export class TutorialOverlay {
     // pressing, and the instruction already says what to do.
     this.buttonEl.hidden = view.button === null
     this.buttonEl.textContent = view.button ?? ''
+    this.skipEl.hidden = !view.skippable
   }
 
   /**

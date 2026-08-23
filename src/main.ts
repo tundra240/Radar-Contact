@@ -1370,6 +1370,14 @@ function start(
         paintTools()
       },
       elapsedSeconds: () => loop.clock.elapsedSeconds,
+      // Through the same gate as the console, the menu and the drag: a step
+      // carried out on the player's behalf is refused for the same reasons
+      // and read back the same way as one they issued themselves.
+      issue: (command) => issue([command]),
+      select: (callsign) => {
+        setSelected(callsign)
+        syncStrips()
+      },
       screenOf: (at) => cam.worldToScreen(at),
       changed: () => {
         syncStrips()

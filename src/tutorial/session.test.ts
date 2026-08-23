@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { Speed } from '../core/loop'
 import { loadAirport } from '../data/airport'
 import raw from '../data/egll.json'
+import type { Command } from '../commands/types'
 import type { Aircraft } from '../sim/types'
 import type { WeatherCell } from '../sim/weather'
 import { BASICS } from './lessons/basics'
@@ -26,6 +27,9 @@ function stubWorld(): TutorialWorld & {
     speed: Speed
     changes: number
     said: string[]
+    /** Clearances the lesson issued on the player's behalf. */
+    issued: Command[]
+    selected: (string | null)[]
   }
 } {
   const state = {
@@ -35,6 +39,8 @@ function stubWorld(): TutorialWorld & {
     speed: 1 as Speed,
     changes: 0,
     said: [] as string[],
+    issued: [] as Command[],
+    selected: [] as (string | null)[],
   }
   return {
     state,
@@ -53,6 +59,26 @@ function stubWorld(): TutorialWorld & {
       state.speed = s
     },
     elapsedSeconds: () => 0,
+    issue: (command) => {
+      state.issued.push(command)
+      // The world would actually change; the parts of it the tests look at
+      // are the clearance itself and where the aircraft ends up, so the
+      // aircraft is updated just enough to be believable.
+      state.traffic = state.traffic.map((a) =>
+        a.callsign !== command.callsign
+          ? a
+          : command.kind === 'heading'
+            ? { ...a, clearedHdg: command.deg, navMode: 'VECTOR' }
+            : command.kind === 'altitude'
+              ? { ...a, clearedAltFt: command.ft }
+              : command.kind === 'speed'
+                ? { ...a, clearedSpdKts: command.kts }
+                : a,
+      )
+    },
+    select: (callsign) => {
+      state.selected.push(callsign)
+    },
     screenOf: (at) => ({ x: 400 + at.x * 8, y: 300 - at.y * 8 }),
     changed: () => {
       state.changes += 1
@@ -430,5 +456,95 @@ describe('the spotlight', () => {
     const { tutorial } = session()
     tutorial.layout()
     expect(tutorial.element.querySelectorAll('.tutorial-ring')).toHaveLength(0)
+  })
+})
+
+describe('skipping a step', () => {
+  /** Press the skip button on the card. */
+  const skip = (t: TutorialSession): void =>
+    void t.element.querySelector<HTMLButtonElement>('.tutorial-skip')?.click()
+
+  it('is offered on a step that asks for something', () => {
+    const { tutorial } = session()
+    tutorial.start()
+    // The welcome step has a Continue button, which already moves you on.
+    expect(tutorial.element.querySelector<HTMLElement>('.tutorial-skip')?.hidden).toBe(true)
+    tutorial.element.querySelector<HTMLButtonElement>('.tutorial-continue')?.click()
+    tutorial.element.querySelector<HTMLButtonElement>('.tutorial-continue')?.click()
+    // The inbound step wants a rate change, so there is something to skip.
+    expect(tutorial.element.querySelector<HTMLElement>('.tutorial-skip')?.hidden).toBe(false)
+  })
+
+  it('moves on', () => {
+    const { tutorial } = session()
+    tutorial.start()
+    tutorial.element.querySelector<HTMLButtonElement>('.tutorial-continue')?.click()
+    tutorial.element.querySelector<HTMLButtonElement>('.tutorial-continue')?.click()
+    const at = tutorial.stepIndex
+    skip(tutorial)
+    expect(tutorial.stepIndex).toBe(at + 1)
+  })
+
+  it('carries the step out rather than jumping over it', () => {
+    // The whole point. A step skipped by only advancing leaves the
+    // aeroplane where it was, and the steps after it then ask for things
+    // that cannot work from there.
+    const { tutorial, world } = session()
+    tutorial.start()
+    const press = (): void =>
+      void tutorial.element.querySelector<HTMLButtonElement>('.tutorial-continue')?.click()
+    press()
+    press()
+    // Rate step: skipping it should actually set the rate.
+    skip(tutorial)
+    expect(world.state.speed).toBe(4)
+  })
+
+  it('issues the clearances a step was asking for', () => {
+    const { tutorial, world } = session()
+    tutorial.start()
+    const press = (): void =>
+      void tutorial.element.querySelector<HTMLButtonElement>('.tutorial-continue')?.click()
+    press()
+    press()
+    skip(tutorial) // rate
+    skip(tutorial) // hold -- nothing to carry out
+    press() // the four holds
+    skip(tutorial) // select
+    expect(world.state.selected.at(-1)).toBe('BAW214')
+
+    skip(tutorial) // descend: 3000 and 180
+    const kinds = world.state.issued.map((c) => c.kind)
+    expect(kinds).toContain('altitude')
+    expect(kinds).toContain('speed')
+    const altitude = world.state.issued.find((c) => c.kind === 'altitude')
+    expect(altitude?.kind === 'altitude' ? altitude.ft : null).toBe(3000)
+  })
+
+  it('satisfies an ordered goal whole rather than halfway', () => {
+    // "Vector it, then hand it back" is two leaves in order. A skip that
+    // met only the first would leave the step still waiting.
+    const { tutorial } = session()
+    tutorial.start()
+    let guard = 0
+    while (BASICS.steps[tutorial.stepIndex]?.id !== 'resume-nav' && guard < 40) {
+      guard += 1
+      const step = BASICS.steps[tutorial.stepIndex]
+      if (step === undefined) break
+      if ((step.button ?? null) !== null) {
+        tutorial.element.querySelector<HTMLButtonElement>('.tutorial-continue')?.click()
+      } else {
+        skip(tutorial)
+      }
+    }
+    expect(BASICS.steps[tutorial.stepIndex]?.id).toBe('resume-nav')
+    skip(tutorial)
+    expect(BASICS.steps[tutorial.stepIndex]?.id).not.toBe('resume-nav')
+  })
+
+  it('does nothing when no lesson is running', () => {
+    const { tutorial, world } = session()
+    tutorial.skip()
+    expect(world.state.issued).toEqual([])
   })
 })

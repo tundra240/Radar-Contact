@@ -27,6 +27,14 @@ export type TutorialEvent =
   /** A clearance that was accepted. Refused ones are not progress. */
   | { readonly kind: 'command'; readonly command: Command }
   | { readonly kind: 'speed'; readonly speed: number }
+  /**
+   * The player asked to move on without doing this step.
+   *
+   * Satisfies whatever the step wanted, whole. The session performs the
+   * step's actual effect on the world first -- see TutorialSession.skip --
+   * so this is only the bookkeeping half.
+   */
+  | { readonly kind: 'skip' }
   /** The world, as often as the host cares to offer it. */
   | {
       readonly kind: 'tick'
@@ -332,6 +340,10 @@ function record(
   state: EngineState,
   event: TutorialEvent,
 ): readonly string[] {
+  // A skip meets everything at once, in order, so an inOrder goal is
+  // satisfied rather than half-done.
+  if (event.kind === 'skip') return leavesOf(goal).map((leaf) => leafKey(leaf))
+
   let met = state.met
   for (const leaf of leavesOf(goal)) {
     const key = leafKey(leaf)

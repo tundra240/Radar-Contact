@@ -8,6 +8,7 @@ import type { WeatherCell } from '../sim/weather'
 import {
   advance,
   beginLesson,
+  leavesOf,
   stepLabel,
   stepOf,
   withRefs,
@@ -17,7 +18,7 @@ import {
 import { readoutBox } from '../render/scope'
 import { holeAround, holeOfElement, TutorialOverlay, type Hole } from './overlay'
 import { buildTraffic, buildWeather, refsOf } from './traffic'
-import type { Failure, Spotlight, TutorialModule, TutorialStep } from './types'
+import type { Failure, Goal, Spotlight, TutorialModule, TutorialStep } from './types'
 
 /**
  * The lesson, running.
@@ -43,6 +44,16 @@ export interface TutorialWorld {
   readonly elapsedSeconds: () => number
   /** World position to viewport pixels, for spotlighting a target or a fix. */
   readonly screenOf: (at: Vec2NM) => { readonly x: number; readonly y: number }
+  /**
+   * Issue a clearance, through the same gate every other input path uses.
+   *
+   * Only wanted for skipping: a step skipped has to leave the world as
+   * though it had been done, or the steps after it are being asked to
+   * continue from a situation that never happened.
+   */
+  readonly issue: (command: Command) => void
+  /** Pick a target, as clicking one would. */
+  readonly select: (callsign: string | null) => void
   /** Redraw and re-sync the strips: the situation has changed underneath. */
   readonly changed: () => void
   readonly announce: (text: string, kind: 'note' | 'reject' | 'readback') => void
@@ -86,6 +97,7 @@ export class TutorialSession {
     this.overlay = new TutorialOverlay({
       mount: opts.mount,
       onContinue: () => this.observe({ kind: 'continue' }),
+      onSkip: () => this.skip(),
       onExit: () => this.stop(),
     })
   }
@@ -190,6 +202,90 @@ export class TutorialSession {
     if (!this.active) return
     const traffic = this.world.traffic()
     this.observe({ kind: 'tick', traffic, conflicts: conflictsIn(traffic) })
+  }
+
+  /**
+   * Move on without doing this step, having done it for them.
+   *
+   * The important half is that it is carried out rather than jumped over.
+   * A step skipped by simply advancing leaves the aeroplane wherever it
+   * was -- still in the hold, still at ten thousand feet -- and the steps
+   * after it then ask for things that cannot work from there, which is
+   * exactly the sort of dead end a skip is supposed to rescue somebody
+   * from.
+   *
+   * What cannot be performed is skipped anyway: there is no clearance that
+   * makes an aircraft be established in a hold, and nothing that lands
+   * three of them. Those the world reaches on its own or not at all.
+   */
+  skip(): void {
+    if (!this.active) return
+    const step = stepOf(this.module, this.state)
+    if (step === null) return
+    for (const leaf of leavesOf(step.goal)) this.perform(leaf)
+    this.observe({ kind: 'skip' })
+  }
+
+  /** Do to the world whatever this leaf was asking the player to do. */
+  private perform(goal: Goal): void {
+    const callsign = this.callsignFor(goal)
+
+    switch (goal.kind) {
+      case 'speed':
+        this.world.setSpeed(goal.to as Speed)
+        return
+      case 'select':
+        if (callsign !== null) this.world.select(callsign)
+        return
+      case 'altitude':
+        if (callsign !== null) this.world.issue({ kind: 'altitude', callsign, ft: goal.ft })
+        return
+      case 'airspeed':
+        if (callsign !== null) this.world.issue({ kind: 'speed', callsign, kts: goal.kts })
+        return
+      case 'heading':
+        if (callsign !== null) this.world.issue({ kind: 'heading', callsign, deg: goal.deg })
+        return
+      case 'vector': {
+        // Any heading at all, so the one it is already on: the step is
+        // about having taken control, and a skip should not also move the
+        // aeroplane somewhere the player did not ask for.
+        const aircraft = this.world.traffic().find((a) => a.callsign === callsign)
+        if (callsign !== null && aircraft !== undefined) {
+          this.world.issue({ kind: 'heading', callsign, deg: Math.round(aircraft.hdg) })
+        }
+        return
+      }
+      case 'approach':
+        if (callsign !== null) {
+          const runway = this.world.airport.arrivalRunways[0]?.id
+          if (runway !== undefined) this.world.issue({ kind: 'approach', callsign, runway })
+        }
+        return
+      case 'resumeNav':
+        if (callsign !== null) this.world.issue({ kind: 'resumeNav', callsign })
+        return
+
+      // Nothing to carry out: a button, or a state the world arrives at by
+      // itself and no clearance can bring about.
+      case 'continue':
+      case 'holding':
+      case 'navMode':
+      case 'allLanded':
+      case 'every':
+      case 'inOrder':
+        return
+    }
+  }
+
+  /** The aircraft a goal is about, resolved through the step's refs. */
+  private callsignFor(goal: Goal): string | null {
+    const ref = 'ref' in goal ? goal.ref : undefined
+    if (ref !== undefined) return this.state.refs[ref] ?? ref
+    // No ref: the only aeroplane in play, if there is exactly one, and
+    // nothing rather than a guess when there are several.
+    const traffic = this.world.traffic()
+    return traffic.length === 1 ? (traffic[0]?.callsign ?? null) : null
   }
 
   private observe(event: TutorialEvent): void {
@@ -305,6 +401,10 @@ export class TutorialSession {
       counter: stepLabel(this.module, this.state),
       text: step.text,
       button: step.button ?? null,
+      // Only where there is something to skip. A step that advances on a
+      // button already has one that moves you on, and two controls doing
+      // the same thing is a choice the reader has to make for no reason.
+      skippable: (step.button ?? null) === null,
     })
   }
 

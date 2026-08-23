@@ -8,16 +8,21 @@ function mount(): {
   root: HTMLElement
   onContinue: () => void
   continued: () => number
+  skipped: () => number
   exited: () => number
 } {
   const host = document.createElement('div')
   document.body.appendChild(host)
   let continues = 0
+  let skips = 0
   let exits = 0
   const overlay = new TutorialOverlay({
     mount: host,
     onContinue: () => {
       continues += 1
+    },
+    onSkip: () => {
+      skips += 1
     },
     onExit: () => {
       exits += 1
@@ -28,6 +33,7 @@ function mount(): {
     root: overlay.element,
     onContinue: () => {},
     continued: () => continues,
+    skipped: () => skips,
     exited: () => exits,
   }
 }
@@ -37,6 +43,7 @@ const CARD = {
   counter: 'Step 4 of 16',
   text: 'The flight has entered the published hold.',
   button: 'Continue' as string | null,
+  skippable: false,
 }
 
 beforeEach(() => {
@@ -238,9 +245,10 @@ describe('working out where a hole goes', () => {
     const overlay = new TutorialOverlay({
       mount: document.body,
       onContinue: () => {},
+      onSkip: () => {},
       onExit: () => {},
     })
-    overlay.show({ title: 't', counter: 'Step 1 of 1', text: 'x', button: null })
+    overlay.show({ title: 't', counter: 'Step 1 of 1', text: 'x', button: null, skippable: false })
     overlay.place([holeAround({ x: 400, y: 300 }, 96)])
     const ring = overlay.element.querySelector('.tutorial-ring')
     expect(ring?.tagName.toLowerCase()).toBe('circle')
@@ -253,9 +261,10 @@ describe('working out where a hole goes', () => {
     const overlay = new TutorialOverlay({
       mount: document.body,
       onContinue: () => {},
+      onSkip: () => {},
       onExit: () => {},
     })
-    overlay.show({ title: 't', counter: 'Step 1 of 1', text: 'x', button: null })
+    overlay.show({ title: 't', counter: 'Step 1 of 1', text: 'x', button: null, skippable: false })
     overlay.place([{ x: 10, y: 20, w: 30, h: 12 }])
     expect(overlay.element.querySelector('.tutorial-ring')?.tagName.toLowerCase()).toBe('rect')
   })
@@ -296,9 +305,10 @@ describe('staying out of the way of the display', () => {
     const overlay = new TutorialOverlay({
       mount: host,
       onContinue: () => {},
+      onSkip: () => {},
       onExit: () => {},
     })
-    overlay.show({ title: 't', counter: 'Step 1 of 1', text: 'x', button: null })
+    overlay.show({ title: 't', counter: 'Step 1 of 1', text: 'x', button: null, skippable: false })
     expect(host.childElementCount).toBe(before + 1)
   })
 })
