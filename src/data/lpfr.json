@@ -1,0 +1,441 @@
+{
+  "icao": "LPFR",
+  "name": "Faro",
+  "tier": "easy",
+  "brief": "One runway, one arrival stream, and the sea on three sides. Traffic comes down the coast from the north-west or in off the Atlantic from the south, and there is nothing in the way of either: no high ground, no neighbouring field to work around, and room to take an aircraft out over the Gulf of Cadiz and bring it back if the sequence goes wrong. The single runway is the whole constraint -- everything lands on the same strip of tarmac, so the job is spacing rather than sorting. The gentlest place to learn what a vector does.",
+  "arp": {
+    "lat": 37.014444,
+    "lon": -7.965833
+  },
+  "elevationFt": 24,
+  "magVarDeg": 0,
+  "sector": {
+    "radiusNM": 35,
+    "ceilingFt": 12000,
+    "floorFt": 1000,
+    "speedLimitKts": 250,
+    "speedLimitBelowFt": 10000,
+    "interceptAltMaxFt": 3000,
+    "rangeRingsNM": [
+      5,
+      10,
+      15,
+      20
+    ],
+    "defaultRangeNM": 40,
+    "activeArrivalRunways": [
+      "28"
+    ],
+    "activeDepartureRunways": [
+      "28"
+    ]
+  },
+  "weather": {
+    "wind": {
+      "fromDeg": 280,
+      "speedKts": 10
+    },
+    "windEffect": 1,
+    "cellsPerHour": 4,
+    "minLifeMinutes": 7,
+    "maxLifeMinutes": 18,
+    "heavyChance": 0.12,
+    "minRadiusNM": 4,
+    "maxRadiusNM": 12,
+    "driftFactor": 0.8,
+    "driftSpreadDeg": 30,
+    "driftSpeedSpread": 0.35,
+    "shapeDriftDegPerMin": 6,
+    "spreadNM": 19
+  },
+  "render": {
+    "runwayExaggeration": 3,
+    "exaggerationCutoffPxPerNM": 45,
+    "neighbourRunwayMinPx": 9,
+    "holdSpeedKts": 220
+  },
+  "runways": [
+    {
+      "id": "10",
+      "threshold": {
+        "lat": 37.01647,
+        "lon": -7.980222
+      },
+      "bearingTrue": 100,
+      "lengthFt": 8169,
+      "thresholdElevationFt": 24,
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
+    },
+    {
+      "id": "28",
+      "threshold": {
+        "lat": 37.012418,
+        "lon": -7.951444
+      },
+      "bearingTrue": 280,
+      "lengthFt": 8169,
+      "thresholdElevationFt": 24,
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
+    }
+  ],
+  "navaids": [
+    {
+      "name": "SAGRE",
+      "fullName": "Sagres gate",
+      "lat": 37.183491,
+      "lon": -8.419847,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 112.5
+      },
+      "hold": {
+        "turns": "right",
+        "legMins": 1
+      },
+      "entry": {
+        "minAltFt": 6000,
+        "maxAltFt": 11000
+      }
+    },
+    {
+      "name": "GUADI",
+      "fullName": "Guadiana gate",
+      "lat": 37.109344,
+      "lon": -7.522276,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 113.9
+      },
+      "hold": {
+        "turns": "right",
+        "legMins": 1
+      },
+      "entry": {
+        "minAltFt": 6000,
+        "maxAltFt": 11000
+      }
+    },
+    {
+      "name": "FAR",
+      "fullName": "Faro",
+      "lat": 37.031111,
+      "lon": -7.965833,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 112.8
+      }
+    }
+  ],
+  "airspace": [
+    {
+      "id": "LPFR TMA",
+      "label": "FARO TMA",
+      "class": "A",
+      "kind": "lines",
+      "paths": [
+        [
+          {
+            "lat": 37.564444,
+            "lon": -7.965833
+          },
+          {
+            "lat": 37.545703,
+            "lon": -7.787557
+          },
+          {
+            "lat": 37.490758,
+            "lon": -7.62143
+          },
+          {
+            "lat": 37.403353,
+            "lon": -7.478774
+          },
+          {
+            "lat": 37.289444,
+            "lon": -7.36931
+          },
+          {
+            "lat": 37.156794,
+            "lon": -7.300498
+          },
+          {
+            "lat": 37.014444,
+            "lon": -7.277028
+          },
+          {
+            "lat": 36.872094,
+            "lon": -7.300498
+          },
+          {
+            "lat": 36.739444,
+            "lon": -7.36931
+          },
+          {
+            "lat": 36.625535,
+            "lon": -7.478774
+          },
+          {
+            "lat": 36.53813,
+            "lon": -7.62143
+          },
+          {
+            "lat": 36.483185,
+            "lon": -7.787557
+          },
+          {
+            "lat": 36.464444,
+            "lon": -7.965833
+          },
+          {
+            "lat": 36.483185,
+            "lon": -8.144109
+          },
+          {
+            "lat": 36.53813,
+            "lon": -8.310236
+          },
+          {
+            "lat": 36.625535,
+            "lon": -8.452892
+          },
+          {
+            "lat": 36.739444,
+            "lon": -8.562356
+          },
+          {
+            "lat": 36.872094,
+            "lon": -8.631168
+          },
+          {
+            "lat": 37.014444,
+            "lon": -8.654638
+          },
+          {
+            "lat": 37.156794,
+            "lon": -8.631168
+          },
+          {
+            "lat": 37.289444,
+            "lon": -8.562356
+          },
+          {
+            "lat": 37.403353,
+            "lon": -8.452892
+          },
+          {
+            "lat": 37.490758,
+            "lon": -8.310236
+          },
+          {
+            "lat": 37.545703,
+            "lon": -8.144109
+          },
+          {
+            "lat": 37.564444,
+            "lon": -7.965833
+          }
+        ]
+      ],
+      "floorFt": 2500,
+      "ceilingFt": 16500,
+      "derivation": "rule",
+      "verticalSource": "rule"
+    },
+    {
+      "id": "LPFR CTR",
+      "label": "FARO CTR",
+      "class": "D",
+      "kind": "circle",
+      "centre": {
+        "lat": 37.014444,
+        "lon": -7.965833
+      },
+      "radiusNM": 8,
+      "floorFt": 0,
+      "ceilingFt": 2500,
+      "derivation": "rule",
+      "verticalSource": "rule"
+    }
+  ],
+  "aircraftTypes": [],
+  "traffic": {
+    "seed": 20260901,
+    "firstSpawnSeconds": 10,
+    "initialIntervalSeconds": 120,
+    "minIntervalSeconds": 45,
+    "rampMinutes": 10,
+    "intervalJitter": 0.2,
+    "maxConcurrent": 12,
+    "minFixSpacingNM": 8,
+    "minFixSpacingSeconds": 60,
+    "entrySpeedKts": 220,
+    "entryDistanceNM": 8,
+    "airlines": [
+      {
+        "code": "TOM",
+        "preferredFixes": {
+          "SAGRE": 50,
+          "GUADI": 50
+        },
+        "weight": 8,
+        "fleet": [
+          "B738"
+        ],
+        "numbers": [
+          [
+            1000,
+            1099
+          ]
+        ]
+      },
+      {
+        "code": "EZY",
+        "preferredFixes": {
+          "SAGRE": 60,
+          "GUADI": 40
+        },
+        "weight": 8,
+        "fleet": [
+          "A319",
+          "A320",
+          "A20N",
+          "A321",
+          "A21N"
+        ],
+        "numbers": [
+          [
+            8000,
+            8999
+          ]
+        ]
+      },
+      {
+        "code": "TAP",
+        "preferredFixes": {
+          "SAGRE": 40,
+          "GUADI": 60
+        },
+        "weight": 6,
+        "fleet": [
+          "A320",
+          "A20N"
+        ],
+        "numbers": [
+          [
+            1300,
+            1399
+          ]
+        ]
+      },
+      {
+        "code": "BAW",
+        "preferredFixes": {
+          "SAGRE": 70,
+          "GUADI": 30
+        },
+        "weight": 4,
+        "fleet": [
+          "A319",
+          "A320",
+          "A20N",
+          "A321",
+          "A21N",
+          "A359",
+          "B789",
+          "B77W",
+          "A388"
+        ],
+        "numbers": [
+          [
+            1,
+            199
+          ],
+          [
+            300,
+            999
+          ]
+        ]
+      },
+      {
+        "code": "AFR",
+        "preferredFixes": {
+          "SAGRE": 30,
+          "GUADI": 70
+        },
+        "weight": 2,
+        "fleet": [
+          "A319",
+          "A320",
+          "A20N",
+          "A21N"
+        ],
+        "numbers": [
+          [
+            1000,
+            1099
+          ]
+        ]
+      }
+    ]
+  },
+  "overflights": {
+    "seed": 20260902,
+    "firstSpawnSeconds": 180,
+    "intervalSeconds": 300,
+    "intervalJitter": 0.4,
+    "maxConcurrent": 3,
+    "entryDistanceNM": 6,
+    "exitDistanceNM": 10,
+    "corridors": [
+      {
+        "id": "ATLANTIC-EAST",
+        "label": "Atlantic traffic routing east along the coast",
+        "via": [
+          "SAGRE",
+          "GUADI"
+        ],
+        "destination": "LEMG",
+        "minAltFt": 14000,
+        "maxAltFt": 19000,
+        "speedKts": 320,
+        "weight": 2,
+        "operators": [
+          "TAP",
+          "AFR"
+        ],
+        "crossing": "clear"
+      },
+      {
+        "id": "ATLANTIC-WEST",
+        "label": "Mediterranean traffic routing west out over the Atlantic",
+        "via": [
+          "GUADI",
+          "SAGRE"
+        ],
+        "destination": "LPPT",
+        "minAltFt": 14000,
+        "maxAltFt": 19000,
+        "speedKts": 320,
+        "weight": 2,
+        "operators": [
+          "TAP"
+        ],
+        "crossing": "clear"
+      }
+    ]
+  },
+  "provenance": {
+    "positions": "CONSTRUCTED, NOT SURVEYED.",
+    "notes": "The aerodrome reference point, the runway designators and bearings, and the field elevation are real to the best of the author knowledge. EVERYTHING ELSE IS CONSTRUCTED: the entry fixes and their names, the airspace boundary, the terrain and noise areas and the traffic mix are invented to give the sector a shape to control, and are NOT taken from any AIP. Do not use for anything but this game. Contrast egll.json, whose positions are surveyed."
+  }
+}

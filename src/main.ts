@@ -1,7 +1,12 @@
 import './style.css'
 import { Camera } from './core/camera'
-import { loadAirport, outerLimitNM, type Runway } from './data/airport'
-import egllConfig from './data/egll.json'
+import { outerLimitNM, type Runway } from './data/airport'
+import {
+  airportOf,
+  airportSummaries,
+  AIRPORT_IDS,
+  DEFAULT_AIRPORT,
+} from './data/airports'
 import { departureOf, enterSector, isInSector, stepAircraft } from './sim/aircraft'
 import { NO_SCORE, pointsFor, scoreDeparture, type Score } from './sim/score'
 import type { Vec2NM } from './core/geo'
@@ -43,6 +48,7 @@ import { TutorialSession } from './tutorial/session'
 import { Spawner } from './sim/spawner'
 import { withScriptedCells, type WeatherCell } from './sim/weather'
 import { inWarning } from './sim/conflict'
+import { belowMinimumSafe, infringingNoise } from './sim/zones'
 import type { Aircraft } from './sim/types'
 import type { Command } from './commands/types'
 import { applyAll, type ApplyContext } from './commands/apply'
@@ -85,7 +91,30 @@ import {
  * fixed-timestep simulation arrives with the aircraft model in Day 1.
  */
 
-const airport = loadAirport(egllConfig)
+/** Where the session is worked, remembered between visits. */
+const AIRPORT_STORAGE = 'radar-contact:airport'
+
+/**
+ * Which field to load.
+ *
+ * Read before anything else exists, because everything else is built from
+ * it: the camera's range, the projection world space is anchored on, the
+ * spawner's fixes. Changing it is therefore a reload rather than a live
+ * swap -- see the logon screen, which stores the choice and reloads. That
+ * is honest about what it costs rather than pretending a sector can be
+ * exchanged underneath a running clock.
+ */
+function chosenAirport(): string {
+  try {
+    const asked = new URLSearchParams(window.location.search).get('airport')
+    if (asked !== null && asked.trim() !== '') return asked.trim().toUpperCase()
+    return window.localStorage.getItem(AIRPORT_STORAGE) ?? DEFAULT_AIRPORT
+  } catch {
+    return DEFAULT_AIRPORT
+  }
+}
+
+const airport = airportOf(chosenAirport())
 
 const host = document.querySelector<HTMLDivElement>('#app')
 if (!host) throw new Error('#app not found in index.html')
@@ -1262,6 +1291,12 @@ function start(
   /** Who is inside the warning buffer, which is wider than a breach. */
   let warned: ReadonlySet<string> = new Set()
 
+  /** Who is below a minimum safe altitude over high ground. */
+  let overTerrain: ReadonlySet<string> = new Set()
+  /** Who is under a noise abatement floor, and has already been charged. */
+  let overNoise: ReadonlySet<string> = new Set()
+  const chargedForNoise = new Set<string>()
+
   /** Where the runway-change cycle has got to. See sim/atisflow.ts. */
   let atisFlow: AtisFlowState = beginAtisFlow()
 
@@ -1393,6 +1428,29 @@ function start(
         // this setting gives you. On the hardest two the buffer IS the
         // minimum, so the warning and the loss arrive together.
         warned = inWarning(traffic, difficulty.warnNM, difficulty.warnFt)
+
+        // High ground. Said once per aircraft and marked for as long as it
+        // lasts, because it is the one alert that is about the aeroplane
+        // being somewhere it cannot survive.
+        const low = belowMinimumSafe(airport.terrain, traffic)
+        for (const callsign of low) {
+          if (overTerrain.has(callsign)) continue
+          announce(`${callsign} TERRAIN -- climb immediately`, 'reject')
+        }
+        overTerrain = low
+
+        // Noise. Charged once per aircraft rather than once per tick: it is
+        // one complaint however long the aeroplane is over the town.
+        const loud = infringingNoise(airport.noise, traffic)
+        for (const callsign of loud) {
+          if (chargedForNoise.has(callsign)) continue
+          chargedForNoise.add(callsign)
+          const zone = airport.noise[0]
+          const cost = zone?.penaltyPoints ?? 0
+          score = { ...score, points: score.points - cost }
+          announce(`${callsign} below the noise abatement floor -${cost}`, 'reject')
+        }
+        overNoise = loud
         // Once a sweep rather than once a tick: no goal here can change
         // faster than that, and the conflict scan would otherwise run
         // twenty times a second for nothing.
@@ -1436,7 +1494,10 @@ function start(
           // Weather requests and separation warnings both mark a target,
           // because both mean the same thing to a controller: this one
           // needs doing something about.
-          alerts: new Set([...asking, ...warned]),
+          // Everything that means "this one needs doing something about",
+          // in one set: the display marks a target the same way whichever
+          // of them it is, because the response is the same -- look at it.
+          alerts: new Set([...asking, ...warned, ...overTerrain, ...overNoise]),
           trailDots: difficulty.trailDots,
         },
       )
@@ -1689,6 +1750,20 @@ function start(
     enforceAirspace: storedAirspace(),
     difficulty: storedDifficulty(),
     mode: storedMode(),
+    airports: airportSummaries(),
+    airport: airport.icao,
+    onAirport: (icao) => {
+      // A different sector is a different world: the projection, the
+      // camera and every fix come from it. Stored and reloaded rather than
+      // swapped under a running session.
+      if (icao === airport.icao || !AIRPORT_IDS.includes(icao)) return
+      try {
+        window.localStorage.setItem(AIRPORT_STORAGE, icao)
+      } catch {
+        /* the choice simply will not persist */
+      }
+      window.location.reload()
+    },
     onSettings: () => menu.setOpen(true),
     onLogon: (details) => {
       takePosition(details)

@@ -6,6 +6,7 @@ import {
   type ControlVolume,
   type ControlZone,
 } from '../sim/airspace'
+import type { NoiseZone, TerrainZone, ZoneShape } from '../sim/zones'
 import {
   FT_PER_NM,
   advance,
@@ -174,6 +175,9 @@ export interface FlightNumberRange {
  * real arrival rates and altitudes depend on the STAR, the flow and the
  * day. This is the first thing to tune if the traffic feels wrong.
  */
+/** How hard the field itself is, before any difficulty setting. */
+export type AirportTier = 'easy' | 'normal' | 'hard'
+
 export interface TrafficConfig {
   /** Fixes the arrival stream, so a scenario can be repeated exactly. */
   readonly seed: number
@@ -429,6 +433,31 @@ export interface Airport {
   readonly projection: Projection
   readonly sector: Sector
   readonly render: RenderSettings
+  /**
+   * Which tier this field belongs to, and what makes it that.
+   *
+   * A property of the aerodrome rather than of the session: Faro is a
+   * gentle place to control whatever settings you pick, and Barcelona is
+   * not. The session's difficulty scales the traffic on top of this; the
+   * tier is what the menu sorts by and what the brief describes.
+   */
+  readonly tier: AirportTier
+  /** A paragraph on how the place works and what catches people out. */
+  readonly brief: string
+  /**
+   * Where the numbers in this profile came from.
+   *
+   * Carried onto the loaded airport rather than left in the file, because
+   * the four profiles are not of equal quality: Heathrow is surveyed from
+   * the AIP and the other three are constructed. Anything that presents a
+   * field to a player should be able to find that out, and a test can
+   * insist a constructed profile says so.
+   */
+  readonly provenance: Readonly<Record<string, string>>
+  /** High ground, and the lowest anything may be over it. */
+  readonly terrain: readonly TerrainZone[]
+  /** Where traffic may not be vectored low, and what it costs. */
+  readonly noise: readonly NoiseZone[]
   readonly traffic: TrafficConfig
   /** Transit corridors, or null for a field configured without any. */
   readonly overflights: OverflightConfig | null
@@ -599,9 +628,15 @@ export function loadAirport(raw: unknown): Airport {
   const rawNavaids = arr(root['navaids'], 'navaids').map((n, i) =>
     parseNavaid(n, `navaids[${i}]`, projection),
   )
-  const airports = arr(root['airports'], 'airports').map((a, i) =>
-    parseNeighbour(a, `airports[${i}]`, projection),
-  )
+  // Optional, and empty is a legitimate answer: a field with no charted
+  // neighbours is a field with no charted neighbours. Requiring one would
+  // make every new profile invent an aerodrome to satisfy the parser.
+  const airports =
+    root['airports'] === undefined
+      ? []
+      : arr(root['airports'], 'airports').map((a, i) =>
+          parseNeighbour(a, `airports[${i}]`, projection),
+        )
   const aircraftTypes = arr(root['aircraftTypes'], 'aircraftTypes').map((t, i) =>
     parseAircraftType(t, `aircraftTypes[${i}]`),
   )
@@ -683,6 +718,11 @@ export function loadAirport(raw: unknown): Airport {
     projection,
     sector,
     render,
+    tier: parseTier(root['tier']),
+    brief: str(root['brief'], 'brief'),
+    provenance: parseProvenance(root['provenance']),
+    terrain: parseTerrain(root['terrain'], projection),
+    noise: parseNoise(root['noise'], projection),
     traffic,
     overflights,
     runways,
@@ -905,6 +945,91 @@ function oneOfCrossing(raw: unknown, path: string): 'clear' | 'crossing' | 'over
   const value = str(raw, path)
   if (value === 'clear' || value === 'crossing' || value === 'overhead') return value
   throw new ConfigError(path, 'must be clear, crossing or overhead')
+}
+
+/**
+ * A zone's footprint: a circle, or a ring of coordinates.
+ *
+ * Deliberately fewer shapes than the airspace parser offers. Terrain and
+ * noise are areas rather than published volumes -- nobody needs a multi-path
+ * mountain -- and two shapes cover every case either of them has.
+ */
+function parseZoneShape(o: Record<string, unknown>, path: string, projection: Projection): ZoneShape {
+  const kind = str(o['kind'], `${path}.kind`)
+  if (kind === 'circle') {
+    const radiusNM = num(o['radiusNM'], `${path}.radiusNM`)
+    if (radiusNM <= 0) throw new ConfigError(`${path}.radiusNM`, 'must be positive')
+    return {
+      kind: 'circle',
+      centreNM: projection.toWorld(latLon(o['centre'], `${path}.centre`)),
+      radiusNM,
+    }
+  }
+  if (kind === 'polygon') {
+    const verts = arr(o['vertices'], `${path}.vertices`)
+    if (verts.length < 3) throw new ConfigError(`${path}.vertices`, 'needs at least three')
+    return {
+      kind: 'polygon',
+      verticesNM: verts.map((v, i) =>
+        projection.toWorld(latLon(v, `${path}.vertices[${i}]`)),
+      ),
+    }
+  }
+  throw new ConfigError(`${path}.kind`, 'must be circle or polygon')
+}
+
+/** High ground. Optional: most fields are flat enough not to need any. */
+function parseTerrain(raw: unknown, projection: Projection): TerrainZone[] {
+  if (raw === undefined || raw === null) return []
+  return arr(raw, 'terrain').map((t, i) => {
+    const p = `terrain[${i}]`
+    const o = obj(t, p)
+    const peakFt = num(o['peakFt'], `${p}.peakFt`)
+    const minimumSafeFt = num(o['minimumSafeFt'], `${p}.minimumSafeFt`)
+    if (minimumSafeFt <= peakFt) {
+      // The minimum is the hill plus the margin. One at or below the summit
+      // is not a minimum safe altitude, it is a hill with a number on it.
+      throw new ConfigError(`${p}.minimumSafeFt`, 'must be above peakFt')
+    }
+    return {
+      id: str(o['id'], `${p}.id`),
+      label: str(o['label'], `${p}.label`),
+      shape: parseZoneShape(o, p, projection),
+      minimumSafeFt,
+      peakFt,
+    }
+  })
+}
+
+/** Noise abatement areas. Optional, and empty at a field with none. */
+function parseNoise(raw: unknown, projection: Projection): NoiseZone[] {
+  if (raw === undefined || raw === null) return []
+  return arr(raw, 'noise').map((n, i) => {
+    const p = `noise[${i}]`
+    const o = obj(n, p)
+    return {
+      id: str(o['id'], `${p}.id`),
+      label: str(o['label'], `${p}.label`),
+      shape: parseZoneShape(o, p, projection),
+      floorFt: num(o['floorFt'], `${p}.floorFt`),
+      penaltyPoints: num(o['penaltyPoints'], `${p}.penaltyPoints`),
+    }
+  })
+}
+
+/** Free-form notes on where the data came from. Optional, and empty is fine. */
+function parseProvenance(raw: unknown): Record<string, string> {
+  if (raw === undefined || raw === null) return {}
+  const o = obj(raw, 'provenance')
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(o)) out[key] = String(value)
+  return out
+}
+
+function parseTier(raw: unknown): AirportTier {
+  const value = str(raw, 'tier')
+  if (value === 'easy' || value === 'normal' || value === 'hard') return value
+  throw new ConfigError('tier', 'must be easy, normal or hard')
 }
 
 function parseTraffic(

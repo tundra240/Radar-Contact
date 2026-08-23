@@ -13,6 +13,7 @@ interface Harness {
   mount: HTMLElement
   logons: LogonDetails[]
   tutorials: LogonDetails[]
+  fields: string[]
   settings: number
 }
 
@@ -29,6 +30,7 @@ function mountLogon(over: { initials?: string; enforceAirspace?: boolean } = {})
     mount,
     logons: [],
     tutorials: [],
+    fields: [],
     settings: 0,
   }
 
@@ -42,6 +44,12 @@ function mountLogon(over: { initials?: string; enforceAirspace?: boolean } = {})
     enforceAirspace: over.enforceAirspace ?? true,
     difficulty: 'normal',
     mode: 'career',
+    airports: [
+      { icao: 'LPFR', name: 'Faro', tier: 'easy', brief: 'One runway and the sea.' },
+      { icao: 'EGLL', name: 'Heathrow', tier: 'normal', brief: 'Four stacks and two parallels.' },
+    ],
+    airport: 'EGLL',
+    onAirport: (icao) => h.fields.push(icao),
     onLogon: (d) => h.logons.push(d),
     onTutorial: (d) => h.tutorials.push(d),
     onSettings: () => {

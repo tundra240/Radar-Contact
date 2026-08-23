@@ -1,0 +1,725 @@
+{
+  "icao": "LEBL",
+  "name": "Barcelona El Prat",
+  "tier": "hard",
+  "brief": "Three runways in two directions that cross each other, and a great deal of traffic. The parallels take the arrivals while the crosswind runway is worked around them, so the two flows are dependent -- what you do with one constrains the other, and the intersection is a place two aircraft must never be at once. Arrivals come from Europe to the north, north Africa to the south and the Atlantic to the west, and the Mediterranean transit lanes run straight across the arrival streams at levels the arrivals are descending through. Add a noise abatement floor over the coast and the city that takes away the low airspace where you would otherwise turn traffic in, and there is very little room left to be untidy in.",
+  "arp": {
+    "lat": 41.297078,
+    "lon": 2.078464
+  },
+  "elevationFt": 12,
+  "magVarDeg": 0,
+  "sector": {
+    "radiusNM": 40,
+    "ceilingFt": 14500,
+    "floorFt": 1000,
+    "speedLimitKts": 250,
+    "speedLimitBelowFt": 10000,
+    "interceptAltMaxFt": 3000,
+    "rangeRingsNM": [
+      5,
+      10,
+      15,
+      20
+    ],
+    "defaultRangeNM": 46,
+    "activeArrivalRunways": [
+      "24R"
+    ],
+    "activeDepartureRunways": [
+      "24L"
+    ]
+  },
+  "weather": {
+    "wind": {
+      "fromDeg": 240,
+      "speedKts": 12
+    },
+    "windEffect": 1,
+    "cellsPerHour": 4,
+    "minLifeMinutes": 7,
+    "maxLifeMinutes": 18,
+    "heavyChance": 0.12,
+    "minRadiusNM": 4,
+    "maxRadiusNM": 12,
+    "driftFactor": 0.8,
+    "driftSpreadDeg": 30,
+    "driftSpeedSpread": 0.35,
+    "shapeDriftDegPerMin": 6,
+    "spreadNM": 22
+  },
+  "render": {
+    "runwayExaggeration": 3,
+    "exaggerationCutoffPxPerNM": 45,
+    "neighbourRunwayMinPx": 9,
+    "holdSpeedKts": 220
+  },
+  "runways": [
+    {
+      "id": "06L",
+      "threshold": {
+        "lat": 41.289098,
+        "lon": 2.04928
+      },
+      "bearingTrue": 70,
+      "lengthFt": 8727,
+      "thresholdElevationFt": 12,
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
+    },
+    {
+      "id": "24R",
+      "threshold": {
+        "lat": 41.305058,
+        "lon": 2.107648
+      },
+      "bearingTrue": 250,
+      "lengthFt": 8727,
+      "thresholdElevationFt": 12,
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
+    },
+    {
+      "id": "06R",
+      "threshold": {
+        "lat": 41.283695,
+        "lon": 2.040264
+      },
+      "bearingTrue": 70,
+      "lengthFt": 10171,
+      "thresholdElevationFt": 12,
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
+    },
+    {
+      "id": "24L",
+      "threshold": {
+        "lat": 41.310461,
+        "lon": 2.116664
+      },
+      "bearingTrue": 250,
+      "lengthFt": 10171,
+      "thresholdElevationFt": 12,
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
+    },
+    {
+      "id": "02",
+      "threshold": {
+        "lat": 41.278284,
+        "lon": 2.069359
+      },
+      "bearingTrue": 20,
+      "lengthFt": 8293,
+      "thresholdElevationFt": 12,
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
+    },
+    {
+      "id": "20",
+      "threshold": {
+        "lat": 41.315872,
+        "lon": 2.087569
+      },
+      "bearingTrue": 200,
+      "lengthFt": 8293,
+      "thresholdElevationFt": 12,
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
+    }
+  ],
+  "navaids": [
+    {
+      "name": "MATAR",
+      "fullName": "Maresme gate",
+      "lat": 41.545628,
+      "lon": 2.550934,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 114.6
+      },
+      "hold": {
+        "turns": "right",
+        "legMins": 1
+      },
+      "entry": {
+        "minAltFt": 7000,
+        "maxAltFt": 13000
+      }
+    },
+    {
+      "name": "GARRF",
+      "fullName": "Garraf gate",
+      "lat": 41.048528,
+      "lon": 1.605994,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 115.8
+      },
+      "hold": {
+        "turns": "right",
+        "legMins": 1
+      },
+      "entry": {
+        "minAltFt": 7000,
+        "maxAltFt": 13000
+      }
+    },
+    {
+      "name": "MONTS",
+      "fullName": "Montserrat gate",
+      "lat": 41.654565,
+      "lon": 1.679198,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 116.7
+      },
+      "hold": {
+        "turns": "right",
+        "legMins": 1
+      },
+      "entry": {
+        "minAltFt": 8000,
+        "maxAltFt": 14000
+      }
+    },
+    {
+      "name": "BALEA",
+      "fullName": "Balearic gate",
+      "lat": 40.914056,
+      "lon": 2.506249,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 117.2
+      },
+      "hold": {
+        "turns": "right",
+        "legMins": 1
+      },
+      "entry": {
+        "minAltFt": 8000,
+        "maxAltFt": 14000
+      }
+    },
+    {
+      "name": "BCN",
+      "fullName": "Barcelona",
+      "lat": 41.313745,
+      "lon": 2.078464,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 114.3
+      }
+    }
+  ],
+  "airspace": [
+    {
+      "id": "LEBL TMA",
+      "label": "BARCELONA TMA",
+      "class": "A",
+      "kind": "lines",
+      "paths": [
+        [
+          {
+            "lat": 41.930411,
+            "lon": 2.078464
+          },
+          {
+            "lat": 41.908831,
+            "lon": 2.296645
+          },
+          {
+            "lat": 41.845561,
+            "lon": 2.499957
+          },
+          {
+            "lat": 41.744912,
+            "lon": 2.674545
+          },
+          {
+            "lat": 41.613745,
+            "lon": 2.808511
+          },
+          {
+            "lat": 41.460997,
+            "lon": 2.892726
+          },
+          {
+            "lat": 41.297078,
+            "lon": 2.92145
+          },
+          {
+            "lat": 41.133159,
+            "lon": 2.892726
+          },
+          {
+            "lat": 40.980411,
+            "lon": 2.808511
+          },
+          {
+            "lat": 40.849244,
+            "lon": 2.674545
+          },
+          {
+            "lat": 40.748595,
+            "lon": 2.499957
+          },
+          {
+            "lat": 40.685325,
+            "lon": 2.296645
+          },
+          {
+            "lat": 40.663745,
+            "lon": 2.078464
+          },
+          {
+            "lat": 40.685325,
+            "lon": 1.860283
+          },
+          {
+            "lat": 40.748595,
+            "lon": 1.656971
+          },
+          {
+            "lat": 40.849244,
+            "lon": 1.482383
+          },
+          {
+            "lat": 40.980411,
+            "lon": 1.348417
+          },
+          {
+            "lat": 41.133159,
+            "lon": 1.264202
+          },
+          {
+            "lat": 41.297078,
+            "lon": 1.235478
+          },
+          {
+            "lat": 41.460997,
+            "lon": 1.264202
+          },
+          {
+            "lat": 41.613745,
+            "lon": 1.348417
+          },
+          {
+            "lat": 41.744912,
+            "lon": 1.482383
+          },
+          {
+            "lat": 41.845561,
+            "lon": 1.656971
+          },
+          {
+            "lat": 41.908831,
+            "lon": 1.860283
+          },
+          {
+            "lat": 41.930411,
+            "lon": 2.078464
+          }
+        ]
+      ],
+      "floorFt": 3000,
+      "ceilingFt": 19000,
+      "derivation": "rule",
+      "verticalSource": "rule"
+    },
+    {
+      "id": "LEBL CTR",
+      "label": "BARCELONA CTR",
+      "class": "D",
+      "kind": "circle",
+      "centre": {
+        "lat": 41.297078,
+        "lon": 2.078464
+      },
+      "radiusNM": 8,
+      "floorFt": 0,
+      "ceilingFt": 3000,
+      "derivation": "rule",
+      "verticalSource": "rule"
+    }
+  ],
+  "terrain": [
+    {
+      "id": "collserola",
+      "label": "COLLSEROLA",
+      "kind": "circle",
+      "centre": {
+        "lat": 41.444799,
+        "lon": 2.043794
+      },
+      "radiusNM": 5,
+      "peakFt": 1680,
+      "minimumSafeFt": 3500
+    },
+    {
+      "id": "montserrat",
+      "label": "MONTSERRAT",
+      "kind": "circle",
+      "centre": {
+        "lat": 41.579921,
+        "lon": 1.701992
+      },
+      "radiusNM": 8,
+      "peakFt": 4055,
+      "minimumSafeFt": 6000
+    }
+  ],
+  "noise": [
+    {
+      "id": "coastal-strip",
+      "label": "COAST NOISE",
+      "kind": "polygon",
+      "vertices": [
+        {
+          "lat": 41.322078,
+          "lon": 2.136099
+        },
+        {
+          "lat": 41.413745,
+          "lon": 2.347429
+        },
+        {
+          "lat": 41.180411,
+          "lon": 2.347429
+        },
+        {
+          "lat": 41.181608,
+          "lon": 2.167199
+        },
+        {
+          "lat": 41.231424,
+          "lon": 2.093873
+        }
+      ],
+      "floorFt": 3000,
+      "penaltyPoints": 25
+    },
+    {
+      "id": "city",
+      "label": "CITY NOISE",
+      "kind": "circle",
+      "centre": {
+        "lat": 41.379574,
+        "lon": 2.188268
+      },
+      "radiusNM": 4.5,
+      "floorFt": 4000,
+      "penaltyPoints": 25
+    }
+  ],
+  "aircraftTypes": [],
+  "traffic": {
+    "seed": 20260905,
+    "firstSpawnSeconds": 10,
+    "initialIntervalSeconds": 120,
+    "minIntervalSeconds": 45,
+    "rampMinutes": 10,
+    "intervalJitter": 0.2,
+    "maxConcurrent": 12,
+    "minFixSpacingNM": 8,
+    "minFixSpacingSeconds": 60,
+    "entrySpeedKts": 220,
+    "entryDistanceNM": 8,
+    "airlines": [
+      {
+        "code": "IBE",
+        "preferredFixes": {
+          "MATAR": 25,
+          "GARRF": 25,
+          "MONTS": 25,
+          "BALEA": 25
+        },
+        "weight": 9,
+        "fleet": [
+          "A319",
+          "A320",
+          "A20N",
+          "A21N"
+        ],
+        "numbers": [
+          [
+            3100,
+            3199
+          ]
+        ]
+      },
+      {
+        "code": "EZY",
+        "preferredFixes": {
+          "MATAR": 30,
+          "GARRF": 30,
+          "MONTS": 20,
+          "BALEA": 20
+        },
+        "weight": 7,
+        "fleet": [
+          "A319",
+          "A320",
+          "A20N",
+          "A321",
+          "A21N"
+        ],
+        "numbers": [
+          [
+            8000,
+            8999
+          ]
+        ]
+      },
+      {
+        "code": "DLH",
+        "preferredFixes": {
+          "MATAR": 40,
+          "GARRF": 10,
+          "MONTS": 40,
+          "BALEA": 10
+        },
+        "weight": 4,
+        "fleet": [
+          "A320",
+          "A20N",
+          "A21N",
+          "A359"
+        ],
+        "numbers": [
+          [
+            900,
+            999
+          ]
+        ]
+      },
+      {
+        "code": "AFR",
+        "preferredFixes": {
+          "MATAR": 20,
+          "GARRF": 20,
+          "MONTS": 50,
+          "BALEA": 10
+        },
+        "weight": 4,
+        "fleet": [
+          "A319",
+          "A320",
+          "A20N",
+          "A21N"
+        ],
+        "numbers": [
+          [
+            1000,
+            1099
+          ]
+        ]
+      },
+      {
+        "code": "BAW",
+        "preferredFixes": {
+          "MATAR": 20,
+          "GARRF": 20,
+          "MONTS": 50,
+          "BALEA": 10
+        },
+        "weight": 4,
+        "fleet": [
+          "A319",
+          "A320",
+          "A20N",
+          "A321",
+          "A21N",
+          "A359",
+          "B789",
+          "B77W",
+          "A388"
+        ],
+        "numbers": [
+          [
+            1,
+            199
+          ],
+          [
+            300,
+            999
+          ]
+        ]
+      },
+      {
+        "code": "KLM",
+        "preferredFixes": {
+          "MATAR": 30,
+          "GARRF": 10,
+          "MONTS": 50,
+          "BALEA": 10
+        },
+        "weight": 3,
+        "fleet": [
+          "B738",
+          "A20N"
+        ],
+        "numbers": [
+          [
+            1000,
+            1099
+          ]
+        ]
+      },
+      {
+        "code": "UAE",
+        "preferredFixes": {
+          "MATAR": 20,
+          "GARRF": 20,
+          "MONTS": 20,
+          "BALEA": 40
+        },
+        "weight": 2,
+        "fleet": [
+          "A388",
+          "B77W"
+        ],
+        "numbers": [
+          [
+            1,
+            60
+          ]
+        ]
+      },
+      {
+        "code": "TAP",
+        "preferredFixes": {
+          "MATAR": 20,
+          "GARRF": 40,
+          "MONTS": 30,
+          "BALEA": 10
+        },
+        "weight": 2,
+        "fleet": [
+          "A320",
+          "A20N"
+        ],
+        "numbers": [
+          [
+            1300,
+            1399
+          ]
+        ]
+      }
+    ]
+  },
+  "overflights": {
+    "seed": 20260906,
+    "firstSpawnSeconds": 120,
+    "intervalSeconds": 200,
+    "intervalJitter": 0.4,
+    "maxConcurrent": 6,
+    "entryDistanceNM": 6,
+    "exitDistanceNM": 10,
+    "corridors": [
+      {
+        "id": "MED-EAST",
+        "label": "Iberia to the Mediterranean, across the arrival flow",
+        "via": [
+          "MONTS",
+          "BCN",
+          "BALEA"
+        ],
+        "destination": "LIRF",
+        "minAltFt": 15000,
+        "maxAltFt": 19000,
+        "speedKts": 330,
+        "weight": 3,
+        "operators": [
+          "IBE",
+          "DLH",
+          "AFR"
+        ],
+        "crossing": "overhead"
+      },
+      {
+        "id": "MED-WEST",
+        "label": "Mediterranean to Iberia, across the arrival flow",
+        "via": [
+          "BALEA",
+          "BCN",
+          "MONTS"
+        ],
+        "destination": "LEMD",
+        "minAltFt": 14000,
+        "maxAltFt": 18000,
+        "speedKts": 330,
+        "weight": 3,
+        "operators": [
+          "IBE",
+          "TAP"
+        ],
+        "crossing": "overhead"
+      },
+      {
+        "id": "COAST-NORTH",
+        "label": "Coastal traffic routing north-east towards France",
+        "via": [
+          "GARRF",
+          "MATAR"
+        ],
+        "destination": "LFMN",
+        "minAltFt": 13000,
+        "maxAltFt": 17000,
+        "speedKts": 320,
+        "weight": 3,
+        "operators": [
+          "EZY",
+          "AFR"
+        ],
+        "crossing": "crossing"
+      },
+      {
+        "id": "COAST-SOUTH",
+        "label": "Coastal traffic routing south-west towards Valencia",
+        "via": [
+          "MATAR",
+          "GARRF"
+        ],
+        "destination": "LEVC",
+        "minAltFt": 13000,
+        "maxAltFt": 17000,
+        "speedKts": 320,
+        "weight": 2,
+        "operators": [
+          "IBE",
+          "EZY"
+        ],
+        "crossing": "clear"
+      }
+    ]
+  },
+  "provenance": {
+    "positions": "CONSTRUCTED, NOT SURVEYED.",
+    "notes": "The aerodrome reference point, the runway designators and bearings, and the field elevation are real to the best of the author knowledge. EVERYTHING ELSE IS CONSTRUCTED: the entry fixes and their names, the airspace boundary, the terrain and noise areas and the traffic mix are invented to give the sector a shape to control, and are NOT taken from any AIP. Do not use for anything but this game. Contrast egll.json, whose positions are surveyed."
+  }
+}

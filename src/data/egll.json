@@ -17919,5 +17919,7 @@
         "crossing": "overhead"
       }
     ]
-  }
+  },
+  "tier": "normal",
+  "brief": "Two parallel runways, worked segregated -- one lands, one departs -- and four holding stacks fed by direction: BNN north-west for the Atlantic, LAM north-east for northern Europe, BIG south-east for the Middle East and Asia, OCK south-west for Iberia. The whole job is turning four separate queues into one line for one runway, at a rate that leaves no slack. Flat ground and no terrain to speak of; the pressure is entirely traffic density and the length of the final approach track everybody has to share."
 }

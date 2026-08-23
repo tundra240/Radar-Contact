@@ -36,6 +36,14 @@ import {
  */
 export type SessionMode = 'career' | 'sandbox'
 
+/** One field on the menu. */
+export interface AirportChoice {
+  readonly icao: string
+  readonly name: string
+  readonly tier: string
+  readonly brief: string
+}
+
 export interface LogonDetails {
   /** Operating initials, two or three letters. */
   readonly initials: string
@@ -71,6 +79,18 @@ export interface LogonOptions {
   /** Remembered difficulty, preselected. */
   readonly difficulty: DifficultyName
   readonly mode: SessionMode
+  /** The fields on offer, gentlest first. */
+  readonly airports: readonly AirportChoice[]
+  /** Which one is loaded now. */
+  readonly airport: string
+  /**
+   * Asked for a different field.
+   *
+   * Not a value returned with the logon: a sector is the world the whole
+   * session is built on, so changing it reloads rather than being carried
+   * through as a preference.
+   */
+  readonly onAirport: (icao: string) => void
   readonly onLogon: (details: LogonDetails) => void
   /**
    * Log on and start the tutorial instead of a free session.
@@ -98,6 +118,8 @@ export class Logon {
   private difficulty: DifficultyName = DEFAULT_DIFFICULTY
   private mode: SessionMode = 'career'
   private readonly levelButtons: HTMLButtonElement[] = []
+  private readonly fieldButtons: HTMLButtonElement[] = []
+  private fieldNote!: HTMLParagraphElement
   private readonly modeButtons: HTMLButtonElement[] = []
   private levelNote!: HTMLParagraphElement
   private readonly opts: LogonOptions
@@ -206,6 +228,7 @@ export class Logon {
     this.error.setAttribute('role', 'alert')
     body.appendChild(this.error)
 
+    body.appendChild(this.buildAirports())
     body.appendChild(this.buildDifficulty())
     body.appendChild(this.buildMode())
 
@@ -247,8 +270,9 @@ export class Logon {
     this.root.appendChild(win)
     opts.mount.appendChild(this.root)
 
-    // Light the remembered choice, and say what it means, before anybody
-    // looks at it.
+    // Light the remembered choices, and say what they mean, before anybody
+    // looks at them.
+    this.describeAirport(opts.airport)
     this.paintDifficulty()
 
     // Uppercase as typed, because operating initials are always written
@@ -293,6 +317,57 @@ export class Logon {
 
   destroy(): void {
     this.root.remove()
+  }
+
+  /**
+   * The fields, with a paragraph on whichever is under the cursor.
+   *
+   * The brief matters more than the name: "Nice" tells somebody nothing,
+   * and "a strip of usable airspace between the Alps and the sea" tells
+   * them what they are about to be asked to do.
+   */
+  private buildAirports(): HTMLElement {
+    const wrap = document.createElement('div')
+    wrap.className = 'logon-section'
+
+    const title = document.createElement('div')
+    title.className = 'logon-section-title'
+    title.textContent = 'Sector'
+    wrap.appendChild(title)
+
+    const row = document.createElement('div')
+    row.className = 'logon-levels'
+    for (const field of this.opts.airports) {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'logon-level logon-field'
+      button.dataset['airport'] = field.icao
+      button.textContent = field.icao
+      button.title = `${field.name} -- ${field.tier}`
+      button.addEventListener('click', () => this.opts.onAirport(field.icao))
+      button.addEventListener('pointerenter', () => this.describeAirport(field.icao))
+      button.addEventListener('pointerleave', () => this.describeAirport(this.opts.airport))
+      row.appendChild(button)
+      this.fieldButtons.push(button)
+    }
+    wrap.appendChild(row)
+
+    this.fieldNote = document.createElement('p')
+    this.fieldNote.className = 'logon-note logon-field-note'
+    wrap.appendChild(this.fieldNote)
+    return wrap
+  }
+
+  /** Say what a field is like to work. */
+  private describeAirport(icao: string): void {
+    const field = this.opts.airports.find((f) => f.icao === icao)
+    if (field === undefined) return
+    this.fieldNote.textContent = `${field.name} (${field.tier}). ${field.brief}`
+    for (const button of this.fieldButtons) {
+      const on = button.dataset['airport'] === this.opts.airport
+      button.classList.toggle('is-on', on)
+      button.setAttribute('aria-pressed', String(on))
+    }
   }
 
   /** The four settings, as a row of buttons with the chosen one lit. */

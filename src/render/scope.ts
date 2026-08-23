@@ -16,6 +16,7 @@ import {
   type Runway,
 } from '../data/airport'
 import type { Aircraft } from '../sim/types'
+import type { ZoneShape } from '../sim/zones'
 import { drawTargets, drawVectorDrag, type VectorDrag } from './layers/targets'
 import { drawWeather } from './layers/weather'
 import type { Weather } from '../sim/weather'
@@ -202,6 +203,7 @@ export function drawScope(
 
   // Above every overlay and below the chrome: traffic is the top layer of
   // the radar picture, but it is still inside the display.
+  drawZones(g, cam, airport)
   drawTargets(
     g,
     cam,
@@ -1125,6 +1127,85 @@ const readoutAt = new Map<string, ReadoutBox>()
 /** The rectangle a named readout occupies, or null if it is not drawn. */
 export function readoutBox(label: string): ReadoutBox | null {
   return readoutAt.get(label) ?? null
+}
+
+/**
+ * High ground and noise abatement areas.
+ *
+ * Under the traffic and over the map: they are constraints on where you may
+ * put an aeroplane, so they have to be visible while you are deciding, and
+ * they must never be the brightest thing on the glass. Terrain is drawn in
+ * the warning colour because flying into it is the worst thing that can
+ * happen; a noise zone is drawn in the furniture colour because breaking it
+ * costs money.
+ */
+function drawZones(g: CanvasRenderingContext2D, cam: Camera, airport: Airport): void {
+  if (airport.terrain.length === 0 && airport.noise.length === 0) return
+
+  g.save()
+  g.lineWidth = 1
+
+  for (const zone of airport.terrain) {
+    g.strokeStyle = theme.warn
+    g.globalAlpha = 0.5
+    traceZone(g, cam, zone.shape)
+    g.stroke()
+    g.globalAlpha = 0.85
+    // The minimum, not the summit: the number a controller uses.
+    labelZone(g, cam, zone.shape, `${zone.label} ${zone.minimumSafeFt} MSA`, theme.warn)
+  }
+
+  for (const zone of airport.noise) {
+    g.strokeStyle = theme.ringStrong
+    g.globalAlpha = 0.55
+    g.setLineDash([5, 4])
+    traceZone(g, cam, zone.shape)
+    g.stroke()
+    g.setLineDash([])
+    g.globalAlpha = 0.8
+    labelZone(g, cam, zone.shape, `${zone.label} ${zone.floorFt}+`, theme.ringLabel)
+  }
+
+  g.restore()
+}
+
+/** The outline of a zone, whichever shape it is. */
+function traceZone(g: CanvasRenderingContext2D, cam: Camera, shape: ZoneShape): void {
+  g.beginPath()
+  if (shape.kind === 'circle') {
+    const centre = cam.worldToScreen(shape.centreNM)
+    g.arc(centre.x, centre.y, shape.radiusNM * cam.pxPerNM, 0, Math.PI * 2)
+    return
+  }
+  shape.verticesNM.forEach((v, i) => {
+    const p = cam.worldToScreen(v)
+    if (i === 0) g.moveTo(p.x, p.y)
+    else g.lineTo(p.x, p.y)
+  })
+  g.closePath()
+}
+
+/** A name in the middle of a zone, so it can be told from a range ring. */
+function labelZone(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  shape: ZoneShape,
+  text: string,
+  colour: string,
+): void {
+  const at =
+    shape.kind === 'circle'
+      ? shape.centreNM
+      : {
+          x: shape.verticesNM.reduce((sum, v) => sum + v.x, 0) / shape.verticesNM.length,
+          y: shape.verticesNM.reduce((sum, v) => sum + v.y, 0) / shape.verticesNM.length,
+        }
+  const p = cam.worldToScreen(at)
+  g.font = fonts.label(9)
+  g.fillStyle = colour
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillText(text, p.x, p.y)
 }
 
 function drawHud(

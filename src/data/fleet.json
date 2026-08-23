@@ -1,0 +1,75 @@
+{
+  "note": "Aircraft performance, shared by every airport profile. Not per-field data: an A320 flies the same wherever it is, and a copy in each profile is a copy that can drift. Merged in by data/airports.ts before the profile is loaded.",
+  "aircraftTypes": [
+    {
+      "type": "A319",
+      "wake": "M",
+      "cruiseKts": 250,
+      "approachKts": 135,
+      "weight": 7
+    },
+    {
+      "type": "A320",
+      "wake": "M",
+      "cruiseKts": 250,
+      "approachKts": 140,
+      "weight": 13
+    },
+    {
+      "type": "A20N",
+      "wake": "M",
+      "cruiseKts": 250,
+      "approachKts": 140,
+      "weight": 11
+    },
+    {
+      "type": "A321",
+      "wake": "M",
+      "cruiseKts": 250,
+      "approachKts": 142,
+      "weight": 8
+    },
+    {
+      "type": "A21N",
+      "wake": "M",
+      "cruiseKts": 250,
+      "approachKts": 142,
+      "weight": 9
+    },
+    {
+      "type": "B738",
+      "wake": "M",
+      "cruiseKts": 250,
+      "approachKts": 142,
+      "weight": 5
+    },
+    {
+      "type": "A359",
+      "wake": "H",
+      "cruiseKts": 280,
+      "approachKts": 148,
+      "weight": 9
+    },
+    {
+      "type": "B789",
+      "wake": "H",
+      "cruiseKts": 280,
+      "approachKts": 150,
+      "weight": 10
+    },
+    {
+      "type": "B77W",
+      "wake": "H",
+      "cruiseKts": 280,
+      "approachKts": 152,
+      "weight": 10
+    },
+    {
+      "type": "A388",
+      "wake": "J",
+      "cruiseKts": 280,
+      "approachKts": 145,
+      "weight": 4
+    }
+  ]
+}

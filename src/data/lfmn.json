@@ -1,0 +1,589 @@
+{
+  "icao": "LFMN",
+  "name": "Nice Cote d'Azur",
+  "tier": "normal",
+  "brief": "A strip of usable airspace between the Maritime Alps and the sea. The mountains start a few miles inland and climb hard -- there is a minimum safe altitude over them that is higher than the level you want to be at on the approach -- so almost all vectoring happens over the water to the south. Arrivals are brought down the coast and turned in from the sea rather than from behind the field, which makes the base leg short and the intercept unforgiving. Two close parallel runways handle it. The sea breeze turns through the day and the field turns round with it, so the direction you started in is not necessarily the one you finish in.",
+  "arp": {
+    "lat": 43.658411,
+    "lon": 7.215869
+  },
+  "elevationFt": 12,
+  "magVarDeg": 0,
+  "sector": {
+    "radiusNM": 32,
+    "ceilingFt": 13000,
+    "floorFt": 1000,
+    "speedLimitKts": 250,
+    "speedLimitBelowFt": 10000,
+    "interceptAltMaxFt": 3000,
+    "rangeRingsNM": [
+      5,
+      10,
+      15,
+      20
+    ],
+    "defaultRangeNM": 37,
+    "activeArrivalRunways": [
+      "04L"
+    ],
+    "activeDepartureRunways": [
+      "04R"
+    ]
+  },
+  "weather": {
+    "wind": {
+      "fromDeg": 50,
+      "speedKts": 10
+    },
+    "windEffect": 1,
+    "cellsPerHour": 4,
+    "minLifeMinutes": 7,
+    "maxLifeMinutes": 18,
+    "heavyChance": 0.12,
+    "minRadiusNM": 4,
+    "maxRadiusNM": 12,
+    "driftFactor": 0.8,
+    "driftSpreadDeg": 30,
+    "driftSpeedSpread": 0.35,
+    "shapeDriftDegPerMin": 6,
+    "spreadNM": 18
+  },
+  "render": {
+    "runwayExaggeration": 3,
+    "exaggerationCutoffPxPerNM": 45,
+    "neighbourRunwayMinPx": 9,
+    "holdSpeedKts": 220
+  },
+  "runways": [
+    {
+      "id": "04L",
+      "threshold": {
+        "lat": 43.647441,
+        "lon": 7.201729
+      },
+      "bearingTrue": 43,
+      "lengthFt": 9711,
+      "thresholdElevationFt": 12,
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
+    },
+    {
+      "id": "22R",
+      "threshold": {
+        "lat": 43.669381,
+        "lon": 7.230009
+      },
+      "bearingTrue": 223,
+      "lengthFt": 9711,
+      "thresholdElevationFt": 12,
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
+    },
+    {
+      "id": "04R",
+      "threshold": {
+        "lat": 43.642534,
+        "lon": 7.203199
+      },
+      "bearingTrue": 43,
+      "lengthFt": 8432,
+      "thresholdElevationFt": 12,
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
+    },
+    {
+      "id": "22L",
+      "threshold": {
+        "lat": 43.674288,
+        "lon": 7.228539
+      },
+      "bearingTrue": 223,
+      "lengthFt": 8432,
+      "thresholdElevationFt": 12,
+      "ils": {
+        "available": true,
+        "glideslopeDeg": 3,
+        "fafDistNM": 10,
+        "minInterceptDeg": 30
+      }
+    }
+  ],
+  "navaids": [
+    {
+      "name": "ANTIB",
+      "fullName": "Antibes gate",
+      "lat": 43.34518,
+      "lon": 7.058285,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 114.2
+      },
+      "hold": {
+        "turns": "right",
+        "legMins": 1
+      },
+      "entry": {
+        "minAltFt": 5000,
+        "maxAltFt": 11000
+      }
+    },
+    {
+      "name": "MENTO",
+      "fullName": "Menton gate",
+      "lat": 43.59474,
+      "lon": 7.714987,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 115.4
+      },
+      "hold": {
+        "turns": "right",
+        "legMins": 1
+      },
+      "entry": {
+        "minAltFt": 6000,
+        "maxAltFt": 12000
+      }
+    },
+    {
+      "name": "ESTRL",
+      "fullName": "Esterel gate",
+      "lat": 43.521603,
+      "lon": 6.69632,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 116.1
+      },
+      "hold": {
+        "turns": "right",
+        "legMins": 1
+      },
+      "entry": {
+        "minAltFt": 5000,
+        "maxAltFt": 11000
+      }
+    },
+    {
+      "name": "NIZ",
+      "fullName": "Nice",
+      "lat": 43.675078,
+      "lon": 7.215869,
+      "navaid": {
+        "type": "VOR-DME",
+        "freqMHz": 112.4
+      }
+    }
+  ],
+  "airspace": [
+    {
+      "id": "LFMN TMA",
+      "label": "NICE TMA",
+      "class": "A",
+      "kind": "lines",
+      "paths": [
+        [
+          {
+            "lat": 44.158411,
+            "lon": 7.215869
+          },
+          {
+            "lat": 44.141374,
+            "lon": 7.394743
+          },
+          {
+            "lat": 44.091424,
+            "lon": 7.561427
+          },
+          {
+            "lat": 44.011964,
+            "lon": 7.704561
+          },
+          {
+            "lat": 43.908411,
+            "lon": 7.814392
+          },
+          {
+            "lat": 43.787821,
+            "lon": 7.883435
+          },
+          {
+            "lat": 43.658411,
+            "lon": 7.906984
+          },
+          {
+            "lat": 43.529001,
+            "lon": 7.883435
+          },
+          {
+            "lat": 43.408411,
+            "lon": 7.814392
+          },
+          {
+            "lat": 43.304858,
+            "lon": 7.704561
+          },
+          {
+            "lat": 43.225398,
+            "lon": 7.561427
+          },
+          {
+            "lat": 43.175448,
+            "lon": 7.394743
+          },
+          {
+            "lat": 43.158411,
+            "lon": 7.215869
+          },
+          {
+            "lat": 43.175448,
+            "lon": 7.036995
+          },
+          {
+            "lat": 43.225398,
+            "lon": 6.870311
+          },
+          {
+            "lat": 43.304858,
+            "lon": 6.727177
+          },
+          {
+            "lat": 43.408411,
+            "lon": 6.617346
+          },
+          {
+            "lat": 43.529001,
+            "lon": 6.548303
+          },
+          {
+            "lat": 43.658411,
+            "lon": 6.524754
+          },
+          {
+            "lat": 43.787821,
+            "lon": 6.548303
+          },
+          {
+            "lat": 43.908411,
+            "lon": 6.617346
+          },
+          {
+            "lat": 44.011964,
+            "lon": 6.727177
+          },
+          {
+            "lat": 44.091424,
+            "lon": 6.870311
+          },
+          {
+            "lat": 44.141374,
+            "lon": 7.036995
+          },
+          {
+            "lat": 44.158411,
+            "lon": 7.215869
+          }
+        ]
+      ],
+      "floorFt": 3000,
+      "ceilingFt": 17500,
+      "derivation": "rule",
+      "verticalSource": "rule"
+    },
+    {
+      "id": "LFMN CTR",
+      "label": "NICE CTR",
+      "class": "D",
+      "kind": "circle",
+      "centre": {
+        "lat": 43.658411,
+        "lon": 7.215869
+      },
+      "radiusNM": 8,
+      "floorFt": 0,
+      "ceilingFt": 3000,
+      "derivation": "rule",
+      "verticalSource": "rule"
+    }
+  ],
+  "terrain": [
+    {
+      "id": "maritime-alps",
+      "label": "MARITIME ALPS",
+      "kind": "polygon",
+      "vertices": [
+        {
+          "lat": 43.991744,
+          "lon": 6.417838
+        },
+        {
+          "lat": 44.36318,
+          "lon": 6.861306
+        },
+        {
+          "lat": 44.36318,
+          "lon": 7.570432
+        },
+        {
+          "lat": 43.991744,
+          "lon": 8.0139
+        },
+        {
+          "lat": 43.744447,
+          "lon": 7.385708
+        },
+        {
+          "lat": 43.775078,
+          "lon": 7.215869
+        },
+        {
+          "lat": 43.744447,
+          "lon": 7.04603
+        }
+      ],
+      "peakFt": 9800,
+      "minimumSafeFt": 11500
+    },
+    {
+      "id": "esterel-hills",
+      "label": "ESTEREL",
+      "kind": "circle",
+      "centre": {
+        "lat": 43.61202,
+        "lon": 6.759609
+      },
+      "radiusNM": 8,
+      "peakFt": 2000,
+      "minimumSafeFt": 4000
+    }
+  ],
+  "noise": [
+    {
+      "id": "nice-city",
+      "label": "NICE CITY",
+      "kind": "circle",
+      "centre": {
+        "lat": 43.673509,
+        "lon": 7.293752
+      },
+      "radiusNM": 3,
+      "floorFt": 2500,
+      "penaltyPoints": 20
+    }
+  ],
+  "aircraftTypes": [],
+  "traffic": {
+    "seed": 20260903,
+    "firstSpawnSeconds": 10,
+    "initialIntervalSeconds": 120,
+    "minIntervalSeconds": 45,
+    "rampMinutes": 10,
+    "intervalJitter": 0.2,
+    "maxConcurrent": 12,
+    "minFixSpacingNM": 8,
+    "minFixSpacingSeconds": 60,
+    "entrySpeedKts": 220,
+    "entryDistanceNM": 8,
+    "airlines": [
+      {
+        "code": "EZY",
+        "preferredFixes": {
+          "ANTIB": 40,
+          "MENTO": 20,
+          "ESTRL": 40
+        },
+        "weight": 8,
+        "fleet": [
+          "A319",
+          "A320",
+          "A20N",
+          "A321",
+          "A21N"
+        ],
+        "numbers": [
+          [
+            8000,
+            8999
+          ]
+        ]
+      },
+      {
+        "code": "AFR",
+        "preferredFixes": {
+          "ANTIB": 35,
+          "MENTO": 30,
+          "ESTRL": 35
+        },
+        "weight": 8,
+        "fleet": [
+          "A319",
+          "A320",
+          "A20N",
+          "A21N"
+        ],
+        "numbers": [
+          [
+            1000,
+            1099
+          ]
+        ]
+      },
+      {
+        "code": "BAW",
+        "preferredFixes": {
+          "ANTIB": 45,
+          "MENTO": 15,
+          "ESTRL": 40
+        },
+        "weight": 4,
+        "fleet": [
+          "A319",
+          "A320",
+          "A20N",
+          "A321",
+          "A21N",
+          "A359",
+          "B789",
+          "B77W",
+          "A388"
+        ],
+        "numbers": [
+          [
+            1,
+            199
+          ],
+          [
+            300,
+            999
+          ]
+        ]
+      },
+      {
+        "code": "DLH",
+        "preferredFixes": {
+          "ANTIB": 25,
+          "MENTO": 50,
+          "ESTRL": 25
+        },
+        "weight": 4,
+        "fleet": [
+          "A320",
+          "A20N",
+          "A21N",
+          "A359"
+        ],
+        "numbers": [
+          [
+            900,
+            999
+          ]
+        ]
+      },
+      {
+        "code": "SWR",
+        "preferredFixes": {
+          "ANTIB": 25,
+          "MENTO": 50,
+          "ESTRL": 25
+        },
+        "weight": 3,
+        "fleet": [
+          "A319",
+          "A320",
+          "A20N",
+          "A21N"
+        ],
+        "numbers": [
+          [
+            300,
+            349
+          ]
+        ]
+      },
+      {
+        "code": "KLM",
+        "preferredFixes": {
+          "ANTIB": 40,
+          "MENTO": 20,
+          "ESTRL": 40
+        },
+        "weight": 2,
+        "fleet": [
+          "B738",
+          "A20N"
+        ],
+        "numbers": [
+          [
+            1000,
+            1099
+          ]
+        ]
+      }
+    ]
+  },
+  "overflights": {
+    "seed": 20260904,
+    "firstSpawnSeconds": 150,
+    "intervalSeconds": 260,
+    "intervalJitter": 0.4,
+    "maxConcurrent": 4,
+    "entryDistanceNM": 6,
+    "exitDistanceNM": 10,
+    "corridors": [
+      {
+        "id": "RIVIERA-EAST",
+        "label": "Coastal traffic routing east towards Italy",
+        "via": [
+          "ESTRL",
+          "ANTIB",
+          "MENTO"
+        ],
+        "destination": "LIMC",
+        "minAltFt": 15000,
+        "maxAltFt": 19000,
+        "speedKts": 320,
+        "weight": 3,
+        "operators": [
+          "AFR",
+          "DLH",
+          "SWR"
+        ],
+        "crossing": "clear"
+      },
+      {
+        "id": "RIVIERA-WEST",
+        "label": "Coastal traffic routing west towards Marseille",
+        "via": [
+          "MENTO",
+          "ANTIB",
+          "ESTRL"
+        ],
+        "destination": "LFML",
+        "minAltFt": 14000,
+        "maxAltFt": 18000,
+        "speedKts": 320,
+        "weight": 3,
+        "operators": [
+          "AFR",
+          "EZY"
+        ],
+        "crossing": "crossing"
+      }
+    ]
+  },
+  "provenance": {
+    "positions": "CONSTRUCTED, NOT SURVEYED.",
+    "notes": "The aerodrome reference point, the runway designators and bearings, and the field elevation are real to the best of the author knowledge. EVERYTHING ELSE IS CONSTRUCTED: the entry fixes and their names, the airspace boundary, the terrain and noise areas and the traffic mix are invented to give the sector a shape to control, and are NOT taken from any AIP. Do not use for anything but this game. Contrast egll.json, whose positions are surveyed."
+  }
+}
