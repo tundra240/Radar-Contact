@@ -172,10 +172,11 @@ canvas {
 }
 
 .menu-panel {
-  /* Hangs below its button, out of the controls row's flow. */
+  /* Out of the rail's flow, so opening it does not shove the buttons
+     about. Where it opens is settled in one place, further down with the
+     other panels: a side declared here as well would mean two rules
+     disagreeing and the later one winning by accident of order. */
   position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
   width: 212px;
   /* Scrolls rather than runs off the bottom on a short window. */
   max-height: calc(100vh - 96px);
@@ -834,13 +835,21 @@ canvas {
 }
 
 .guide-window {
+  /* Fixed rather than absolute: it is a document, sized against the window
+     rather than against the button that opened it. Which means it is placed
+     in viewport coordinates -- a percentage here is a percentage of the
+     screen, not of the rail -- so it sits beside the rail by measuring from
+     the left edge, and says so in one place. */
   position: fixed;
   top: 48px;
-  right: 12px;
+  left: 36px;
+  right: auto;
   z-index: 40;
   display: flex;
   flex-direction: column;
-  width: min(740px, calc(100vw - 24px));
+  /* It starts 36px in, so that much again has to come off the width or
+     the far edge hangs off the screen. */
+  width: min(740px, calc(100vw - 48px));
   max-height: calc(100vh - 72px);
   color: var(--chrome-text);
   background: var(--face);
@@ -1723,12 +1732,6 @@ canvas {
 :root[data-chrome='flat'] .atis-choice-name {
   font-size: 11px;
   letter-spacing: 0.04em;
-}
-
-.guide-window {
-  right: auto;
-  left: calc(100% + 1px);
-  top: 0;
 }
 
 /* Tighter type and spacing throughout the panels: a modern readout fits
