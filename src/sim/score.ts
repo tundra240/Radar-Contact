@@ -1,4 +1,5 @@
 import type { Departure } from './aircraft'
+import { DIFFICULTIES, scaledPoints, type DifficultySettings } from './difficulty'
 
 /**
  * The score.
@@ -47,22 +48,40 @@ export interface Score {
 
 export const NO_SCORE: Score = { points: 0, landed: 0, lost: 0, transited: 0 }
 
-/** What one departure is worth, positive or negative. */
-export function pointsFor(departure: Departure): number {
+/**
+ * What one departure is worth, positive or negative.
+ *
+ * Scaled by the difficulty, because the same landing is not the same
+ * achievement at nine an hour and at thirty-four. The penalty scales with
+ * it: a setting that paid triple for a landing and charged single for a
+ * loss would make the hard settings easier to score well on by being
+ * careless, which is backwards.
+ */
+export function pointsFor(
+  departure: Departure,
+  // Unscaled unless a setting is given. The base figures are what a
+  // landing is worth; the multiplier is a property of the session, so a
+  // caller that has not said which session it means gets the plain number.
+  difficulty: DifficultySettings = DIFFICULTIES.easy,
+): number {
   switch (departure) {
     case 'landed':
-      return LANDING_POINTS
+      return scaledPoints(LANDING_POINTS, difficulty)
     case 'transited':
       return TRANSIT_POINTS
     case 'left':
-      return -LOST_PENALTY
+      return -scaledPoints(LOST_PENALTY, difficulty)
   }
 }
 
 /** The score after one more aircraft has finished with the sector. */
-export function scoreDeparture(score: Score, departure: Departure): Score {
+export function scoreDeparture(
+  score: Score,
+  departure: Departure,
+  difficulty: DifficultySettings = DIFFICULTIES.easy,
+): Score {
   return {
-    points: score.points + pointsFor(departure),
+    points: score.points + pointsFor(departure, difficulty),
     landed: score.landed + (departure === 'landed' ? 1 : 0),
     lost: score.lost + (departure === 'left' ? 1 : 0),
     transited: score.transited + (departure === 'transited' ? 1 : 0),

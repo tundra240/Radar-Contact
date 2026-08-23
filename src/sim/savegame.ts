@@ -4,6 +4,8 @@ import type { Atis } from './atis'
 import type { Score } from './score'
 import type { OverflightState } from './overflight'
 import type { SpawnerState } from './spawner'
+import type { DifficultyName } from './difficulty'
+import type { SessionMode } from '../ui/logon'
 import { ROLES } from './types'
 import type {
   Aircraft,
@@ -40,7 +42,7 @@ import type { WakeCategory } from '../data/airport'
  * Bumped whenever the shape changes. An older save is refused rather than
  * guessed at -- there is no migration path worth the bugs it would carry.
  */
-export const SAVE_VERSION = 5
+export const SAVE_VERSION = 6
 
 export interface SavedController {
   readonly initials: string
@@ -52,6 +54,17 @@ export interface SavedController {
    * initials.
    */
   readonly enforceAirspace: boolean
+  /**
+   * The setting the session was flown on.
+   *
+   * Part of who is on position for the same reason the airspace rule is: it
+   * was chosen at logon and it is a rule for the shift. It also has to
+   * survive a save, or a career run resumed tomorrow would come back at
+   * whatever the menu happened to be showing -- which for a career run is
+   * the difference between finishing it and cheating at it.
+   */
+  readonly difficulty: DifficultyName
+  readonly mode: SessionMode
 }
 
 export interface SavedGame {
@@ -234,6 +247,10 @@ function parseAtis(v: unknown, path: string): Atis {
   }
 }
 
+/** Every difficulty name, for the save file's validator. */
+const DIFFICULTY_NAMES = ['easy', 'normal', 'hard', 'pro'] as const
+const SESSION_MODES = ['career', 'sandbox'] as const
+
 function parseController(v: unknown): SavedController | null {
   if (v === null) return null
   const o = obj(v, 'save.controller')
@@ -241,6 +258,8 @@ function parseController(v: unknown): SavedController | null {
     initials: str(o['initials'], 'save.controller.initials'),
     position: str(o['position'], 'save.controller.position'),
     enforceAirspace: bool(o['enforceAirspace'], 'save.controller.enforceAirspace'),
+    difficulty: oneOf(o['difficulty'], 'save.controller.difficulty', DIFFICULTY_NAMES),
+    mode: oneOf(o['mode'], 'save.controller.mode', SESSION_MODES),
   }
 }
 

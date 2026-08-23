@@ -3,6 +3,13 @@ import { advance, bearingDeg, distanceNM, normalizeHeading, type Vec2NM } from '
 import { isWithinFootprint } from './airspace'
 import { makeRng, makeRngAt, type Rng } from '../core/rng'
 import type { Airport, Corridor } from '../data/airport'
+import {
+  allowsCorridor,
+  DIFFICULTIES,
+  hasTransits,
+  intervalSecondsFor,
+  type DifficultySettings,
+} from './difficulty'
 import type { FlightGenerator } from './flightgen'
 import type { Aircraft, Route, RouteLeg } from './types'
 
@@ -167,6 +174,8 @@ export interface OverflightState {
 
 export interface OverflightOptions {
   readonly airport: Airport
+  /** The session's difficulty, which sets the rate and picks the corridors. */
+  readonly difficulty?: DifficultySettings
   /** Shared with the arrival spawner, so no two flights take one callsign. */
   readonly flights: FlightGenerator
   readonly seed?: number
@@ -187,6 +196,7 @@ export class Overflights {
   private readonly flights: FlightGenerator
   private rng: Rng
   private readonly corridors: readonly Corridor[]
+  private readonly difficulty: DifficultySettings
   /** Routes never move, and building one walks the boundary six times. */
   private readonly routes = new Map<string, Route>()
   private readonly lastUsedAt = new Map<string, number>()
@@ -199,13 +209,29 @@ export class Overflights {
     this.airport = opts.airport
     this.flights = opts.flights
     const config = opts.airport.overflights
-    this.corridors = config?.corridors ?? []
+    this.difficulty = opts.difficulty ?? DIFFICULTIES.normal
+    // Only the corridors this setting flies. Easy has none at all, and a
+    // setting with none is a sector with no transits in it.
+    this.corridors = (config?.corridors ?? []).filter((c) =>
+      allowsCorridor(this.difficulty, c.crossing),
+    )
     this.rng = opts.rng ?? makeRng(opts.seed ?? config?.seed ?? 0)
     this.waitSeconds = config?.firstSpawnSeconds ?? 0
   }
 
   get seed(): number {
     return this.rng.seed
+  }
+
+  /**
+   * How many transits may be up at once on this setting.
+   *
+   * Worth reading back: it is the difference between a quiet sector and a
+   * busy one, and it is derived from the rate rather than configured, so
+   * the only honest way to check it is to ask.
+   */
+  get concurrentCap(): number {
+    return this.cap(this.airport.overflights?.maxConcurrent ?? 1)
   }
 
   get spawned(): number {
@@ -244,11 +270,13 @@ export class Overflights {
     const config = this.airport.overflights
     if (config === null || this.corridors.length === 0) return []
 
+    if (!hasTransits(this.difficulty)) return []
+
     this.sinceLastSpawn += Math.max(0, dtSeconds)
     if (this.sinceLastSpawn < this.waitSeconds) return []
 
     const airborne = traffic.filter((a) => a.role === 'overflight').length
-    if (airborne >= config.maxConcurrent) {
+    if (airborne >= this.cap(config.maxConcurrent)) {
       // Full. Bank nothing and look again shortly, rather than releasing a
       // backlog the moment one leaves.
       this.sinceLastSpawn = 0
@@ -258,7 +286,10 @@ export class Overflights {
 
     const corridor = this.pick(clock.elapsedSeconds)
     this.sinceLastSpawn = 0
-    this.waitSeconds = this.nextWait(config.intervalSeconds, config.intervalJitter)
+    this.waitSeconds = this.nextWait(
+      intervalSecondsFor(this.difficulty.transitsPerHour),
+      config.intervalJitter,
+    )
     if (corridor === null) return []
 
     this.lastUsedAt.set(corridor.id, clock.elapsedSeconds)
@@ -283,8 +314,9 @@ export class Overflights {
     const config = this.airport.overflights
     if (config === null || this.corridors.length === 0) return []
 
+    if (!hasTransits(this.difficulty)) return []
     const airborne = existing.filter((a) => a.role === 'overflight').length
-    if (airborne >= config.maxConcurrent) return []
+    if (airborne >= this.cap(config.maxConcurrent)) return []
 
     // Every corridor, cooldown ignored -- but still weighted, so pressing
     // the key repeatedly gives the same mix as leaving it alone would.
@@ -292,6 +324,18 @@ export class Overflights {
     this.lastUsedAt.set(corridor.id, clock.elapsedSeconds)
     this.spawnCount += 1
     return [this.release(corridor, clock, existing)]
+  }
+
+  /**
+   * How many transits may be up at once.
+   *
+   * The published figure is what the field can hold; the difficulty scales
+   * it down, so an easier session is quieter in the air as well as slower
+   * to release.
+   */
+  private cap(published: number): number {
+    const wanted = Math.ceil(this.difficulty.transitsPerHour / 3)
+    return Math.max(1, Math.min(published, wanted))
   }
 
   /** The corridors not resting, weighted, or null if they are all resting. */

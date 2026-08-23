@@ -229,6 +229,15 @@ export interface Corridor {
   readonly weight: number
   /** Operators that plausibly fly it. Empty falls back to all of them. */
   readonly operators: readonly string[]
+  /**
+   * How much this corridor gets in the way, which is what decides whether a
+   * given difficulty flies it.
+   *
+   * A fact about the corridor and this field's geometry, so it belongs in
+   * the airport file: sim/difficulty.ts says which classes are in use and
+   * knows nothing about which corridors exist anywhere.
+   */
+  readonly crossing: 'clear' | 'crossing' | 'overhead'
 }
 
 /**
@@ -872,6 +881,7 @@ function parseOverflights(
       speedKts: num(co['speedKts'], `${p}.speedKts`),
       weight: num(co['weight'], `${p}.weight`),
       operators,
+      crossing: oneOfCrossing(co['crossing'], `${p}.crossing`),
     }
   })
 
@@ -885,6 +895,16 @@ function parseOverflights(
     exitDistanceNM: num(o['exitDistanceNM'], 'overflights.exitDistanceNM'),
     corridors,
   }
+}
+
+/** A corridor's class, defaulting to the cautious reading. */
+function oneOfCrossing(raw: unknown, path: string): 'clear' | 'crossing' | 'overhead' {
+  // Absent means crossing rather than clear: a corridor nobody has thought
+  // about should not quietly turn up on the gentlest setting.
+  if (raw === undefined || raw === null) return 'crossing'
+  const value = str(raw, path)
+  if (value === 'clear' || value === 'crossing' || value === 'overhead') return value
+  throw new ConfigError(path, 'must be clear, crossing or overhead')
 }
 
 function parseTraffic(

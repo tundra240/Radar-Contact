@@ -26,10 +26,23 @@ import {
   type SavedGame,
 } from './sim/savegame'
 import { Overflights } from './sim/overflight'
+import {
+  DEFAULT_DIFFICULTY,
+  difficultyOf,
+  intervalSecondsFor,
+  NO_OVERRIDES,
+  openingIntervalSecondsFor,
+  withOverrides,
+  type DifficultyName,
+  type DifficultyOverrides,
+  type DifficultySettings,
+} from './sim/difficulty'
+import { beginAtisFlow, stepAtisFlow, type AtisFlowState } from './sim/atisflow'
 import { BASICS } from './tutorial/lessons/basics'
 import { TutorialSession } from './tutorial/session'
 import { Spawner } from './sim/spawner'
 import { withScriptedCells, type WeatherCell } from './sim/weather'
+import { inWarning } from './sim/conflict'
 import type { Aircraft } from './sim/types'
 import type { Command } from './commands/types'
 import { applyAll, type ApplyContext } from './commands/apply'
@@ -37,7 +50,7 @@ import { TagMenu } from './ui/tagmenu'
 import { dragHeading, pickTarget, type VectorDrag } from './render/layers/targets'
 import { StripBay } from './ui/stripbay'
 import { Menu } from './ui/menu'
-import { Logon, type LogonDetails } from './ui/logon'
+import { Logon, type LogonDetails, type SessionMode } from './ui/logon'
 import { isTypingTarget, ownsSpace } from './ui/keys'
 import { Guide } from './ui/guide'
 // The guide's text is the repository's own how-to-play document, imported
@@ -572,6 +585,19 @@ function start(
     // the menu is built before there is a loop or a spawner to snapshot.
     onSave: () => saveSession(),
     onLoad: () => loadSession(),
+    onDifficulty: (name) => {
+      // Sandbox only; the menu refuses to call this on a career run. The
+      // preset is remembered so a reload comes back where you left it.
+      chosen = name
+      applyDifficulty(withOverrides(difficultyOf(name), overrides))
+      paintDifficulty()
+      announce(`difficulty: ${difficultyOf(name).label}`, 'note')
+    },
+    onOverrides: (next) => {
+      overrides = next
+      applyDifficulty(withOverrides(difficultyOf(chosen), overrides))
+      paintDifficulty()
+    },
   })
 
   // ---- the guide -------------------------------------------------------
@@ -774,15 +800,33 @@ function start(
 
   // The spawner owns the arrival flow; this list is the world until there
   // is a world module to own it.
-  const spawner = new Spawner({ airport, seed: seedFromUrl() ?? Date.now() })
+  /**
+   * How hard this session is.
+   *
+   * Everything the setting touches is rebuilt from it rather than nudged,
+   * which is why the flows below are reassignable: a difficulty chosen at
+   * logon has to reach the spawner's cadence and the weather's seed, and
+   * both of those are decided at construction.
+   */
+  let difficulty: DifficultySettings = difficultyOf(DEFAULT_DIFFICULTY)
+  /** The preset chosen, before any sandbox switches are applied over it. */
+  let chosen: DifficultyName = DEFAULT_DIFFICULTY
+  let overrides: DifficultyOverrides = NO_OVERRIDES
+  /** Career fixes the setting for the run; sandbox does not. */
+  let sessionMode: SessionMode = 'career'
+
+  const sessionSeed = seedFromUrl() ?? Date.now()
+
+  let spawner = new Spawner({ airport, seed: sessionSeed })
   // Traffic that is not this field's: neighbours' inbounds crossing a
   // corner of the airspace, and continental flights over the top of it.
   // Sharing the spawner's flight generator, so no transit can be issued a
   // callsign an arrival is already using.
-  const overflights = new Overflights({
+  let overflights = new Overflights({
     airport,
     flights: spawner.flights,
-    seed: seedFromUrl() ?? Date.now(),
+    seed: sessionSeed,
+    difficulty,
   })
   let traffic: readonly Aircraft[] = []
 
@@ -1009,6 +1053,15 @@ function start(
     atis = game.atis
     selected = game.selected
     controller = game.controller
+    // A career run resumed tomorrow has to come back at the setting it was
+    // flown on, not at whatever the menu was last showing.
+    if (game.controller !== null) {
+      chosen = game.controller.difficulty
+      sessionMode = game.controller.mode
+      overrides = NO_OVERRIDES
+      applyDifficulty(difficultyOf(game.controller.difficulty))
+      paintDifficulty()
+    }
     spawner.restore(game.spawner)
     if (game.overflights !== null) overflights.restore(game.overflights)
     loop.setTicks(game.clock.ticks)
@@ -1096,7 +1149,28 @@ function start(
    * the clock, so a loaded session regenerates exactly the weather it was
    * saved with.
    */
-  let weather = makeWeather(makeRng(spawner.seed ^ 0x7715), airport.weather)
+  /**
+   * The weather schedule, built from the field's figures with the
+   * difficulty's applied over them.
+   *
+   * The field publishes what its weather is like; the setting says how much
+   * of it you get. Multiplying the published wind rather than replacing it
+   * keeps the direction -- which is a fact about the place -- while letting
+   * a calm setting be genuinely calm.
+   */
+  const weatherFor = (settings: DifficultySettings): ReturnType<typeof makeWeather> =>
+    makeWeather(makeRng(spawner.seed ^ 0x7715), {
+      ...airport.weather,
+      cellsPerHour: settings.cellsPerHour,
+      heavyChance: settings.heavyChance,
+      driftFactor: airport.weather.driftFactor * settings.stormDrift,
+      wind: {
+        ...airport.weather.wind,
+        speedKts: Math.round(airport.weather.wind.speedKts * settings.windStrength),
+      },
+    })
+
+  let weather = weatherFor(difficulty)
 
   /**
    * Cells put on the schedule by hand, for a lesson.
@@ -1185,6 +1259,12 @@ function start(
   /** Who was already asking, so each request is made once and not per tick. */
   let asking: ReadonlySet<string> = new Set()
 
+  /** Who is inside the warning buffer, which is wider than a breach. */
+  let warned: ReadonlySet<string> = new Set()
+
+  /** Where the runway-change cycle has got to. See sim/atisflow.ts. */
+  let atisFlow: AtisFlowState = beginAtisFlow()
+
   let score: Score = NO_SCORE
 
   /** Nothing exists beyond this: see data/airport.ts. */
@@ -1237,8 +1317,8 @@ function start(
           continue
         }
 
-        score = scoreDeparture(score, departure)
-        const worth = signed(pointsFor(departure))
+        score = scoreDeparture(score, departure, difficulty)
+        const worth = signed(pointsFor(departure, difficulty))
         if (departure === 'landed') {
           announce(
             `${a.callsign} landed ${a.clearedApproach?.runway ?? ''} ${worth}`.replace('  ', ' '),
@@ -1266,7 +1346,26 @@ function start(
       if (tutorial?.suppressesTraffic === true) {
         traffic = flown
       } else {
-        // The spawner sees the world as it is after the step, so a fix that
+        // The runway direction, which on the harder settings the weather
+      // takes out of your hands. Stepped every tick so the notice period
+      // counts down in simulated time like everything else.
+      if (controller !== null && tutorial?.running !== true) {
+        const flow = stepAtisFlow(atisFlow, dt, atis, runwayFaces, atis.wind, difficulty)
+        atisFlow = flow.state
+        if (flow.announce !== null) {
+          announce(
+            `ATIS: runway change to ${flow.announce.arrivals.join('/')} in ` +
+              `${Math.round(flow.announce.inSeconds / 60)} min`,
+            'note',
+          )
+        }
+        if (flow.apply !== null) {
+          setAtis({ arrivals: flow.apply.arrivals, departures: flow.apply.departures })
+          announce(`ATIS: now landing ${flow.apply.arrivals.join('/')}`, 'readback')
+        }
+      }
+
+      // The spawner sees the world as it is after the step, so a fix that
         // has just been vacated is available again on the same tick.
         const arrivals = spawner.update(dt, clock, flown)
         // And the transits see the arrivals, so their own cap counts what
@@ -1290,6 +1389,10 @@ function start(
           announce(`${callsign} requesting vector due to severe weather`, 'reject')
         }
         asking = now
+        // Marked on the scope before it is a breach, by however much room
+        // this setting gives you. On the hardest two the buffer IS the
+        // minimum, so the warning and the loss arrive together.
+        warned = inWarning(traffic, difficulty.warnNM, difficulty.warnFt)
         // Once a sweep rather than once a tick: no goal here can change
         // faster than that, and the conflict scan would otherwise run
         // twenty times a second for nothing.
@@ -1326,7 +1429,16 @@ function start(
         weather,
           controller,
         },
-        { aircraft: traffic, selected, drag: currentDrag(), alerts: asking },
+        {
+          aircraft: traffic,
+          selected,
+          drag: currentDrag(),
+          // Weather requests and separation warnings both mark a target,
+          // because both mean the same thing to a controller: this one
+          // needs doing something about.
+          alerts: new Set([...asking, ...warned]),
+          trailDots: difficulty.trailDots,
+        },
       )
     },
   })
@@ -1395,11 +1507,54 @@ function start(
    * wanted twice. The two ways in differ in what happens after -- one starts
    * the clock, the other starts the lesson -- and in nothing before.
    */
+  /**
+   * Apply a difficulty to the whole session.
+   *
+   * The flows are rebuilt rather than adjusted. A spawner half way through
+   * a gap at nine an hour does not become a spawner at thirty-four an hour
+   * by having a number changed underneath it -- it becomes a spawner with
+   * an inconsistent idea of when it last released something.
+   */
+  const applyDifficulty = (settings: DifficultySettings): void => {
+    difficulty = settings
+
+    spawner = new Spawner({
+      airport,
+      seed: sessionSeed,
+      traffic: {
+        minIntervalSeconds: intervalSecondsFor(settings.arrivalsPerHour),
+        initialIntervalSeconds: openingIntervalSecondsFor(settings.arrivalsPerHour),
+        maxConcurrent: settings.maxConcurrent,
+      },
+    })
+    overflights = new Overflights({
+      airport,
+      flights: spawner.flights,
+      seed: sessionSeed,
+      difficulty: settings,
+    })
+    weather = weatherFor(settings)
+    atisFlow = beginAtisFlow()
+    requestDraw()
+  }
+
+  /** Tell the options menu what is running and whether it may be changed. */
+  const paintDifficulty = (): void => {
+    menu.setDifficulty(chosen, sessionMode === 'career', overrides)
+  }
+
   const takePosition = (details: LogonDetails): void => {
     controller = details
+    chosen = details.difficulty
+    sessionMode = details.mode
+    overrides = NO_OVERRIDES
+    applyDifficulty(difficultyOf(details.difficulty))
+    paintDifficulty()
     try {
       window.localStorage.setItem(LOGON_STORAGE, details.initials)
       window.localStorage.setItem(AIRSPACE_STORAGE, details.enforceAirspace ? '1' : '0')
+      window.localStorage.setItem(DIFFICULTY_STORAGE, details.difficulty)
+      window.localStorage.setItem(MODE_STORAGE, details.mode)
     } catch {
       /* preference simply will not persist */
     }
@@ -1473,12 +1628,31 @@ function start(
 
   const LOGON_STORAGE = 'radar-contact:initials'
   const AIRSPACE_STORAGE = 'radar-contact:airspace'
+  const DIFFICULTY_STORAGE = 'radar-contact:difficulty'
+  const MODE_STORAGE = 'radar-contact:mode'
 
   const storedInitials = (): string => {
     try {
       return window.localStorage.getItem(LOGON_STORAGE) ?? ''
     } catch {
       return ''
+    }
+  }
+
+  const storedDifficulty = (): DifficultyName => {
+    try {
+      const saved = window.localStorage.getItem(DIFFICULTY_STORAGE)
+      return saved === null ? DEFAULT_DIFFICULTY : (difficultyOf(saved).name as DifficultyName)
+    } catch {
+      return DEFAULT_DIFFICULTY
+    }
+  }
+
+  const storedMode = (): SessionMode => {
+    try {
+      return window.localStorage.getItem(MODE_STORAGE) === 'sandbox' ? 'sandbox' : 'career'
+    } catch {
+      return 'career'
     }
   }
 
@@ -1513,6 +1687,8 @@ function start(
     ],
     initials: storedInitials(),
     enforceAirspace: storedAirspace(),
+    difficulty: storedDifficulty(),
+    mode: storedMode(),
     onSettings: () => menu.setOpen(true),
     onLogon: (details) => {
       takePosition(details)

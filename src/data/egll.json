@@ -17311,7 +17311,7 @@
       "The aerodrome list was extended outwards from the original fifteen within 40 NM: every large airport within 100 NM and every medium one within 90 NM that OurAirports records a runway for, which adds twenty-five fields including London Southend, Southampton, Bournemouth, Cambridge, Birmingham and Bristol. Small aerodromes were deliberately left alone -- the close-in strips were curated by hand and there are hundreds of farm strips at that size. Each runway bearing is computed from the two published threshold coordinates rather than taken from the heading column, which is often blank and sometimes magnetic."
     ],
     "airspace": "Airspace boundaries are from the VATSIM UK Sector File (github.com/VATSIM-UK/UK-Sector-File), licensed GPL-3.0. See ATTRIBUTION.md. Retrieved 2026-08-21.",
-    "overflights": "The transit corridors are constructed for the simulation, not published routings. Every fix on them is a navaid published in this file; the sequence of fixes, the levels and the operators are invented to give the sector plausible neighbour traffic."
+    "overflights": "The transit corridors are constructed for the simulation, not published routings. Every fix on them is a navaid published in this file; the sequence of fixes, the levels and the operators are invented to give the sector plausible neighbour traffic. Each corridor also carries a \"crossing\" class -- clear, crossing or overhead -- which is how the difficulty settings decide whether it flies; see sim/difficulty.ts."
   },
   "traffic": {
     "seed": 20260821,
@@ -17812,7 +17812,8 @@
           "EZY",
           "TOM",
           "BAW"
-        ]
+        ],
+        "crossing": "clear"
       },
       {
         "id": "KK-WEST",
@@ -17831,7 +17832,8 @@
           "EZY",
           "TOM",
           "BAW"
-        ]
+        ],
+        "crossing": "crossing"
       },
       {
         "id": "GW-NORTH",
@@ -17849,7 +17851,8 @@
         "operators": [
           "EZY",
           "TOM"
-        ]
+        ],
+        "crossing": "clear"
       },
       {
         "id": "SS-NORTH",
@@ -17867,7 +17870,8 @@
         "operators": [
           "EZY",
           "TOM"
-        ]
+        ],
+        "crossing": "clear"
       },
       {
         "id": "TRANSIT-EAST",
@@ -17889,7 +17893,8 @@
           "SWR",
           "TAP",
           "IBE"
-        ]
+        ],
+        "crossing": "overhead"
       },
       {
         "id": "TRANSIT-WEST",
@@ -17910,7 +17915,8 @@
           "AFR",
           "KLM",
           "SWR"
-        ]
+        ],
+        "crossing": "overhead"
       }
     ]
   }

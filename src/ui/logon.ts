@@ -19,6 +19,23 @@
  *   against and a box that looks like one would be a lie.
  */
 
+import {
+  DEFAULT_DIFFICULTY,
+  DIFFICULTIES,
+  DIFFICULTY_ORDER,
+  type DifficultyName,
+} from '../sim/difficulty'
+
+/**
+ * What a session is for.
+ *
+ * Career locks the setting for the shift, which is the point of it: a run
+ * whose difficulty could be turned down half way through is not a run at
+ * that difficulty. Sandbox keeps the preset as a starting point and lets it
+ * be changed, because that is what a sandbox is.
+ */
+export type SessionMode = 'career' | 'sandbox'
+
 export interface LogonDetails {
   /** Operating initials, two or three letters. */
   readonly initials: string
@@ -35,6 +52,8 @@ export interface LogonDetails {
    * chosen here and not in the options menu.
    */
   readonly enforceAirspace: boolean
+  readonly difficulty: DifficultyName
+  readonly mode: SessionMode
 }
 
 export interface LogonOptions {
@@ -49,6 +68,9 @@ export interface LogonOptions {
   readonly initials: string
   /** Remembered airspace setting, preselected. */
   readonly enforceAirspace: boolean
+  /** Remembered difficulty, preselected. */
+  readonly difficulty: DifficultyName
+  readonly mode: SessionMode
   readonly onLogon: (details: LogonDetails) => void
   /**
    * Log on and start the tutorial instead of a free session.
@@ -73,6 +95,11 @@ export function validateInitials(raw: string): string | null {
 }
 
 export class Logon {
+  private difficulty: DifficultyName = DEFAULT_DIFFICULTY
+  private mode: SessionMode = 'career'
+  private readonly levelButtons: HTMLButtonElement[] = []
+  private readonly modeButtons: HTMLButtonElement[] = []
+  private levelNote!: HTMLParagraphElement
   private readonly opts: LogonOptions
   private readonly root: HTMLDivElement
   private readonly input: HTMLInputElement
@@ -83,6 +110,8 @@ export class Logon {
 
   constructor(opts: LogonOptions) {
     this.opts = opts
+    this.difficulty = opts.difficulty
+    this.mode = opts.mode
 
     this.root = document.createElement('div')
     this.root.className = 'logon'
@@ -177,6 +206,9 @@ export class Logon {
     this.error.setAttribute('role', 'alert')
     body.appendChild(this.error)
 
+    body.appendChild(this.buildDifficulty())
+    body.appendChild(this.buildMode())
+
     const actions = document.createElement('div')
     actions.className = 'logon-actions'
 
@@ -214,6 +246,10 @@ export class Logon {
     win.appendChild(body)
     this.root.appendChild(win)
     opts.mount.appendChild(this.root)
+
+    // Light the remembered choice, and say what it means, before anybody
+    // looks at it.
+    this.paintDifficulty()
 
     // Uppercase as typed, because operating initials are always written
     // that way and correcting it afterwards feels like a rejection.
@@ -259,6 +295,91 @@ export class Logon {
     this.root.remove()
   }
 
+  /** The four settings, as a row of buttons with the chosen one lit. */
+  private buildDifficulty(): HTMLElement {
+    const wrap = document.createElement('div')
+    wrap.className = 'logon-section'
+
+    const title = document.createElement('div')
+    title.className = 'logon-section-title'
+    title.textContent = 'Difficulty'
+    wrap.appendChild(title)
+
+    const row = document.createElement('div')
+    row.className = 'logon-levels'
+    for (const name of DIFFICULTY_ORDER) {
+      const settings = DIFFICULTIES[name]
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'logon-level'
+      button.dataset['level'] = name
+      button.textContent = settings.label
+      button.title = settings.summary
+      button.addEventListener('click', () => {
+        this.difficulty = name
+        this.paintDifficulty()
+      })
+      row.appendChild(button)
+      this.levelButtons.push(button)
+    }
+    wrap.appendChild(row)
+
+    this.levelNote = document.createElement('p')
+    // Its own class: .logon-note already belongs to the airspace note, and
+    // two elements answering to one name is a query that finds the wrong
+    // one depending on which came first.
+    this.levelNote.className = 'logon-note logon-level-note'
+    wrap.appendChild(this.levelNote)
+    return wrap
+  }
+
+  /** Career or sandbox, which decides whether the setting is fixed. */
+  private buildMode(): HTMLElement {
+    const wrap = document.createElement('div')
+    wrap.className = 'logon-section'
+
+    const row = document.createElement('div')
+    row.className = 'logon-levels'
+    for (const mode of ['career', 'sandbox'] as const) {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'logon-level logon-mode'
+      button.dataset['mode'] = mode
+      button.textContent = mode === 'career' ? 'Career' : 'Sandbox'
+      button.title =
+        mode === 'career'
+          ? 'The setting is fixed for the whole session'
+          : 'Start from this setting and change it whenever you like'
+      button.addEventListener('click', () => {
+        this.mode = mode
+        this.paintDifficulty()
+      })
+      row.appendChild(button)
+      this.modeButtons.push(button)
+    }
+    wrap.appendChild(row)
+    return wrap
+  }
+
+  /** Light the chosen setting, and say what it means. */
+  private paintDifficulty(): void {
+    for (const button of this.levelButtons) {
+      const on = button.dataset['level'] === this.difficulty
+      button.classList.toggle('is-on', on)
+      button.setAttribute('aria-pressed', String(on))
+    }
+    for (const button of this.modeButtons) {
+      const on = button.dataset['mode'] === this.mode
+      button.classList.toggle('is-on', on)
+      button.setAttribute('aria-pressed', String(on))
+    }
+    const settings = DIFFICULTIES[this.difficulty]
+    this.levelNote.textContent =
+      `${settings.summary} ${settings.arrivalsPerHour} arrivals an hour, ` +
+      `score x${settings.scoreMultiplier}.` +
+      (this.mode === 'career' ? ' Fixed for the session.' : ' Changeable as you go.')
+  }
+
   private submit(into: 'session' | 'tutorial' = 'session'): void {
     const initials = validateInitials(this.input.value)
     if (initials === null) {
@@ -273,6 +394,8 @@ export class Logon {
       initials,
       position: this.opts.position,
       enforceAirspace: this.airspace.checked,
+      difficulty: this.difficulty,
+      mode: this.mode,
     }
     if (into === 'tutorial') this.opts.onTutorial(details)
     else this.opts.onLogon(details)

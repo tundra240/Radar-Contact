@@ -66,7 +66,7 @@ function game(over: Partial<SavedGame> = {}): SavedGame {
       departures: ['27R'],
       wind: { fromDeg: 250, speedKts: 18 },
     },
-    controller: { initials: 'NF', position: 'EGLL_APP', enforceAirspace: true },
+    controller: { initials: 'NF', position: 'EGLL_APP', enforceAirspace: true, difficulty: 'normal', mode: 'career' },
     selected: 'BAW178',
     traffic: [aircraft()],
     spawner: {
@@ -296,7 +296,7 @@ describe('resuming a real session', () => {
       savedAt: '2026-08-22T09:41:00.000Z',
       clock: clockAt(original.ticks),
       score: { points: 0, landed: 0, lost: 0, transited: 0 },
-      controller: { initials: 'NF', position: 'EGLL_APP', enforceAirspace: true },
+      controller: { initials: 'NF', position: 'EGLL_APP', enforceAirspace: true, difficulty: 'normal', mode: 'career' },
       selected: null,
       traffic: [...original.traffic],
       spawner: original.spawner.snapshot(),
@@ -393,7 +393,15 @@ describe('the airspace rule in a save', () => {
   it('carries whether the session enforced it', () => {
     for (const enforceAirspace of [true, false]) {
       const out = read(
-        game({ controller: { initials: 'NF', position: 'EGLL_APP', enforceAirspace } }),
+        game({
+          controller: {
+            initials: 'NF',
+            position: 'EGLL_APP',
+            enforceAirspace,
+            difficulty: 'normal',
+            mode: 'career',
+          },
+        }),
       )
       expect(out.ok).toBe(true)
       if (!out.ok) return

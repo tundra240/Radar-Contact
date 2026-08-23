@@ -8,6 +8,7 @@ import {
   type Overlays,
 } from '../render/overlays'
 import { PALETTE_LABEL, PALETTE_ORDER, type PaletteName } from '../render/theme'
+import type { DifficultyName, DifficultyOverrides } from '../sim/difficulty'
 import { Menu, type MenuState } from './menu'
 
 /**
@@ -36,6 +37,8 @@ interface Harness {
   sounds: number
   saves: number
   loads: number
+  difficulties: DifficultyName[]
+  overrides: DifficultyOverrides[]
 }
 
 let live: Menu | null = null
@@ -55,6 +58,8 @@ function mountMenu(): Harness {
     sounds: 0,
     saves: 0,
     loads: 0,
+    difficulties: [],
+    overrides: [],
   }
 
   h.menu = new Menu({
@@ -71,6 +76,8 @@ function mountMenu(): Harness {
     onLoad: () => {
       h.loads += 1
     },
+    onDifficulty: (name) => h.difficulties.push(name),
+    onOverrides: (next) => h.overrides.push(next),
     onToggleSound: () => {
       h.sounds += 1
     },
@@ -338,7 +345,13 @@ describe('structure', () => {
   it('groups the controls under headings', () => {
     const { mount } = mountMenu()
     const headings = [...mount.querySelectorAll('.menu-heading')].map((h) => h.textContent)
-    expect(headings).toEqual(['Simulation', 'Display scheme', 'Session', 'Overlays'])
+    expect(headings).toEqual([
+      'Simulation',
+      'Display scheme',
+      'Difficulty',
+      'Session',
+      'Overlays',
+    ])
   })
 
   it('mounts exactly one panel, inside the element it was given', () => {
@@ -390,5 +403,83 @@ describe('saving and loading', () => {
     for (const b of sessionButtons(mount)) {
       expect(b.title.length, b.textContent ?? '').toBeGreaterThan(10)
     }
+  })
+})
+
+describe('choosing the difficulty', () => {
+  /** The four preset buttons, which sit under the Difficulty heading. */
+  const levels = (mount: HTMLElement): HTMLButtonElement[] =>
+    [...mount.querySelectorAll<HTMLButtonElement>('.menu-choice')].filter((b) =>
+      ['Easy', 'Normal', 'Hard', 'Pro'].includes(b.textContent ?? ''),
+    )
+
+  const boxes = (mount: HTMLElement): HTMLInputElement[] =>
+    [...mount.querySelectorAll<HTMLInputElement>('.menu-row input')]
+
+  it('offers all four', () => {
+    const { mount } = mountMenu()
+    expect(levels(mount).map((b) => b.textContent)).toEqual(['Easy', 'Normal', 'Hard', 'Pro'])
+  })
+
+  it('lights the one that is running and says what it costs', () => {
+    const h = mountMenu()
+    h.menu.setDifficulty('hard', false)
+    const lit = levels(h.mount).filter((b) => b.classList.contains('is-on'))
+    expect(lit.map((b) => b.textContent)).toEqual(['Hard'])
+    expect(h.mount.querySelector('.menu-note')?.textContent).toContain('x2')
+  })
+
+  it('changes the setting on a sandbox session', () => {
+    const h = mountMenu()
+    h.menu.setDifficulty('easy', false)
+    levels(h.mount).find((b) => b.textContent === 'Pro')?.click()
+    expect(h.difficulties).toEqual(['pro'])
+  })
+
+  it('will not change it on a career run', () => {
+    // The point of career: a run whose difficulty could be turned down half
+    // way through is not a run at that difficulty.
+    const h = mountMenu()
+    h.menu.setDifficulty('hard', true)
+    for (const b of levels(h.mount)) expect(b.disabled).toBe(true)
+    levels(h.mount).find((b) => b.textContent === 'Easy')?.click()
+    expect(h.difficulties).toEqual([])
+  })
+
+  it('says the run is fixed rather than hiding the controls', () => {
+    // Shown and unusable, so a player can read why rather than infer it
+    // from a control that is not there.
+    const h = mountMenu()
+    h.menu.setDifficulty('pro', true)
+    expect(h.mount.querySelector('.menu-note')?.textContent).toContain('fixed')
+    expect(levels(h.mount)).toHaveLength(4)
+  })
+
+  it('lets a sandbox turn part of a preset off', () => {
+    // The brief's own example: peak traffic with the weather switched off.
+    const h = mountMenu()
+    h.menu.setDifficulty('pro', false, { weather: true, transits: true })
+    const weather = boxes(h.mount).find((b) => b.disabled === false)
+    expect(weather).toBeDefined()
+    // The two difficulty switches are the last pair before the overlays.
+    const [wx] = [...h.mount.querySelectorAll<HTMLElement>('.menu-row')]
+      .filter((row) => (row.textContent ?? '').includes('Weather and wind'))
+      .map((row) => row.querySelector<HTMLInputElement>('input'))
+    expect(wx).toBeDefined()
+    wx!.checked = false
+    wx!.dispatchEvent(new Event('change'))
+    expect(h.overrides.at(-1)).toEqual({ weather: false, transits: true })
+  })
+
+  it('does not let a career run turn anything off either', () => {
+    const h = mountMenu()
+    h.menu.setDifficulty('normal', true)
+    const [wx] = [...h.mount.querySelectorAll<HTMLElement>('.menu-row')]
+      .filter((row) => (row.textContent ?? '').includes('Weather and wind'))
+      .map((row) => row.querySelector<HTMLInputElement>('input'))
+    expect(wx?.disabled).toBe(true)
+    wx!.checked = false
+    wx!.dispatchEvent(new Event('change'))
+    expect(h.overrides).toEqual([])
   })
 })

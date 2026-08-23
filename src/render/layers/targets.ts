@@ -7,6 +7,7 @@ import {
   normalizeHeading,
   type Vec2NM,
 } from '../../core/geo'
+import { TRAIL_POINTS } from '../../sim/aircraft'
 import { isHeavy, modeC, trendOf, type Aircraft } from '../../sim/types'
 import { fonts, theme } from '../theme'
 
@@ -98,10 +99,12 @@ export function drawTargets(
   traffic: readonly Aircraft[],
   selected: string | null,
   alerts: ReadonlySet<string> = new Set(),
+  /** How much of the recorded history to show. Defaults to all of it. */
+  trailDots: number = TRAIL_POINTS,
 ): void {
   // Two passes so that no target's data block can be buried under a
   // neighbour's trail, however close the two pass.
-  for (const a of traffic) drawTrail(g, cam, a, alphaFor(a))
+  for (const a of traffic) drawTrail(g, cam, a, alphaFor(a), trailDots)
   for (const a of traffic) {
     const alpha = alphaFor(a)
     g.globalAlpha = alpha
@@ -123,17 +126,23 @@ function drawTrail(
   cam: Camera,
   a: Aircraft,
   baseAlpha = 1,
+  dots: number = TRAIL_POINTS,
 ): void {
-  if (a.trail.length === 0) return
+  // Nought is a legitimate answer rather than a missing argument: the
+  // hardest setting shows no history at all.
+  const shown = a.trail.slice(0, Math.max(0, dots))
+  if (shown.length === 0) return
 
   // The history is drawn in the target's own ink, so a transit's trail
   // does not read as an arrival's.
   g.fillStyle = a.role === 'overflight' ? theme.overflight : theme.trail
-  const oldest = a.trail.length
-  for (let i = 0; i < a.trail.length; i += 1) {
+  // Faded against how many are drawn rather than how many exist, so three
+  // dots read as a whole trail rather than as the bright end of a longer one.
+  const oldest = shown.length
+  for (let i = 0; i < shown.length; i += 1) {
     const age = (i + 1) / oldest
     g.globalAlpha = baseAlpha * (1 - age * (1 - TRAIL_FADE_FLOOR))
-    const p = cam.worldToScreen(a.trail[i] as { x: number; y: number })
+    const p = cam.worldToScreen(shown[i] as { x: number; y: number })
     g.beginPath()
     g.arc(p.x, p.y, TRAIL_DOT_PX, 0, Math.PI * 2)
     g.fill()

@@ -97,6 +97,16 @@ export interface ScopeStatus {
 /** The traffic picture: everything on frequency, and which one is selected. */
 export interface ScopeContacts {
   readonly aircraft: readonly Aircraft[]
+  /**
+   * History dots to draw behind each target.
+   *
+   * A display setting rather than a physical one: the simulation records
+   * the same trail whatever this says, and the difficulty decides how much
+   * of it you are allowed to see. Nought leaves the speed vector and
+   * nothing else, which is how the hardest setting makes you work out where
+   * an aircraft has been rather than reading it off.
+   */
+  readonly trailDots?: number
   /** Callsign of the target under the controller's hand, if any. */
   readonly selected: string | null
   /** A vector being dragged out with the mouse, while one is in progress. */
@@ -192,7 +202,14 @@ export function drawScope(
 
   // Above every overlay and below the chrome: traffic is the top layer of
   // the radar picture, but it is still inside the display.
-  drawTargets(g, cam, contacts.aircraft, contacts.selected, contacts.alerts)
+  drawTargets(
+    g,
+    cam,
+    contacts.aircraft,
+    contacts.selected,
+    contacts.alerts,
+    contacts.trailDots,
+  )
   // Above the traffic: the line being dragged is the thing the controller
   // is looking at, and it has to be readable over a target it crosses.
   if (contacts.drag) drawVectorDrag(g, cam, contacts.drag)

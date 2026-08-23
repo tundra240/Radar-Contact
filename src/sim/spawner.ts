@@ -2,7 +2,7 @@ import type { Clock } from '../core/loop'
 import { advance, bearingDeg, distanceNM, type Vec2NM } from '../core/geo'
 import { exitRangeNM } from './airspace'
 import { makeRng, makeRngAt, type Rng } from '../core/rng'
-import type { Airline, Airport, Navaid } from '../data/airport'
+import type { Airline, Airport, Navaid, TrafficConfig } from '../data/airport'
 import {
   FlightGenerator,
   type FlightGeneratorState,
@@ -65,6 +65,15 @@ interface Slot {
 export interface SpawnerOptions {
   readonly airport: Airport
   /**
+   * Overrides on the published traffic figures.
+   *
+   * The difficulty supplies the cadence and the ceiling; everything else --
+   * the fix spacing, the entry distance, the airline mix -- stays as the
+   * field publishes it, because those are facts about the airport rather
+   * than about how hard the session is.
+   */
+  readonly traffic?: Partial<TrafficConfig>
+  /**
    * The traffic seed. Defaults to the one in the airport config, which is
    * fixed -- so a caller that wants a different session every time has to
    * say so. `main.ts` does.
@@ -76,6 +85,8 @@ export interface SpawnerOptions {
 
 export class Spawner {
   private readonly airport: Airport
+  /** The published figures with the session's overrides applied. */
+  private readonly traffic: TrafficConfig
   private rng: Rng
   private readonly fixes: readonly Navaid[]
   private readonly flightGen: FlightGenerator
@@ -97,12 +108,13 @@ export class Spawner {
 
   constructor(opts: SpawnerOptions) {
     this.airport = opts.airport
+    this.traffic = { ...opts.airport.traffic, ...opts.traffic }
     this.rng = opts.rng ?? makeRng(opts.seed ?? opts.airport.traffic.seed)
     // Only holds with an entry band: a navaid with neither is a fix on the
     // chart, not a place traffic arrives from.
     this.flightGen = new FlightGenerator(opts.airport)
     this.fixes = opts.airport.navaids.filter((n) => n.hold !== null && n.entry !== null)
-    this.waitSeconds = opts.airport.traffic.firstSpawnSeconds
+    this.waitSeconds = this.traffic.firstSpawnSeconds
     this.airlines = new Map(opts.airport.traffic.airlines.map((a) => [a.code, a]))
   }
 
@@ -186,7 +198,7 @@ export class Spawner {
    * arriving all at once.
    */
   intervalSeconds(clock: Clock): number {
-    const t = this.airport.traffic
+    const t = this.traffic
     const rampSeconds = Math.max(1, t.rampMinutes * 60)
     const progress = Math.min(1, Math.max(0, clock.elapsedSeconds / rampSeconds))
     return t.initialIntervalSeconds + (t.minIntervalSeconds - t.initialIntervalSeconds) * progress
@@ -194,7 +206,7 @@ export class Spawner {
 
   /** Position in the ramp: 0 at the opening cadence, 1 at the fastest. */
   rampProgress(clock: Clock): number {
-    const rampSeconds = Math.max(1, this.airport.traffic.rampMinutes * 60)
+    const rampSeconds = Math.max(1, this.traffic.rampMinutes * 60)
     return Math.min(1, Math.max(0, clock.elapsedSeconds / rampSeconds))
   }
 
@@ -207,7 +219,7 @@ export class Spawner {
     this.sinceLastSpawn += Math.max(0, dtSeconds)
     if (this.sinceLastSpawn < this.waitSeconds) return []
 
-    if (existing.length >= this.airport.traffic.maxConcurrent) {
+    if (existing.length >= this.traffic.maxConcurrent) {
       this.hold()
       return []
     }
@@ -231,7 +243,7 @@ export class Spawner {
    * an empty array when it cannot place one.
    */
   spawnNow(clock: Clock, existing: readonly Aircraft[]): Aircraft[] {
-    if (existing.length >= this.airport.traffic.maxConcurrent) {
+    if (existing.length >= this.traffic.maxConcurrent) {
       this.deferCount += 1
       return []
     }
@@ -280,7 +292,7 @@ export class Spawner {
   }
 
   private nextInterval(clock: Clock): number {
-    const t = this.airport.traffic
+    const t = this.traffic
     const base = this.intervalSeconds(clock)
     // Jitter either side so arrivals are not metronomic, then clamped to
     // the configured band: the cadence is stated as a range, and jitter
@@ -305,7 +317,7 @@ export class Spawner {
     existing: readonly Aircraft[],
     opts: { ignoreCooldown: boolean },
   ): readonly Slot[] {
-    const t = this.airport.traffic
+    const t = this.traffic
     const slots: Slot[] = []
 
     for (const fix of this.fixes) {
@@ -377,7 +389,7 @@ export class Spawner {
     // which at Heathrow ranges from seventeen miles to thirty-five.
     const radial = bearingDeg(ARP, fix.posNM)
     const edge = exitRangeNM(this.airport.controlZone, ARP, radial)
-    const gate = advance(ARP, radial, edge + this.airport.traffic.entryDistanceNM)
+    const gate = advance(ARP, radial, edge + this.traffic.entryDistanceNM)
     this.gates.set(fix.name, gate)
     return gate
   }

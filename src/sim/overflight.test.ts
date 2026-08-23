@@ -6,6 +6,7 @@ import { loadAirport } from '../data/airport'
 import raw from '../data/egll.json'
 import { departureOf, enterSector, isInSector, stepAircraft } from './aircraft'
 import { FlightGenerator } from './flightgen'
+import { DIFFICULTIES } from './difficulty'
 import { corridorEntry, corridorRoute, Overflights, semicircularLevelFt } from './overflight'
 import { buildSequence } from './sequence'
 import type { Aircraft } from './types'
@@ -19,8 +20,20 @@ const clockAt = (elapsedSeconds: number): Clock => ({
   timeOfDaySeconds: 43200 + elapsedSeconds,
 })
 
-function generator(seed = 4242): Overflights {
-  return new Overflights({ airport, flights: new FlightGenerator(airport), seed })
+/**
+ * A generator on a named setting.
+ *
+ * Hard by default: the volume tests want transits to actually flow, and the
+ * gentler settings deliberately produce few or none -- Easy produces none
+ * at all, which is the point of it.
+ */
+function generator(seed = 4242, difficulty = DIFFICULTIES.hard): Overflights {
+  return new Overflights({
+    airport,
+    flights: new FlightGenerator(airport),
+    seed,
+    difficulty,
+  })
 }
 
 /** Run the generator for `minutes`, collecting everything it releases. */
@@ -119,10 +132,14 @@ describe('cruising levels', () => {
 
 describe('releasing transits', () => {
   it('releases them steadily rather than all at once', () => {
-    const out = releases(generator(), 60)
-    expect(out.length).toBeGreaterThan(4)
-    // And never more at a time than the cap allows on the display.
-    expect(out.length).toBeLessThan(60)
+    // Measured against an empty sky, so the concurrency ceiling never binds
+    // and what is left is the cadence. Passing the accumulated list back in
+    // would measure the cap instead, which is a different question.
+    const gen = generator()
+    let released = 0
+    for (let t = 0; t < 60 * 60; t += 1) released += gen.update(1, clockAt(t), []).length
+    expect(released).toBeGreaterThan(4)
+    expect(released).toBeLessThan(60)
   })
 
   it('gives every one a route, a level and somewhere to go', () => {
@@ -184,8 +201,8 @@ describe('releasing transits', () => {
     const gen = generator()
     const full: Aircraft[] = []
     // A world already at the cap, which never empties.
-    for (let i = 0; i < (config?.maxConcurrent ?? 5); i += 1) {
-      full.push({ ...releases(generator(i + 1), 10)[0] } as Aircraft)
+    for (let i = 0; i < gen.concurrentCap; i += 1) {
+      full.push({ ...releases(generator(i + 1), 30)[0] } as Aircraft)
     }
     let released = 0
     for (let t = 0; t < 60 * 60; t += 1) released += gen.update(1, clockAt(t), full).length
@@ -221,10 +238,10 @@ describe('releasing one on command', () => {
     // they did.
     const gen = generator()
     const full: Aircraft[] = []
-    for (let i = 0; i < (config?.maxConcurrent ?? 5); i += 1) {
+    for (let i = 0; i < gen.concurrentCap; i += 1) {
       full.push(...gen.spawnNow(clockAt(i), full))
     }
-    expect(full).toHaveLength(config?.maxConcurrent ?? 5)
+    expect(full).toHaveLength(gen.concurrentCap)
     expect(gen.spawnNow(clockAt(99), full)).toEqual([])
   })
 
@@ -331,3 +348,43 @@ function findCorridor(id: string): never {
 function atFt(pos: { x: number; y: number }, altFt: number): Aircraft {
   return { pos, altFt } as Aircraft
 }
+
+describe('what the difficulty does to the transits', () => {
+  it('produces none at all on the gentlest setting', () => {
+    // Easy is a sector with nothing in it but your own arrivals, which is
+    // the whole reason somebody would choose it.
+    const gen = generator(1, DIFFICULTIES.easy)
+    expect(releases(gen, 180)).toEqual([])
+    expect(gen.spawnNow(clockAt(0), [])).toEqual([])
+  })
+
+  it('produces more of them the harder it gets', () => {
+    const counts = ['normal', 'hard', 'pro'].map(
+      (name) => releases(generator(7, DIFFICULTIES[name as 'normal']), 120).length,
+    )
+    // Strictly increasing: each setting is busier than the one below it.
+    expect(counts[1]).toBeGreaterThan(counts[0] as number)
+    expect(counts[2]).toBeGreaterThan(counts[1] as number)
+  })
+
+  it('flies only the corridors the setting allows', () => {
+    // Normal keeps them clear of the approach; Pro sends them over the top.
+    const clear = new Set(
+      (config?.corridors ?? []).filter((c) => c.crossing === 'clear').map((c) => c.destination),
+    )
+    for (const a of releases(generator(3, DIFFICULTIES.normal), 180)) {
+      expect(clear, `${a.callsign} to ${a.destination}`).toContain(a.destination)
+    }
+
+    const overhead = (config?.corridors ?? []).filter((c) => c.crossing === 'overhead')
+    expect(overhead.length).toBeGreaterThan(0)
+    const seen = new Set(releases(generator(3, DIFFICULTIES.pro), 300).map((a) => a.destination))
+    expect(overhead.some((c) => seen.has(c.destination))).toBe(true)
+  })
+
+  it('holds fewer of them in the air on a gentler setting', () => {
+    expect(generator(1, DIFFICULTIES.normal).concurrentCap).toBeLessThan(
+      generator(1, DIFFICULTIES.pro).concurrentCap,
+    )
+  })
+})

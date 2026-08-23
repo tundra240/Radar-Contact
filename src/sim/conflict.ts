@@ -89,6 +89,56 @@ export function conflictsIn(traffic: readonly Aircraft[]): Conflict[] {
   return out
 }
 
+/**
+ * Pairs closer than a given buffer, which is not the same question as a
+ * breach.
+ *
+ * The minimum never moves -- three miles and a thousand feet, on every
+ * setting. What a difficulty changes is how much room the display gives you
+ * before you reach it: four miles on the gentlest setting is an early
+ * warning, and three on the hardest means the warning and the breach are
+ * the same event.
+ *
+ * A breach is therefore always also a warning, and the caller can tell them
+ * apart by asking both.
+ */
+export function warningsIn(
+  traffic: readonly Aircraft[],
+  withinNM: number,
+  withinFt: number,
+): Conflict[] {
+  const out: Conflict[] = []
+  for (let i = 0; i < traffic.length; i += 1) {
+    const a = traffic[i]
+    if (a === undefined || !counts(a)) continue
+    for (let j = i + 1; j < traffic.length; j += 1) {
+      const b = traffic[j]
+      if (b === undefined || !counts(b)) continue
+      const verticalFt = Math.abs(a.altFt - b.altFt)
+      if (verticalFt >= withinFt) continue
+      const apart = distanceNM(a.pos, b.pos)
+      if (apart >= withinNM) continue
+      const [first, second] = a.callsign <= b.callsign ? [a, b] : [b, a]
+      out.push({ a: first.callsign, b: second.callsign, distanceNM: apart, verticalFt })
+    }
+  }
+  return out
+}
+
+/** Every callsign inside the warning buffer, for marking them on the scope. */
+export function inWarning(
+  traffic: readonly Aircraft[],
+  withinNM: number,
+  withinFt: number,
+): ReadonlySet<string> {
+  const out = new Set<string>()
+  for (const c of warningsIn(traffic, withinNM, withinFt)) {
+    out.add(c.a)
+    out.add(c.b)
+  }
+  return out
+}
+
 /** Every callsign involved in a breach, for marking them on the scope. */
 export function inConflict(traffic: readonly Aircraft[]): ReadonlySet<string> {
   const out = new Set<string>()

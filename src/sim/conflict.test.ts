@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { conflictsIn, inConflict, isConflict, SEPARATION_FT, SEPARATION_NM } from './conflict'
+import {
+  conflictsIn,
+  inConflict,
+  inWarning,
+  isConflict,
+  SEPARATION_FT,
+  SEPARATION_NM,
+  warningsIn,
+} from './conflict'
+import { DIFFICULTIES } from './difficulty'
 import type { Aircraft } from './types'
 
 function ac(over: Partial<Aircraft> = {}): Aircraft {
@@ -154,5 +163,64 @@ describe('scanning the whole picture', () => {
   it('finds nothing in an empty sector', () => {
     expect(conflictsIn([])).toEqual([])
     expect(conflictsIn([ac()])).toEqual([])
+  })
+})
+
+describe('warning before it is a breach', () => {
+  /** Two aircraft a given distance and height apart. */
+  const pair = (apartNM: number, apartFt: number) => [
+    ac({ callsign: 'A', altFt: 7000 }),
+    ac({ callsign: 'B', altFt: 7000 + apartFt, pos: { x: apartNM, y: 0 } }),
+  ]
+
+  it('sees a pair the minimum would not', () => {
+    // Three and a half miles apart is legal and, on the gentle settings,
+    // worth telling somebody about.
+    const close = pair(3.5, 400)
+    expect(conflictsIn(close)).toEqual([])
+    expect(warningsIn(close, 4, 1200)).toHaveLength(1)
+  })
+
+  it('needs both, like a breach does', () => {
+    // A thousand feet apart is separated however close they are laterally,
+    // and a buffer that ignored that would warn about every holding stack.
+    expect(warningsIn(pair(1, 1300), 4, 1200)).toEqual([])
+  })
+
+  it('says nothing extra on the settings with no buffer', () => {
+    // On Hard and Pro the warning IS the minimum, so anything warned about
+    // is already a breach and the display is telling you what happened
+    // rather than what is about to.
+    const close = pair(3.5, 400)
+    const pro = DIFFICULTIES.pro
+    expect(warningsIn(close, pro.warnNM, pro.warnFt)).toEqual([])
+
+    const breaching = pair(2, 400)
+    expect(warningsIn(breaching, pro.warnNM, pro.warnFt)).toHaveLength(1)
+    expect(conflictsIn(breaching)).toHaveLength(1)
+  })
+
+  it('gives an easy session more room than a hard one', () => {
+    const close = pair(3.7, 500)
+    expect(warningsIn(close, DIFFICULTIES.easy.warnNM, DIFFICULTIES.easy.warnFt)).toHaveLength(1)
+    expect(warningsIn(close, DIFFICULTIES.hard.warnNM, DIFFICULTIES.hard.warnFt)).toEqual([])
+  })
+
+  it('always covers an actual breach, whatever the buffer', () => {
+    // A breach is by definition inside the minimum, and the buffer is never
+    // narrower than the minimum -- so every breach is also a warning.
+    const breaching = pair(1.5, 200)
+    for (const settings of Object.values(DIFFICULTIES)) {
+      expect(
+        warningsIn(breaching, settings.warnNM, settings.warnFt),
+        settings.name,
+      ).toHaveLength(1)
+    }
+  })
+
+  it('lists who to mark', () => {
+    const who = inWarning(pair(3.6, 300), 4, 1200)
+    expect([...who].sort()).toEqual(['A', 'B'])
+    expect([...inConflict(pair(3.6, 300))]).toEqual([])
   })
 })

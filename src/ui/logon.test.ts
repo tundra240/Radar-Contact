@@ -40,6 +40,8 @@ function mountLogon(over: { initials?: string; enforceAirspace?: boolean } = {})
     facts: ['Sector 40 NM -- 1500 to FL150', '4 holds -- LAM BIG BNN OCK'],
     initials,
     enforceAirspace: over.enforceAirspace ?? true,
+    difficulty: 'normal',
+    mode: 'career',
     onLogon: (d) => h.logons.push(d),
     onTutorial: (d) => h.tutorials.push(d),
     onSettings: () => {
@@ -124,7 +126,7 @@ describe('the main menu', () => {
     const h = mountLogon()
     type(input(h.mount), 'NF')
     button(h.mount, '.logon-go').click()
-    expect(h.logons).toEqual([{ initials: 'NF', position: 'EGLL_APP', enforceAirspace: true }])
+    expect(h.logons).toEqual([{ initials: 'NF', position: 'EGLL_APP', enforceAirspace: true, difficulty: 'normal', mode: 'career' }])
   })
 
   it('upper-cases and filters as you type', () => {
@@ -158,7 +160,15 @@ describe('the main menu', () => {
     const h = mountLogon()
     type(input(h.mount), 'ABC')
     input(h.mount).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-    expect(h.logons).toEqual([{ initials: 'ABC', position: 'EGLL_APP', enforceAirspace: true }])
+    expect(h.logons).toEqual([
+      {
+        initials: 'ABC',
+        position: 'EGLL_APP',
+        enforceAirspace: true,
+        difficulty: 'normal',
+        mode: 'career',
+      },
+    ])
   })
 
   it('prefills remembered initials', () => {

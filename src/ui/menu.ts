@@ -1,4 +1,11 @@
 import { SPEEDS, formatSpeed, type Speed } from '../core/loop'
+import {
+  DIFFICULTIES,
+  DIFFICULTY_ORDER,
+  NO_OVERRIDES,
+  type DifficultyName,
+  type DifficultyOverrides,
+} from '../sim/difficulty'
 import { setToolLabel } from './icons'
 import {
   OVERLAY_ITEMS,
@@ -62,6 +69,10 @@ export interface MenuOptions {
   readonly onToggle?: (open: boolean) => void
   readonly onSave: () => void
   readonly onLoad: () => void
+  /** Pick a different preset. Sandbox only; career fixes it at logon. */
+  readonly onDifficulty: (name: DifficultyName) => void
+  /** Turn part of the preset off without leaving it. */
+  readonly onOverrides: (next: DifficultyOverrides) => void
 }
 
 /**
@@ -79,6 +90,13 @@ const SCHEME_NOTE: Record<PaletteName, string> = {
 }
 
 export class Menu {
+  private readonly levelButtons = new Map<DifficultyName, HTMLButtonElement>()
+  private levelNote!: HTMLDivElement
+  private weatherBox!: HTMLInputElement
+  private transitBox!: HTMLInputElement
+  private overrides: DifficultyOverrides = NO_OVERRIDES
+  /** Career sessions show the section and cannot use it. */
+  private levelsLocked = true
   private readonly opts: MenuOptions
   private readonly root: HTMLElement
   private readonly button: HTMLButtonElement
@@ -179,6 +197,41 @@ export class Menu {
       this.schemeButtons.set(name, b)
     }
     display.appendChild(schemes)
+
+    /* ---- difficulty ----------------------------------------------------
+
+       Present on every session and usable only on a sandbox one. Shown
+       rather than hidden in career, because "this is fixed for the run" is
+       something a player should be able to read rather than infer from a
+       control that is not there. */
+
+    const level = this.section('Difficulty')
+    this.levelNote = document.createElement('div')
+    this.levelNote.className = 'menu-note'
+    level.appendChild(this.levelNote)
+
+    const levels = document.createElement('div')
+    levels.className = 'menu-choices'
+    for (const name of DIFFICULTY_ORDER) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.className = 'menu-key menu-choice'
+      b.textContent = DIFFICULTIES[name].label
+      b.title = DIFFICULTIES[name].summary
+      b.addEventListener('click', () => {
+        if (!this.levelsLocked) this.opts.onDifficulty(name)
+      })
+      levels.appendChild(b)
+      this.levelButtons.set(name, b)
+    }
+    level.appendChild(levels)
+
+    this.weatherBox = this.checkRow(level, 'Weather and wind', (on) => {
+      if (!this.levelsLocked) this.opts.onOverrides({ ...this.overrides, weather: on })
+    })
+    this.transitBox = this.checkRow(level, 'Crossing traffic', (on) => {
+      if (!this.levelsLocked) this.opts.onOverrides({ ...this.overrides, transits: on })
+    })
 
     /* ---- the session -------------------------------------------------- */
 
@@ -308,6 +361,38 @@ export class Menu {
     el.appendChild(h)
     this.panel.appendChild(el)
     return el
+  }
+
+  /**
+   * Show which preset is running, and whether it can be changed.
+   *
+   * Locked means career: the controls stay visible and stop working, and
+   * the note says why. A run whose difficulty could be turned down half way
+   * through is not a run at that difficulty.
+   */
+  setDifficulty(
+    name: DifficultyName,
+    locked: boolean,
+    overrides: DifficultyOverrides = NO_OVERRIDES,
+  ): void {
+    this.levelsLocked = locked
+    this.overrides = overrides
+
+    for (const [key, button] of this.levelButtons) {
+      const on = key === name
+      button.classList.toggle('is-on', on)
+      button.setAttribute('aria-pressed', String(on))
+      button.disabled = locked
+    }
+    this.weatherBox.checked = overrides.weather
+    this.transitBox.checked = overrides.transits
+    this.weatherBox.disabled = locked
+    this.transitBox.disabled = locked
+
+    const settings = DIFFICULTIES[name]
+    this.levelNote.textContent = locked
+      ? `${settings.label}, fixed for this career run. Score x${settings.scoreMultiplier}.`
+      : `${settings.label}: ${settings.arrivalsPerHour} arrivals an hour, score x${settings.scoreMultiplier}.`
   }
 
   private checkRow(
