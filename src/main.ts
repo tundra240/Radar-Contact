@@ -26,7 +26,10 @@ import {
   type SavedGame,
 } from './sim/savegame'
 import { Overflights } from './sim/overflight'
+import { BASICS } from './tutorial/lessons/basics'
+import { TutorialSession } from './tutorial/session'
 import { Spawner } from './sim/spawner'
+import { withScriptedCells, type WeatherCell } from './sim/weather'
 import type { Aircraft } from './sim/types'
 import type { Command } from './commands/types'
 import { applyAll, type ApplyContext } from './commands/apply'
@@ -238,7 +241,7 @@ function start(
     // line is coming out of. What was selected before is remembered, so a
     // press that turns out to be a click can still toggle it.
     selectedBeforePress = selected
-    selected = target.callsign
+    setSelected(target.callsign)
     syncStrips()
     requestDraw()
   })
@@ -287,7 +290,7 @@ function start(
       } else {
         // It did not really move: that is a click, and a click on the
         // target that was already selected lets go of it.
-        selected = selectedBeforePress === callsign ? null : callsign
+        setSelected(selectedBeforePress === callsign ? null : callsign)
         syncStrips()
       }
       requestDraw()
@@ -297,7 +300,7 @@ function start(
     // A press on empty scope that did not pan is how you let go of a
     // target without picking another.
     if (was === 'pan' && !far) {
-      selected = null
+      setSelected(null)
       syncStrips()
     }
     requestDraw()
@@ -348,7 +351,7 @@ function start(
     }
     // Opening the menu picks the target up too: the aircraft being given
     // an instruction should be the one highlighted on the scope.
-    selected = target.callsign
+    setSelected(target.callsign)
     syncStrips()
     requestDraw()
     tagMenu.openFor(target, { x: e.clientX, y: e.clientY })
@@ -460,6 +463,7 @@ function start(
     const i = SPEEDS.indexOf(loop.speed)
     loop.setSpeed(SPEEDS[(i + 1) % SPEEDS.length] ?? SPEEDS[0]!)
     loop.setPaused(false)
+    tutorial?.observeSpeed(loop.speed)
     paintMenu()
     paintTools()
     requestDraw()
@@ -474,6 +478,9 @@ function start(
    * there is take them to the modern position rather than guess which era
    * they meant.
    */
+  /** The lesson. Last on the rail: it is the one you press once. */
+  const lessonButton = tool('lesson-button', () => startLesson())
+
   const themeButton = tool('theme-button', () => {
     applyPalette(paletteName() === 'traconDark' ? 'traconLight' : 'traconDark')
     paintMenu()
@@ -600,6 +607,15 @@ function start(
     )
     setToolLabel(rateButton, 'rate', `Clock rate ${formatSpeed(loop.speed)} -- press to step`)
 
+    const onLesson = tutorial?.running === true
+    lessonButton.classList.toggle('is-on', onLesson)
+    lessonButton.setAttribute('aria-pressed', String(onLesson))
+    setToolLabel(
+      lessonButton,
+      'lesson',
+      onLesson ? 'End the lesson' : 'Start the tutorial',
+    )
+
     const lit = paletteName() === 'traconLight'
     setToolLabel(
       themeButton,
@@ -631,12 +647,21 @@ function start(
 
   let selected: string | null = null
 
+  /**
+   * The lesson, when one is running.
+   *
+   * Declared here and built after the loop, because it needs the clock and
+   * the camera and they do not exist yet -- while the things that report to
+   * it, the selection and the clearance path, are defined above.
+   */
+  let tutorial: TutorialSession | null = null
+
   const bay = new StripBay({
     mount: shell,
     onContextMenu: (callsign, at) => {
       const target = traffic.find((a) => a.callsign === callsign)
       if (target === undefined) return
-      selected = callsign
+      setSelected(callsign)
       syncStrips()
       requestDraw()
       tagMenu.openFor(target, at)
@@ -644,7 +669,7 @@ function start(
     onSelect: (callsign) => {
       // Clicking the same strip again clears the selection, which is how
       // you let go of a target without picking another.
-      selected = selected === callsign ? null : callsign
+      setSelected(selected === callsign ? null : callsign)
       syncStrips()
       requestDraw()
     },
@@ -782,6 +807,20 @@ function start(
     tagMenu.sync(traffic)
   }
 
+  /**
+   * Picking a target, wherever the pick came from.
+   *
+   * There are five ways to select an aircraft -- the scope, its data block,
+   * a strip, a strip's menu button, and a load -- and the lesson has to see
+   * all of them. Routing them through one function is cheaper than five
+   * observations that can be added four times.
+   */
+  const setSelected = (callsign: string | null): void => {
+    if (selected === callsign) return
+    selected = callsign
+    tutorial?.observeSelect(callsign)
+  }
+
   // ---- clearances ------------------------------------------------------
   // Every input path -- the typed console, the strip quick-buttons, and the
   // mouse rubber-band when it arrives -- builds the same Command objects and
@@ -888,6 +927,9 @@ function start(
 
     traffic = traffic.map((a) => (a.callsign === first.callsign ? outcome.aircraft : a))
     for (const readback of outcome.readbacks) announce(readback, 'readback')
+    // Accepted ones only. A refused clearance is not progress through a
+    // lesson, and counting it would teach that saying the wrong thing works.
+    for (const command of commands) tutorial?.observeCommand(command)
     syncStrips()
     requestDraw()
   }
@@ -1066,7 +1108,18 @@ function start(
    * the clock, so a loaded session regenerates exactly the weather it was
    * saved with.
    */
-  const weather = makeWeather(makeRng(spawner.seed ^ 0x7715), airport.weather)
+  let weather = makeWeather(makeRng(spawner.seed ^ 0x7715), airport.weather)
+
+  /**
+   * Cells put on the schedule by hand, for a lesson.
+   *
+   * The session's own weather is a function of its seed and stays exactly
+   * as it was; these sit alongside it and are cleared when the lesson ends.
+   */
+  const setScriptedWeather = (cells: readonly WeatherCell[]): void => {
+    weather = withScriptedCells(weather, cells)
+    requestDraw()
+  }
 
   /**
    * The wind the aircraft feel: a fraction of the reported wind. See
@@ -1218,14 +1271,22 @@ function start(
         }
       }
 
-      // The spawner sees the world as it is after the step, so a fix that
-      // has just been vacated is available again on the same tick.
-      const arrivals = spawner.update(dt, clock, flown)
-      // And the transits see the arrivals, so their own cap counts what is
-      // really on the display.
-      const withArrivals = arrivals.length > 0 ? [...flown, ...arrivals] : flown
-      const crossing = overflights.update(dt, clock, withArrivals)
-      traffic = crossing.length > 0 ? [...withArrivals, ...crossing] : withArrivals
+      // A lesson puts a known situation in front of the player. An
+      // automatic release into the middle of it would break the
+      // instruction, and on the checkride it would break the separation
+      // rule the step is marked against.
+      if (tutorial?.suppressesTraffic === true) {
+        traffic = flown
+      } else {
+        // The spawner sees the world as it is after the step, so a fix that
+        // has just been vacated is available again on the same tick.
+        const arrivals = spawner.update(dt, clock, flown)
+        // And the transits see the arrivals, so their own cap counts what
+        // is really on the display.
+        const withArrivals = arrivals.length > 0 ? [...flown, ...arrivals] : flown
+        const crossing = overflights.update(dt, clock, withArrivals)
+        traffic = crossing.length > 0 ? [...withArrivals, ...crossing] : withArrivals
+      }
 
       // Do not keep pointing at an aircraft that has left.
       if (selected !== null && !traffic.some((a) => a.callsign === selected)) {
@@ -1241,12 +1302,20 @@ function start(
           announce(`${callsign} requesting vector due to severe weather`, 'reject')
         }
         asking = now
+        // Once a sweep rather than once a tick: no goal here can change
+        // faster than that, and the conflict scan would otherwise run
+        // twenty times a second for nothing.
+        tutorial?.observeTick()
         syncStrips()
       }
     },
     render: () => {
       if (!dirty && !simAdvanced) return
       dirty = false
+      // Recomputed every frame: two of the four kinds of spotlight follow
+      // something that moves, and either an aeroplane flying or the camera
+      // panning puts the hole in the wrong place the instant it is not.
+      tutorial?.layout()
       simAdvanced = false
       drawScope(
         ctx,
@@ -1273,6 +1342,70 @@ function start(
       )
     },
   })
+
+  /**
+   * The lesson.
+   *
+   * Built here because it needs the clock and the camera. Everything it can
+   * do to the world goes through this one object, so what a lesson is
+   * capable of is a list you can read in one place rather than a set of
+   * reaches into the session from somewhere else.
+   */
+  tutorial = new TutorialSession({
+    module: BASICS,
+    mount: shell,
+    onRunning: () => {
+      paintTools()
+      requestDraw()
+    },
+    world: {
+      airport,
+      traffic: () => traffic,
+      setTraffic: (next) => {
+        traffic = next
+        // A step that clears the scope must not leave the interface
+        // pointing at an aeroplane that is no longer on it.
+        if (selected !== null && !next.some((a) => a.callsign === selected)) {
+          selected = null
+        }
+        tagMenu.close()
+      },
+      setWeather: setScriptedWeather,
+      setPaused: (paused) => {
+        loop.setPaused(paused)
+        paintMenu()
+        paintTools()
+      },
+      setSpeed: (speed) => {
+        loop.setSpeed(speed)
+        paintMenu()
+        paintTools()
+      },
+      elapsedSeconds: () => loop.clock.elapsedSeconds,
+      screenOf: (at) => cam.worldToScreen(at),
+      changed: () => {
+        syncStrips()
+        requestDraw()
+      },
+      announce,
+    },
+  })
+
+  const startLesson = (): void => {
+    if (tutorial === null) return
+    if (tutorial.running) {
+      tutorial.stop()
+      return
+    }
+    // A lesson needs somebody on position: it stops the clock, replaces the
+    // traffic and expects clearances to be accepted, none of which is true
+    // behind the logon screen.
+    if (controller === null) {
+      announce('log on before starting a lesson', 'reject')
+      return
+    }
+    tutorial.start()
+  }
 
   // Release an arrival on command, for when the scope is quiet or to line
   // up a particular situation without waiting for the cadence.
@@ -1559,6 +1692,10 @@ function start(
       case 'n':
         // A dev shortcut, so it waits until someone is working the sector.
         if (controller !== null) spawnNow()
+        return
+      case 'l':
+        // The lesson, from the keyboard as well as the rail.
+        startLesson()
         return
       case 't':
         // The same, for traffic that is only passing through. T rather than

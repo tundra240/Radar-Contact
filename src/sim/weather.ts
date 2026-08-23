@@ -131,6 +131,20 @@ export interface Weather {
   readonly driftFactor: number
   readonly seed: number
   readonly config: WeatherConfig
+  /**
+   * Cells placed by hand rather than drawn from the seed.
+   *
+   * The schedule is otherwise entirely a function of the seed, which is
+   * what makes a session repeatable and what stops the weather having to
+   * be stored. That is right for a session and useless for a lesson: a
+   * tutorial step that says "a thunderstorm has moved over OCK" needs a
+   * thunderstorm over OCK, not whatever this hour's draw produced.
+   *
+   * They are cells like any other once they exist -- they form, peak and
+   * collapse on the same envelope, and they drift on the same wind -- so
+   * nothing downstream needs to know which kind it is looking at.
+   */
+  readonly scripted: readonly WeatherCell[]
 }
 
 /**
@@ -141,7 +155,28 @@ export interface Weather {
  * indefinitely without being generated up front.
  */
 export function makeWeather(rng: Rng, config: WeatherConfig): Weather {
-  return { wind: config.wind, driftFactor: config.driftFactor, seed: rng.seed, config }
+  return {
+    wind: config.wind,
+    driftFactor: config.driftFactor,
+    seed: rng.seed,
+    config,
+    scripted: [],
+  }
+}
+
+/**
+ * The same schedule with a given set of hand-placed cells, replacing any
+ * already on it.
+ *
+ * Replacing rather than adding: a lesson step declares the weather it wants
+ * to exist, so leaving the previous step's storm behind would make the
+ * picture depend on the order steps happened to be visited in.
+ */
+export function withScriptedCells(
+  weather: Weather,
+  cells: readonly WeatherCell[],
+): Weather {
+  return { ...weather, scripted: cells }
 }
 
 /* ---------------------------------------------------------- the schedule */
@@ -256,6 +291,12 @@ export function activeCells(weather: Weather, elapsedSeconds: number): WeatherCe
     for (const cell of cellsBornIn(weather, s)) {
       if (envelopeOf(cell, elapsedSeconds) > 0) out.push(cell)
     }
+  }
+  // Hand-placed cells are subject to the same test as drawn ones: one whose
+  // life has not begun or has ended is not on the scope, whoever put it
+  // there.
+  for (const cell of weather.scripted) {
+    if (envelopeOf(cell, elapsedSeconds) > 0) out.push(cell)
   }
   return out
 }

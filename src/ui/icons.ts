@@ -36,6 +36,8 @@ export const ICONS = {
   moon: 'M12.6 10.1A5.2 5.2 0 0 1 6.4 3.5a5.4 5.4 0 1 0 6.2 6.6Z',
   /** Stacked rules: the options menu. */
   menu: 'M3 4.5h10M3 8h10M3 11.5h10',
+  // A mortar board: a lesson, told apart from the guide's open book.
+  lesson: 'M8 3 1.5 6 8 9l6.5-3L8 3ZM4.5 7.4v3.1c0 .9 1.6 1.7 3.5 1.7s3.5-.8 3.5-1.7V7.4',
   /** An open book: the guide. */
   guide: 'M8 4.4C6.6 3.3 4.9 3 3 3.2v9.4c1.9-.2 3.6.1 5 1.2 1.4-1.1 3.1-1.4 5-1.2V3.2c-1.9-.2-3.6.1-5 1.2Zm0 0v9.4',
 } as const

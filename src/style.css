@@ -1786,4 +1786,146 @@ canvas {
   padding: 5px 6px 6px;
 }
 
+/* ------------------------------------------------------------- tutorial
 
+   Two pieces: a mask that darkens everything except what the step is
+   talking about, and a card that says what to do.
+
+   The mask never takes a click. Darkening the display is a way of saying
+   "look here", not a way of stopping the controller doing anything else --
+   a lesson that would not let you pan the scope while reading about it
+   would be a worse lesson than one that would.                          */
+
+.tutorial[hidden] {
+  display: none;
+}
+
+.tutorial-mask {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 900;
+  pointer-events: none;
+}
+
+.tutorial-shade {
+  fill: rgb(0 0 0 / 62%);
+  transition: opacity 160ms ease-out;
+}
+
+/* The bright edge of the hole. The accent rather than white: it is the
+   colour this display already uses to mean "this one", on the selected
+   target and on every readout value. */
+.tutorial-ring {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  opacity: 0.9;
+}
+
+/* Bottom left, clear of the strip bay on the right and the tool rail
+   above. Fixed rather than absolute: it is a document about the lesson,
+   not a panel belonging to a control. */
+.tutorial-card {
+  position: fixed;
+  left: 44px;
+  bottom: 46px;
+  z-index: 910;
+  width: min(390px, calc(100vw - 60px));
+  padding: 10px 12px 12px;
+  background: var(--face);
+  color: var(--chrome-text);
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow),
+    0 6px 24px rgb(0 0 0 / 45%);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+:root[data-chrome='flat'] .tutorial-card {
+  box-shadow:
+    inset 0 0 0 1px var(--edge),
+    0 6px 24px rgb(0 0 0 / 45%);
+}
+
+.tutorial-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.tutorial-counter {
+  color: var(--chrome-dim);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.tutorial-close {
+  border: 0;
+  padding: 2px 4px;
+  background: none;
+  color: var(--chrome-dim);
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+.tutorial-close:hover {
+  color: var(--warn);
+}
+
+.tutorial-title {
+  margin-bottom: 4px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.tutorial-text {
+  margin: 0;
+}
+
+.tutorial-continue {
+  margin-top: 10px;
+  padding: 5px 12px;
+  border: 0;
+  background: var(--well);
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-light),
+    inset -1px -1px 0 0 var(--bevel-shadow);
+}
+
+:root[data-chrome='flat'] .tutorial-continue {
+  box-shadow: inset 0 0 0 1px var(--edge);
+}
+
+.tutorial-continue[hidden] {
+  display: none;
+}
+
+/* The reset notice. Subtle on purpose: a player who has just lost
+   separation has enough to read, and it goes away by itself. */
+.tutorial-toast {
+  margin-top: 8px;
+  padding: 5px 8px;
+  background: var(--well);
+  color: var(--warn);
+  font-size: 11px;
+  box-shadow: inset 0 0 0 1px var(--warn);
+}
+
+.tutorial-toast[hidden] {
+  display: none;
+}
