@@ -4,6 +4,7 @@ import { makeRng } from '../core/rng'
 import { makeWeather } from '../sim/weather'
 import { loadAirport, runwayScaleAt } from '../data/airport'
 import raw from '../data/egll.json'
+import { airportOf } from '../data/airports'
 import { drawScope } from './scope'
 import { OVERLAY_ITEMS, OVERLAY_PRESETS, type Overlays } from './overlays'
 import type { ScopeContacts, ScopeStatus } from './scope'
@@ -1789,5 +1790,83 @@ describe('the flat readouts', () => {
     // keeps its single row of inset bevelled cells.
     setPalette('beige')
     expect(hudRows(1000, 600, 'bottom')).toHaveLength(1)
+  })
+})
+
+describe('the terrain overlay', () => {
+  /**
+   * A field with mountains on it.
+   *
+   * Heathrow has none -- it is flat, which is the point of it -- so the
+   * layer has to be exercised against one that does.
+   */
+  // Through the register, which folds in the shared fleet: a profile on
+  // its own carries an empty aircraft list by design.
+  const nice = airportOf('LFMN')
+
+  function drawn(overlays: Overlays): string[] {
+    const cam = new Camera({ x: 0, y: 0 }, 40, { maxNM: 200 })
+    cam.setViewport(1000, 700)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, nice, overlays, STATUS)
+    return rec.texts.map((t) => t.s)
+  }
+
+  it('names the high ground and the height that clears it', () => {
+    const texts = drawn(OVERLAY_PRESETS.standard)
+    expect(texts.some((t) => t.includes('MARITIME ALPS'))).toBe(true)
+    // The minimum is the number a controller uses; the summit is what makes
+    // it believable.
+    expect(texts.some((t) => t.includes('11500 MSA'))).toBe(true)
+    expect(texts.some((t) => t.includes('9800 ft'))).toBe(true)
+  })
+
+  it('goes away when the layer is switched off', () => {
+    const texts = drawn({ ...OVERLAY_PRESETS.standard, terrain: false })
+    expect(texts.some((t) => t.includes('MARITIME ALPS'))).toBe(false)
+  })
+
+  it('is drawn even on the sparest picture', () => {
+    // Everything else optional is context. An aircraft can be flown into
+    // this, so it survives the cut that removes the coastline and the
+    // aerodromes.
+    expect(OVERLAY_PRESETS.minimal.terrain).toBe(true)
+    expect(drawn(OVERLAY_PRESETS.minimal).some((t) => t.includes('MARITIME ALPS'))).toBe(true)
+  })
+
+  it('shades the area rather than only outlining it', () => {
+    // An outline says "this edge"; the thing that matters about terrain is
+    // which side of it you are on, and a wash is what says "this area".
+    const cam = new Camera({ x: 0, y: 0 }, 40, { maxNM: 200 })
+    cam.setViewport(1000, 700)
+    const rec = recorder()
+    drawScope(rec.ctx, cam, nice, OVERLAY_PRESETS.standard, STATUS)
+    expect(rec.fills.length).toBeGreaterThan(0)
+  })
+
+  it('draws the noise areas under their own switch', () => {
+    const bcn = airportOf('LEBL')
+    const cam = new Camera({ x: 0, y: 0 }, 40, { maxNM: 200 })
+    cam.setViewport(1000, 700)
+
+    const on = recorder()
+    drawScope(on.ctx, cam, bcn, OVERLAY_PRESETS.standard, STATUS)
+    expect(on.texts.some((t) => t.s.includes('CITY NOISE'))).toBe(true)
+
+    const off = recorder()
+    drawScope(off.ctx, cam, bcn, { ...OVERLAY_PRESETS.standard, noiseZones: false }, STATUS)
+    expect(off.texts.some((t) => t.s.includes('CITY NOISE'))).toBe(false)
+  })
+
+  it('leaves a flat field alone either way', () => {
+    // Heathrow has no terrain and no noise zones, so the layer costs it
+    // nothing whether it is on or off.
+    const cam = new Camera({ x: 0, y: 0 }, 40, { maxNM: 200 })
+    cam.setViewport(1000, 700)
+    const on = recorder()
+    drawScope(on.ctx, cam, airport, OVERLAY_PRESETS.standard, STATUS)
+    const off = recorder()
+    drawScope(off.ctx, cam, airport, { ...OVERLAY_PRESETS.standard, terrain: false }, STATUS)
+    expect(off.texts.length).toBe(on.texts.length)
   })
 })

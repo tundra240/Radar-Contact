@@ -17,6 +17,18 @@ export interface Overlays {
    * The WX button on the scope is the quick way to it.
    */
   readonly weather: boolean
+  /**
+   * High ground, and the lowest an aircraft may be over it.
+   *
+   * Operational rather than contextual, like the weather: it is a thing
+   * you have to vector around and the alert fires whether it is drawn or
+   * not. Switchable all the same, because at a field with mountains on
+   * three sides the shading covers most of the map and a controller
+   * sometimes wants to see what is underneath it.
+   */
+  readonly terrain: boolean
+  /** Noise abatement areas and the floor over each. */
+  readonly noiseZones: boolean
   /** Control zones, control areas and the TMA. */
   readonly airspace: boolean
   /** Class G aerodrome traffic zones, which are numerous and small. */
@@ -47,6 +59,8 @@ export type OverlayKey = keyof Overlays
 /** Display order and wording for the control panel. */
 export const OVERLAY_ITEMS: readonly { readonly key: OverlayKey; readonly label: string }[] = [
   { key: 'weather', label: 'Weather (WX)' },
+  { key: 'terrain', label: 'Terrain and MSA' },
+  { key: 'noiseZones', label: 'Noise abatement' },
   { key: 'rangeRings', label: 'Range rings' },
   { key: 'centrelines', label: 'Extended centrelines' },
   { key: 'airspace', label: 'Controlled airspace' },
@@ -67,6 +81,8 @@ export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
   /** Just the geometry needed to run an approach. */
   minimal: {
     weather: true,
+    terrain: true,
+    noiseZones: false,
     airspace: false,
     trafficZones: false,
     airspaceLabels: false,
@@ -83,6 +99,8 @@ export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
   /** Enough surrounding context to stay oriented. */
   standard: {
     weather: true,
+    terrain: true,
+    noiseZones: true,
     airspace: true,
     trafficZones: false,
     airspaceLabels: true,
@@ -99,6 +117,8 @@ export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
   /** Everything the data supports. */
   full: {
     weather: true,
+    terrain: true,
+    noiseZones: true,
     airspace: true,
     trafficZones: true,
     airspaceLabels: true,

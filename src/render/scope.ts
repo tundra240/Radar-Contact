@@ -16,7 +16,7 @@ import {
   type Runway,
 } from '../data/airport'
 import type { Aircraft } from '../sim/types'
-import type { ZoneShape } from '../sim/zones'
+import type { TerrainZone, ZoneShape } from '../sim/zones'
 import { drawTargets, drawVectorDrag, type VectorDrag } from './layers/targets'
 import { drawWeather } from './layers/weather'
 import type { Weather } from '../sim/weather'
@@ -203,7 +203,7 @@ export function drawScope(
 
   // Above every overlay and below the chrome: traffic is the top layer of
   // the radar picture, but it is still inside the display.
-  drawZones(g, cam, airport)
+  drawZones(g, cam, airport, overlays)
   drawTargets(
     g,
     cam,
@@ -1139,27 +1139,51 @@ export function readoutBox(label: string): ReadoutBox | null {
  * happen; a noise zone is drawn in the furniture colour because breaking it
  * costs money.
  */
-function drawZones(g: CanvasRenderingContext2D, cam: Camera, airport: Airport): void {
-  if (airport.terrain.length === 0 && airport.noise.length === 0) return
+function drawZones(
+  g: CanvasRenderingContext2D,
+  cam: Camera,
+  airport: Airport,
+  overlays: Overlays,
+): void {
+  const terrain = overlays.terrain ? airport.terrain : []
+  const noise = overlays.noiseZones ? airport.noise : []
+  if (terrain.length === 0 && noise.length === 0) return
 
   g.save()
   g.lineWidth = 1
 
-  for (const zone of airport.terrain) {
-    g.strokeStyle = theme.warn
-    g.globalAlpha = 0.5
+  for (const zone of terrain) {
+    // Filled, faintly, as well as outlined. An outline alone reads as one
+    // more boundary on a display that already has a dozen of them, and the
+    // thing that matters about terrain is which SIDE of the line you are
+    // on. A wash says "this area", where a line only says "this edge".
     traceZone(g, cam, zone.shape)
+    g.globalAlpha = 0.08
+    g.fillStyle = theme.warn
+    g.fill()
+
+    // A second, denser pass along the boundary itself: high ground has an
+    // edge you can be a mile the wrong side of, and it should be the
+    // sharpest part of the shading.
+    g.globalAlpha = 0.55
+    g.strokeStyle = theme.warn
     g.stroke()
-    g.globalAlpha = 0.85
-    // The minimum, not the summit: the number a controller uses.
-    labelZone(g, cam, zone.shape, `${zone.label} ${zone.minimumSafeFt} MSA`, theme.warn)
+
+    g.globalAlpha = 0.9
+    // The minimum, not the summit: the number a controller uses. Both,
+    // where there is room, because the summit is what makes the minimum
+    // believable.
+    labelTerrain(g, cam, zone)
   }
 
-  for (const zone of airport.noise) {
+  for (const zone of noise) {
     g.strokeStyle = theme.ringStrong
+    g.globalAlpha = 0.05
+    g.fillStyle = theme.ringStrong
+    traceZone(g, cam, zone.shape)
+    g.fill()
     g.globalAlpha = 0.55
     g.setLineDash([5, 4])
-    traceZone(g, cam, zone.shape)
     g.stroke()
     g.setLineDash([])
     g.globalAlpha = 0.8
@@ -1167,6 +1191,26 @@ function drawZones(g: CanvasRenderingContext2D, cam: Camera, airport: Airport): 
   }
 
   g.restore()
+}
+
+/**
+ * A terrain area's name, its minimum and its summit.
+ *
+ * Two lines rather than one: the minimum is the number that gets used and
+ * the summit is what explains it, and a controller reading "11500 MSA" over
+ * a blank shape has to take it on trust.
+ */
+function labelTerrain(g: CanvasRenderingContext2D, cam: Camera, zone: TerrainZone): void {
+  const at = centreOf(zone.shape)
+  const p = cam.worldToScreen(at)
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillStyle = theme.warn
+  g.font = fonts.bold(9)
+  g.fillText(`${zone.label} ${zone.minimumSafeFt} MSA`, p.x, p.y - 6)
+  g.font = fonts.label(8)
+  g.globalAlpha = 0.65
+  g.fillText(`terrain to ${zone.peakFt} ft`, p.x, p.y + 6)
 }
 
 /** The outline of a zone, whichever shape it is. */
@@ -1185,6 +1229,15 @@ function traceZone(g: CanvasRenderingContext2D, cam: Camera, shape: ZoneShape): 
   g.closePath()
 }
 
+/** The middle of a zone, for putting a name in. */
+function centreOf(shape: ZoneShape): { readonly x: number; readonly y: number } {
+  if (shape.kind === 'circle') return shape.centreNM
+  return {
+    x: shape.verticesNM.reduce((sum, v) => sum + v.x, 0) / shape.verticesNM.length,
+    y: shape.verticesNM.reduce((sum, v) => sum + v.y, 0) / shape.verticesNM.length,
+  }
+}
+
 /** A name in the middle of a zone, so it can be told from a range ring. */
 function labelZone(
   g: CanvasRenderingContext2D,
@@ -1193,14 +1246,7 @@ function labelZone(
   text: string,
   colour: string,
 ): void {
-  const at =
-    shape.kind === 'circle'
-      ? shape.centreNM
-      : {
-          x: shape.verticesNM.reduce((sum, v) => sum + v.x, 0) / shape.verticesNM.length,
-          y: shape.verticesNM.reduce((sum, v) => sum + v.y, 0) / shape.verticesNM.length,
-        }
-  const p = cam.worldToScreen(at)
+  const p = cam.worldToScreen(centreOf(shape))
   g.font = fonts.label(9)
   g.fillStyle = colour
   g.textAlign = 'center'
