@@ -1,5 +1,5 @@
 import type { Camera } from '../core/camera'
-import { formatClock, formatSpeed, type Clock, type Speed } from '../core/loop'
+import { formatClock, formatElapsed, formatSpeed, type Clock, type Speed } from '../core/loop'
 import { advance, type Vec2NM } from '../core/geo'
 import {
   centrelinePoint,
@@ -1091,17 +1091,19 @@ function drawHud(
 ): void {
   if (theme.chromeStyle === 'flat') {
     drawPositionStrip(g, airport, status)
-    // Started where the position block ends, so the two share the top edge
-    // without overlapping.
+    // Started where the position block ends and stopped where the clock
+    // begins, so the three share the top edge without overlapping.
     drawDataTable(
       g,
-      cam,
       statusCells(cam, airport, overlays, status),
       positionStripWidth(airport, status) + 2,
+      cam.width - 1 - clockWidth(),
     )
+    drawClock(g, cam, status)
     return
   }
   drawTitleBlock(g, airport, status)
+  drawClock(g, cam, status)
   drawStatusBar(g, cam, airport, overlays, status)
 }
 
@@ -1181,9 +1183,9 @@ function drawPositionStrip(
  */
 function drawDataTable(
   g: CanvasRenderingContext2D,
-  cam: Camera,
   cells: readonly Cell[],
   startX: number,
+  endX: number,
 ): void {
   const headSize = 8
   const valueSize = 10
@@ -1196,8 +1198,11 @@ function drawDataTable(
   // A controller reads these against the traffic, and a readout at the far
   // bottom of the glass is a readout you look away from the traffic to see.
   const left = startX
-  const right = cam.width - 1
+  const right = endX
   const top = 1
+  // On a window too narrow to hold the position block and the clock there
+  // is no table, rather than a table drawn backwards.
+  if (right <= left) return
 
   g.fillStyle = theme.chromeFace
   g.fillRect(left, top, right - left, h)
@@ -1234,6 +1239,79 @@ function drawDataTable(
 
     x += w
   }
+}
+
+/* --------------------------------------------------------------- the clock
+
+   The time was a column in the readout table: ten pixels, ninth in a row of
+   ten, and the first thing to go when the window narrowed. That is the
+   wrong treatment for the readout glanced at most and written on every
+   strip, so it has the opposite corner from the position block, at a size
+   meant to be read rather than looked up, and nothing can drop it.
+
+   Two lines, because "the time" means two things here. The large one is the
+   simulated time of day -- what a controller reads, and what an estimate or
+   a strip is written against. The small one is how long the session has
+   been running, which is what a player means by the same word. Showing one
+   and not the other would answer half the question and look like it had
+   answered all of it.
+
+   Both are simulated. They run at whatever rate the loop is set to and they
+   stop when it is paused, so a session at x4 gains four minutes of the day
+   in one of yours. Neither is the wall clock and neither should be.      */
+
+const CLOCK_TIME_SIZE = 15
+const CLOCK_UNDER_SIZE = 8
+const CLOCK_UNDER_PREFIX = 'ELAPSED '
+
+/**
+ * How wide the block is: whichever of its two lines is longer, plus the
+ * padding either side. Measured from the widest text each line can hold
+ * rather than from the text it happens to hold now, or the block would
+ * breathe every time a digit changed.
+ */
+function clockWidth(): number {
+  const time = charW(CLOCK_TIME_SIZE) * '00:00:00'.length
+  const under = charW(CLOCK_UNDER_SIZE) * (CLOCK_UNDER_PREFIX.length + '00:00:00'.length)
+  return Math.ceil(Math.max(time, under)) + 16
+}
+
+function drawClock(g: CanvasRenderingContext2D, cam: Camera, status: ScopeStatus): void {
+  const flat = theme.chromeStyle === 'flat'
+  const w = clockWidth()
+  const h = flat ? 29 : 28
+  // Flush to the frame under the flat idiom and inset ten under the period
+  // one, matching what each does with the block in the other corner.
+  const x = flat ? cam.width - 1 - w : cam.width - 10 - w
+  const y = flat ? 1 : 10
+
+  if (flat) {
+    g.fillStyle = theme.chromeFace
+    g.fillRect(x, y, w, h)
+    g.fillStyle = theme.chromeLight
+    g.fillRect(x, y + h, w, 1)
+    g.fillRect(x, y, 1, h)
+  } else {
+    bevel(g, x, y, w, h)
+  }
+
+  // Right-aligned, so the digits sit in the same place as they tick over
+  // instead of the whole readout shifting under a widening hour.
+  const edge = x + w - 8
+  g.textAlign = 'right'
+  g.textBaseline = 'top'
+
+  g.font = fonts.bold(CLOCK_TIME_SIZE)
+  g.fillStyle = theme.accent
+  g.fillText(formatClock(status.clock.timeOfDaySeconds), edge, y + 2)
+
+  g.font = fonts.label(CLOCK_UNDER_SIZE)
+  g.fillStyle = theme.chromeDim
+  g.fillText(
+    CLOCK_UNDER_PREFIX + formatElapsed(status.clock.elapsedSeconds),
+    edge,
+    y + 18,
+  )
 }
 
 function drawTitleBlock(
@@ -1292,11 +1370,12 @@ function statusCells(
   // hold them all: cells are dropped from the right, so the ones that
   // matter most come first.
   return [
-    // Simulated time, not wall clock: it runs at whatever rate the loop is
-    // set to, and stops when the loop is paused.
-    { label: 'TIME', value: formatClock(status.clock.timeOfDaySeconds) },
-    // First after the clock, because it is the only number here that is a
-    // verdict on how the session is going.
+    // The clock is not here. It has a block of its own in the corner, where
+    // it can be set large enough to read at a glance and cannot be dropped
+    // when the window narrows -- see drawClock.
+    //
+    // First, because it is the only number here that is a verdict on how
+    // the session is going.
     { label: 'SCORE', value: String(status.traffic.points) },
     {
       label: 'RATE',

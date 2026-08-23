@@ -212,6 +212,21 @@ export function formatClock(timeOfDaySeconds: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+/**
+ * Session length, HH:MM:SS.
+ *
+ * Counts up from zero, where the zulu readout counts round a day. Both are
+ * "the time" and they answer different questions -- what the strips are
+ * written against, and how long you have been at it -- so both are shown.
+ */
+export function formatElapsed(elapsedSeconds: number): string {
+  const t = Math.max(0, Math.floor(elapsedSeconds))
+  const h = Math.floor(t / 3600)
+  const m = Math.floor((t % 3600) / 60)
+  const s = t % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
 /** Speed as it appears on a button. */
 export function formatSpeed(speed: Speed): string {
   return speed === 1 ? 'x1' : `x${speed}`

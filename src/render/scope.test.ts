@@ -853,8 +853,24 @@ describe('the clock and rate readouts', () => {
   airspaceEnforced: true,
   weather: CALM,
     })
-    expect(labels).toContain('TIME')
     expect(labels).toContain('13:01:01')
+  })
+
+  it('shows how long the session has run beside the time of day', () => {
+    // The two answer different questions and one is not recoverable from
+    // the other: the day started at noon whatever the session did.
+    const labels = withStatus({
+      ...STATUS,
+      clock: { ticks: 1200, elapsedSeconds: 3661, timeOfDaySeconds: 13 * 3600 + 61 },
+      speed: 1,
+      paused: false,
+      traffic: { spawned: 0, held: 0, landed: 0, left: 0, points: 0 },
+      controller: null,
+      airspaceEnforced: true,
+      weather: CALM,
+    })
+    expect(labels).toContain('13:01:01')
+    expect(labels).toContain('ELAPSED 01:01:01')
   })
 
   it('shows the active rate', () => {
@@ -893,6 +909,76 @@ describe('the clock and rate readouts', () => {
     })
     expect(labels).toContain('PAUSED')
     expect(labels).not.toContain('x4')
+  })
+})
+
+/** Everything drawn in the top band, whatever the idiom. */
+function clockTexts(w = 1000, h = 600): { s: string; x: number; y: number }[] {
+  const cam = new Camera({ x: 0, y: 0 }, 30, { maxNM: 200 })
+  cam.setViewport(w, h)
+  const rec = recorder()
+  drawScope(rec.ctx, cam, airport, OVERLAY_PRESETS.standard, STATUS)
+  return rec.texts
+}
+
+describe('the clock block', () => {
+  it('draws in every idiom', () => {
+    // It was a column in the flat table and nothing at all in the period
+    // one. Both get it now, because the reason for having it does not
+    // depend on which decade the furniture is imitating.
+    for (const name of PALETTE_ORDER) {
+      setPalette(name)
+      const texts = clockTexts().map((t) => t.s)
+      expect(texts, name).toContain('12:00:00')
+      expect(texts, name).toContain('ELAPSED 00:00:00')
+    }
+    setPalette('beige')
+  })
+
+  it('sits in the top-right corner, opposite the position block', () => {
+    for (const name of PALETTE_ORDER) {
+      setPalette(name)
+      const time = clockTexts(1000, 600).find((t) => t.s === '12:00:00')
+      expect(time, name).toBeDefined()
+      // Right-aligned, so x is the right-hand edge of the digits.
+      expect(Number(time?.x), name).toBeGreaterThan(880)
+      expect(Number(time?.y), name).toBeLessThan(34)
+    }
+    setPalette('beige')
+  })
+
+  it('survives a window too narrow for the readout table', () => {
+    // The whole point of taking it out of the table: a column can be
+    // dropped from the right and the time is the last thing that should be.
+    for (const name of PALETTE_ORDER) {
+      setPalette(name)
+      expect(clockTexts(360, 400).map((t) => t.s), name).toContain('12:00:00')
+    }
+    setPalette('beige')
+  })
+
+  it('is set larger than the readouts beside it', () => {
+    // The reason it moved. A ten-pixel column among nine others is not a
+    // readout you glance at.
+    setPalette('traconDark')
+    const cam = new Camera({ x: 0, y: 0 }, 30, { maxNM: 200 })
+    cam.setViewport(1000, 600)
+    const rec = recorder()
+    const fonts: string[] = []
+    const ctx = rec.ctx as CanvasRenderingContext2D & { fillText: unknown }
+    const original = ctx.fillText as (s: string, x: number, y: number) => void
+    ctx.fillText = function (s: string, x: number, y: number): void {
+      if (s === '12:00:00') fonts.push(this.font)
+      original.call(this, s, x, y)
+    }
+    drawScope(ctx, cam, airport, OVERLAY_PRESETS.standard, STATUS)
+    setPalette('beige')
+
+    expect(fonts).toHaveLength(1)
+    const px = Number(/(\d+)px/.exec(String(fonts[0]))?.[1])
+    // Larger than the ten-pixel values in the table, and bold.
+    expect(px).toBeGreaterThan(12)
+    expect(String(fonts[0])).toContain('bold')
   })
 })
 
@@ -1624,12 +1710,12 @@ describe('the flat readouts', () => {
   it('names the columns and shows the values under them', () => {
     const rows = hudRows()
     expect(rows[0]?.cells.slice(0, 4).map((c) => c.s)).toEqual([
-      'TIME',
       'SCORE',
       'RATE',
       'RANGE',
+      'ARR',
     ])
-    expect(rows[1]?.cells[0]?.s).toBe('12:00:00')
+    expect(rows[1]?.cells[0]?.s).toBe('0')
   })
 
   it('runs from the position block to the right-hand edge', () => {
@@ -1651,13 +1737,24 @@ describe('the flat readouts', () => {
 
   it('drops columns from the right when the window narrows', () => {
     const wide = hudRows(1000)[0]?.cells.map((c) => c.s) ?? []
-    const narrow = hudRows(360)[0]?.cells.map((c) => c.s) ?? []
+    const narrow = hudRows(640)[0]?.cells.map((c) => c.s) ?? []
     expect(narrow.length).toBeGreaterThan(0)
     expect(narrow.length).toBeLessThan(wide.length)
-    // What survives is a prefix of what fitted: the clock outlives the
+    // What survives is a prefix of what fitted: the score outlives the
     // airspace provenance, which is the right way round.
     expect(wide.slice(0, narrow.length)).toEqual(narrow)
-    expect(narrow).toContain('TIME')
+    expect(narrow).toContain('SCORE')
+  })
+
+  it('stops short of the clock rather than running under it', () => {
+    const rows = hudRows()
+    const last = Number(rows[0]?.cells.at(-1)?.x)
+    const clock = Number(
+      clockTexts(1000, 600).find((t) => t.s === '12:00:00')?.x,
+    )
+    // Right-aligned, so its x is its right-hand edge; the table's last
+    // heading starts left of where the block begins.
+    expect(last).toBeLessThan(clock)
   })
 
   it('puts the position hard into the corner', () => {
