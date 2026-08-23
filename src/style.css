@@ -121,6 +121,7 @@ canvas {
 }
 
 .mode-toggle {
+  position: relative;
   width: 30px;
   height: 30px;
   padding: 0;
@@ -352,7 +353,11 @@ canvas {
    strip a raised card inside it.                                        */
 
 .strip-bay {
-  flex: 0 0 272px;
+  /* Width is a preference: how many strips you want beside the picture
+     against how much picture you want. The handle on its inner edge sets
+     it, and main.ts remembers it. */
+  flex: 0 0 var(--bay-width, 272px);
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -815,13 +820,10 @@ canvas {
    panels because it is a document rather than a set of controls, and it
    floats above the logon window so it can be read before logging on.    */
 
+/* Nothing of its own: it is a square on the rail like every other tool.
+   It used to carry emoji sizing -- wider, taller, a larger font -- which
+   fought the square once the emoji became a drawn glyph. */
 .guide-button {
-  min-width: 40px;
-  /* The emoji does not want the uppercase letter-spacing the other
-     buttons carry, and it needs a little more room vertically. */
-  padding: 5px 10px 4px;
-  font-size: 15px;
-  line-height: 1;
   letter-spacing: 0;
 }
 
@@ -1311,6 +1313,27 @@ canvas {
   text-decoration: underline;
 }
 
+/* The grip on the bay's inner edge. Wider than it looks: a one-pixel
+   target is a target you miss. */
+.strip-resize {
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 20;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.strip-resize:hover,
+.strip-resize:focus-visible {
+  background: var(--accent);
+  opacity: 0.35;
+}
+
 /* ---- tool glyphs ------------------------------------------------------
 
    Every tool carries a glyph and a word. The period schemes show the word,
@@ -1324,8 +1347,8 @@ canvas {
   display: block;
 }
 
-/* Kept in the markup and never shown: it is the accessible name and the
-   tooltip, so the button still says what it does to a screen reader. */
+/* Out of sight until the pointer is on the button, and still the
+   accessible name the whole time. */
 .tool-text {
   position: absolute;
   width: 1px;
@@ -1333,6 +1356,30 @@ canvas {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* On hover it becomes a label beside the tool: quicker than waiting for a
+   native tooltip, and it reads in the interface's own type rather than the
+   operating system's. Keyboard focus gets it too, or the rail would be
+   unusable without a mouse. */
+.mode-toggle:hover .tool-text,
+.mode-toggle:focus-visible .tool-text {
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+  left: calc(100% + 5px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 60;
+  padding: 4px 8px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: none;
+  color: var(--chrome-text);
+  background: var(--face);
+  border: 1px solid var(--edge);
+  pointer-events: none;
 }
 
 /* ---- the ATIS board --------------------------------------------------- */
@@ -1353,6 +1400,12 @@ canvas {
   right: 0;
   z-index: 40;
   min-width: 220px;
+  /* It opens beside the rail, which starts a little way down the glass, so
+     it has that much less room than the window is tall. Scrolls rather than
+     running off the bottom, and never wider than the space beside it. */
+  max-height: calc(100vh - 48px);
+  max-width: calc(100vw - 48px);
+  overflow-y: auto;
   padding: 10px 12px 12px;
   color: var(--accent);
   background: var(--face);
@@ -1703,10 +1756,4 @@ canvas {
   padding: 5px 6px 6px;
 }
 
-/* A modern position has no command line along the bottom of the glass, so
-   it starts put away. Hidden rather than removed: typing is still one of the
-   three ways to work an aircraft, and it is the fastest of them, so the rail
-   button brings it straight back. */
-:root[data-console='off'] .console {
-  display: none;
-}
+

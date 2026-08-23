@@ -105,7 +105,7 @@ export class Menu {
     this.button = document.createElement('button')
     this.button.type = 'button'
     this.button.className = 'mode-toggle menu-button'
-    setToolLabel(this.button, 'menu', 'MENU')
+    setToolLabel(this.button, 'menu', 'Options')
     this.button.title = 'Simulation, display and overlay options'
     this.button.setAttribute('aria-haspopup', 'true')
     this.button.addEventListener('click', () => this.setOpen(!this.isOpen))

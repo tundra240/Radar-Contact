@@ -28,9 +28,7 @@ import {
 import { Spawner } from './sim/spawner'
 import type { Aircraft } from './sim/types'
 import type { Command } from './commands/types'
-import { parseCommandLine } from './commands/parse'
 import { applyAll, type ApplyContext } from './commands/apply'
-import { CommandConsole } from './ui/console'
 import { TagMenu } from './ui/tagmenu'
 import { dragHeading, pickTarget, type VectorDrag } from './render/layers/targets'
 import { StripBay } from './ui/stripbay'
@@ -94,14 +92,13 @@ viewEl.appendChild(canvas)
 const g = canvas.getContext('2d')
 if (!g) throw new Error('2D canvas context unavailable')
 
-start(host, viewEl, canvas, g, scopeEl)
+start(host, viewEl, canvas, g)
 
 function start(
   shell: HTMLDivElement,
   container: HTMLDivElement,
   surface: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
-  column: HTMLDivElement,
 ): void {
   // World space is anchored on the airport reference point, so centring the
   // camera on the origin centres it on the field.
@@ -447,8 +444,7 @@ function start(
   const wxButton = tool('wx-button', () => {
     setOverlays({ ...overlays, weather: !overlays.weather })
   })
-  wxButton.title = 'Show or hide precipitation'
-  setToolLabel(wxButton, 'wx', 'WX')
+  setToolLabel(wxButton, 'wx', 'Weather')
 
   /** Run and stop, without opening anything. */
   const pauseButton = tool('pause-button', () => {
@@ -468,10 +464,6 @@ function start(
     requestDraw()
   })
 
-  /** The command line, which the flat idiom keeps out of the way. */
-  const consoleButton = tool('console-button', () => {
-    setConsoleOpen(!consoleOpen)
-  })
 
   /**
    * Sun or moon: the lighting, not the whole scheme list.
@@ -523,38 +515,6 @@ function start(
     },
   })
 
-  const CONSOLE_STORAGE = 'radar-contact:console'
-
-  /**
-   * Whether the command line is showing.
-   *
-   * Hidden by default on the modern position, which has no command line on
-   * it -- but hidden rather than removed, because typing is still one of the
-   * three ways to work an aircraft and taking it away would cost the fastest
-   * one. The rail button brings it back.
-   */
-  let consoleOpen = (() => {
-    try {
-      const v = window.localStorage.getItem(CONSOLE_STORAGE)
-      if (v === 'on') return true
-      if (v === 'off') return false
-    } catch {
-      // Blocked storage: fall through to the default for the scheme.
-    }
-    return theme.chromeStyle !== 'flat'
-  })()
-
-  const setConsoleOpen = (open: boolean): void => {
-    consoleOpen = open
-    document.documentElement.dataset['console'] = open ? 'on' : 'off'
-    try {
-      window.localStorage.setItem(CONSOLE_STORAGE, open ? 'on' : 'off')
-    } catch {
-      // Not worth failing a toggle over.
-    }
-    paintTools()
-  }
-
   const menu = new Menu({
     mount: controls,
     onOverlays: (next) => setOverlays(next),
@@ -598,19 +558,19 @@ function start(
 
   /** The tools that relabel themselves as the thing they control changes. */
   const paintTools = (): void => {
-    setToolLabel(pauseButton, loop.paused ? 'play' : 'pause', loop.paused ? 'RUN' : 'HOLD')
-    pauseButton.title = loop.paused ? 'Start the clock' : 'Stop the clock'
-
-    setToolLabel(rateButton, 'rate', formatSpeed(loop.speed))
-    rateButton.title = `Clock rate -- ${formatSpeed(loop.speed)}, press to step`
-
-    setToolLabel(consoleButton, 'console', 'CMD')
-    consoleButton.title = consoleOpen ? 'Hide the command line' : 'Show the command line'
-    consoleButton.classList.toggle('is-on', consoleOpen)
+    setToolLabel(
+      pauseButton,
+      loop.paused ? 'play' : 'pause',
+      loop.paused ? 'Start the clock' : 'Stop the clock',
+    )
+    setToolLabel(rateButton, 'rate', `Clock rate ${formatSpeed(loop.speed)} -- press to step`)
 
     const lit = paletteName() === 'traconLight'
-    setToolLabel(themeButton, lit ? 'moon' : 'sun', lit ? 'DARK' : 'LIGHT')
-    themeButton.title = lit ? 'Switch to the dark position' : 'Switch to the light position'
+    setToolLabel(
+      themeButton,
+      lit ? 'moon' : 'sun',
+      lit ? 'Switch to the dark position' : 'Switch to the light position',
+    )
   }
 
   /** The button reads as pressed in while the layer is on. */
@@ -658,6 +618,89 @@ function start(
     // clearance was issued.
     onLayoutChange: () => resize(),
   })
+
+  /**
+   * The strip bay's width, dragged from a grip on its inner edge.
+   *
+   * How many strips you want beside the picture, against how much picture
+   * you want, is a preference rather than a constant -- and it changes with
+   * the traffic: a quiet sector wants the glass and a busy one wants the
+   * strips. Remembered, because having to set it every session would make
+   * it not worth setting.
+   *
+   * Bounded at both ends. Narrow enough and a strip is unreadable; wide
+   * enough and there is no radar left, and neither is a state worth being
+   * able to drag yourself into.
+   */
+  const BAY_STORAGE = 'radar-contact:bay-width'
+  const BAY_MIN_PX = 180
+  const BAY_MAX_PX = 560
+
+  const bayEl = document.querySelector<HTMLElement>('.strip-bay')
+  if (bayEl !== null) {
+    const clampBay = (px: number): number =>
+      Math.max(BAY_MIN_PX, Math.min(BAY_MAX_PX, Math.round(px)))
+
+    const setBayWidth = (px: number): void => {
+      const width = clampBay(px)
+      bayEl.style.setProperty('--bay-width', `${width}px`)
+      try {
+        window.localStorage.setItem(BAY_STORAGE, String(width))
+      } catch {
+        // Blocked storage is not worth failing a drag over.
+      }
+      // The canvas is sized from what is left, so it has to be told.
+      resize()
+    }
+
+    try {
+      const saved = Number(window.localStorage.getItem(BAY_STORAGE))
+      if (Number.isFinite(saved) && saved > 0) {
+        bayEl.style.setProperty('--bay-width', `${clampBay(saved)}px`)
+      }
+    } catch {
+      // No preference: the stylesheet's default stands.
+    }
+
+    const grip = document.createElement('button')
+    grip.type = 'button'
+    grip.className = 'strip-resize'
+    grip.setAttribute('aria-label', 'Resize the strip bay')
+    grip.title = 'Drag to resize the strip bay'
+
+    grip.addEventListener('pointerdown', (e) => {
+      e.preventDefault()
+      grip.setPointerCapture(e.pointerId)
+      const startX = e.clientX
+      const startW = bayEl.getBoundingClientRect().width
+
+      const move = (ev: PointerEvent): void => {
+        // The bay is docked right, so dragging left widens it.
+        setBayWidth(startW + (startX - ev.clientX))
+      }
+      const up = (ev: PointerEvent): void => {
+        grip.releasePointerCapture(ev.pointerId)
+        grip.removeEventListener('pointermove', move)
+        grip.removeEventListener('pointerup', up)
+        grip.removeEventListener('pointercancel', up)
+      }
+      grip.addEventListener('pointermove', move)
+      grip.addEventListener('pointerup', up)
+      grip.addEventListener('pointercancel', up)
+    })
+
+    // Keyboard, because a drag handle that only works with a mouse is a
+    // control half the people cannot use.
+    grip.addEventListener('keydown', (e) => {
+      const step = e.shiftKey ? 40 : 10
+      if (e.key === 'ArrowLeft') setBayWidth(bayEl.getBoundingClientRect().width + step)
+      else if (e.key === 'ArrowRight') setBayWidth(bayEl.getBoundingClientRect().width - step)
+      else return
+      e.preventDefault()
+    })
+
+    bayEl.appendChild(grip)
+  }
 
   /**
    * The traffic seed.
@@ -755,26 +798,26 @@ function start(
     },
   }
 
-  const commandConsole = new CommandConsole({
-    mount: column,
-    placeholder: 'e.g. BAW123 H270 A30 S180',
-    onSubmit: (line) => {
-      commandConsole.write(line, 'command')
-      if (controller === null) {
-        commandConsole.write('log on before issuing clearances', 'reject')
-        return
-      }
-      const parsed = parseCommandLine(line, {
-        callsigns: traffic.map((a) => a.callsign),
-        selected,
-      })
-      if (!parsed.ok) {
-        commandConsole.write(parsed.error, 'reject')
-        return
-      }
-      issue(parsed.commands)
-    },
-  })
+  /**
+   * Where a message to the controller goes now that there is no command
+   * line to print it on.
+   *
+   * The line at the bottom of the glass has gone: a modern position does
+   * not have one, and every message it carried is also shown where it
+   * matters -- an aircraft asking to leave the weather is flagged on its
+   * strip and its data block, a landing moves the score, and the ATIS
+   * letter is on the board. What is left is the running commentary, which
+   * is genuinely useful while debugging and merely noise on screen, so it
+   * goes to the browser console rather than nowhere.
+   *
+   * Kept as one function rather than twenty scattered calls to console.info
+   * so there is a single place to put the messages back on screen if they
+   * are ever wanted there again.
+   */
+  const announce = (text: string, kind: 'note' | 'reject' | 'command' | 'readback' = 'note'): void => {
+    if (kind === 'reject') console.warn(text)
+    else console.info(text)
+  }
 
   /**
    * Issues a line's worth of commands to one aircraft.
@@ -789,18 +832,18 @@ function start(
 
     const target = traffic.find((a) => a.callsign === first.callsign)
     if (target === undefined) {
-      commandConsole.write(`no aircraft ${first.callsign} on frequency`, 'reject')
+      announce(`no aircraft ${first.callsign} on frequency`, 'reject')
       return
     }
 
     const outcome = applyAll(commands, target, applyContext)
     if (!outcome.ok) {
-      commandConsole.write(outcome.reason, 'reject')
+      announce(outcome.reason, 'reject')
       return
     }
 
     traffic = traffic.map((a) => (a.callsign === first.callsign ? outcome.aircraft : a))
-    for (const readback of outcome.readbacks) commandConsole.write(readback, 'readback')
+    for (const readback of outcome.readbacks) announce(readback, 'readback')
     syncStrips()
     requestDraw()
   }
@@ -854,11 +897,11 @@ function start(
     } catch {
       // Storage full, or blocked. Saying so beats a button that silently
       // does nothing.
-      commandConsole.write('could not save the session', 'reject')
+      announce('could not save the session', 'reject')
       return
     }
 
-    commandConsole.write(
+    announce(
       `session saved at ${formatClock(loop.clock.timeOfDaySeconds)} -- ` +
         `${traffic.length} on frequency, ${score.landed} landed, ${score.points} points`,
       'note',
@@ -873,13 +916,13 @@ function start(
       text = null
     }
     if (text === null) {
-      commandConsole.write('there is no saved session', 'reject')
+      announce('there is no saved session', 'reject')
       return
     }
 
     const read = parseSavedGame(text, { airport: airport.icao })
     if (!read.ok) {
-      commandConsole.write(`could not load: ${read.reason}`, 'reject')
+      announce(`could not load: ${read.reason}`, 'reject')
       return
     }
 
@@ -912,7 +955,7 @@ function start(
     paintMenu()
     requestDraw()
 
-    commandConsole.write(
+    announce(
       `session loaded from ${game.savedAt.slice(0, 16).replace('T', ' ')} -- ` +
         `${traffic.length} on frequency, ${score.points} points. Paused.`,
       'note',
@@ -1019,20 +1062,20 @@ function start(
           : a,
       )
       for (const a of stale) {
-        commandConsole.write(
+        announce(
           `${a.callsign} approach cancelled, runway change, maintain heading`,
           'reject',
         )
       }
     }
 
-    commandConsole.write(
+    announce(
       `ATIS Information ${letterOf(atis)}. Landing ${atis.arrivals.join(' and ') || 'nothing'}` +
         `, wind ${windString(atis.wind)}.`,
     )
     const plan = feeds()
     if (plan.size > 0) {
-      commandConsole.write(
+      announce(
         'Feeds: ' +
           [...plan.entries()].map(([fix, runway]) => `${fix} to ${runway}`).join(', '),
       )
@@ -1110,14 +1153,14 @@ function start(
         score = scoreDeparture(score, departure)
         const worth = signed(pointsFor(departure))
         if (departure === 'landed') {
-          commandConsole.write(
+          announce(
             `${a.callsign} landed ${a.clearedApproach?.runway ?? ''} ${worth}`.replace('  ', ' '),
             'readback',
           )
         } else {
           // Refused rather than noted: an arrival that leaves the sector
           // unlanded is one you lost, and the log should read like it.
-          commandConsole.write(`${a.callsign} left the sector unlanded ${worth}`, 'reject')
+          announce(`${a.callsign} left the sector unlanded ${worth}`, 'reject')
         }
       }
 
@@ -1137,7 +1180,7 @@ function start(
         const now = inWeather()
         for (const callsign of now) {
           if (asking.has(callsign)) continue
-          commandConsole.write(`${callsign} requesting vector due to severe weather`, 'reject')
+          announce(`${callsign} requesting vector due to severe weather`, 'reject')
         }
         asking = now
         syncStrips()
@@ -1245,17 +1288,15 @@ function start(
       logon.hide()
       menu.setOpen(false)
       loop.setPaused(false)
-      commandConsole.write(`${details.initials} on position ${details.position}`, 'note')
-      commandConsole.write(
+      announce(`${details.initials} on position ${details.position}`, 'note')
+      announce(
         `Traffic seed ${spawner.seed}. Add ?seed=${spawner.seed} to the address to fly it again.`,
         'note',
       )
-      commandConsole.write(
-        'Clearances: CALLSIGN H<heading> A<altitude> S<speed>, or select a strip and omit the callsign.',
+      announce(
+        'Clearances: right-click a target for its menu, or drag from one to vector it.',
         'note',
       )
-      // The console is where the work happens, so it starts with the caret.
-      commandConsole.focus()
       paintMenu()
       requestDraw()
     },
@@ -1265,7 +1306,6 @@ function start(
   paintWx()
   paintAtis()
   paintTools()
-  setConsoleOpen(consoleOpen)
   paintMenu()
   resize()
   // Stopped until someone logs on, so the shift starts when the controller

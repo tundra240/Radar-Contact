@@ -46,7 +46,7 @@ export class Guide {
     // Drawn rather than an emoji: an emoji renders in whatever colour and
     // weight the platform feels like, which is never the rail's. The label
     // below is what a screen reader reads, since a glyph is not a name.
-    setToolLabel(this.button, 'guide', 'GUIDE')
+    setToolLabel(this.button, 'guide', 'How to play')
     this.button.title = 'How to play'
     this.button.setAttribute('aria-label', 'How to play')
     this.button.setAttribute('aria-haspopup', 'dialog')

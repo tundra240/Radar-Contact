@@ -52,8 +52,12 @@ const START = makeAtis({ arrivals: ['27R', '27L'], departures: ['27R'], wind: WE
 
 describe('the board', () => {
   it('is a compact button, not a strip of text', () => {
-    // The readout belongs on the board; the toolbar gets a word, like WX.
-    expect(mount(START).button.textContent).toBe('ATIS')
+    // The readout belongs on the board. The toolbar gets a glyph, and the
+    // word behind it is the hover label and the accessible name.
+    const b = mount(START).button
+    expect(b.querySelector('svg.tool-icon')).not.toBeNull()
+    expect(b.getAttribute('aria-label')).toBe('ATIS and runways')
+    expect(b.textContent).not.toContain('INFO')
   })
 
   it('shows the letter, both runway sets and the wind', () => {

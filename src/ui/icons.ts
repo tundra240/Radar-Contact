@@ -78,8 +78,11 @@ export function setToolLabel(button: HTMLElement, name: IconName, text: string):
   word.className = 'tool-text'
   word.textContent = text
   button.replaceChildren(icon(name), word)
-  // The word is hidden by CSS under the flat idiom rather than removed, so
-  // this stays the accessible name in both.
+  // The same string does three jobs: the accessible name, the tooltip the
+  // stylesheet reveals beside the button on hover, and the native title for
+  // anyone who waits for one. Which is why it is a phrase rather than an
+  // abbreviation -- "Weather" earns its space on a hover label in a way
+  // that "WX" does not.
   button.setAttribute('aria-label', text)
-  if (!button.title) button.title = text
+  button.title = text
 }
