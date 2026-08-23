@@ -92,15 +92,24 @@ canvas {
    own panel hanging under it. Laid out right to left so the menu stays
    hard against the corner where it has always been, and above the logon
    window in the stacking order so both panels can be opened over it. */
+/* A column of square tool buttons down the left of the glass.
+
+   Not conditional on the scheme. It was, for a while: the period schemes
+   kept a row of wide word-labelled buttons in the top right because that is
+   what a toolbar of that era looked like. That was the wrong call -- where
+   the tools live is ergonomics rather than period detail, and a rail beside
+   the picture beats a row over it whichever decade the panels are drawn in.
+   The eras still differ in how the edges are drawn, which is the part that
+   actually reads as a date. */
 .controls {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 36px;
+  left: 0;
   z-index: 30;
   display: flex;
-  flex-direction: row-reverse;
-  align-items: flex-start;
-  gap: 6px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
 }
 
 /* Each is just its button as far as the row is concerned -- the panels
@@ -112,8 +121,12 @@ canvas {
 }
 
 .mode-toggle {
-  min-width: 96px;
-  padding: 6px 12px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 0;
   font-family: inherit;
@@ -1308,11 +1321,18 @@ canvas {
    The word is never removed, only hidden, so it stays the accessible name
    in both. */
 .tool-icon {
-  display: none;
+  display: block;
 }
 
+/* Kept in the markup and never shown: it is the accessible name and the
+   tooltip, so the button still says what it does to a screen reader. */
 .tool-text {
-  display: inline;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* ---- the ATIS board --------------------------------------------------- */
@@ -1571,50 +1591,24 @@ canvas {
    the top-right corner, panels flush to the rail instead of hanging under
    it, and less padding everywhere.                                       */
 
-:root[data-chrome='flat'] .controls {
-  top: 36px;
-  right: auto;
-  left: 0;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 1px;
-}
-
-/* Square, dense, and wordless -- a tool button, not a dialog button. */
+/* One shared edge down the rail rather than four round every button. */
 :root[data-chrome='flat'] .mode-toggle {
-  min-width: 0;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* One shared edge down the rail rather than four round every button. */
   border-width: 1px 1px 0 0;
-}
-
-:root[data-chrome='flat'] .tool-icon {
-  display: block;
-}
-
-:root[data-chrome='flat'] .tool-text {
-  display: none;
 }
 
 :root[data-chrome='flat'] .controls > :last-child .mode-toggle {
   border-bottom-width: 1px;
 }
 
-:root[data-chrome='flat'] .guide-button {
-  width: 30px;
-  font-size: 13px;
-}
-
 /* Panels open beside the rail, not under it. */
-:root[data-chrome='flat'] .menu-panel {
+.menu-panel,
+.atis-box {
   top: 0;
   right: auto;
   left: calc(100% + 1px);
+}
+
+:root[data-chrome='flat'] .menu-panel {
   width: 196px;
 }
 
@@ -1666,10 +1660,10 @@ canvas {
   letter-spacing: 0.04em;
 }
 
-:root[data-chrome='flat'] .guide-window {
+.guide-window {
   right: auto;
   left: 32px;
-  top: 36px;
+  top: 0;
 }
 
 /* Tighter type and spacing throughout the panels: a modern readout fits
