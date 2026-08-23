@@ -1653,10 +1653,28 @@ canvas {
   border-bottom-width: 1px;
 }
 
-/* Panels open beside the rail, not under it. */
+/* Panels open beside the rail, and to its left by default.
+
+   Which side is settled when the panel opens rather than here, because it
+   depends on where the rail is. Left of the button is the ask, and it is
+   right whenever the rail has room beside it -- but with the rail hard
+   against the edge of the glass there is nothing over there to open into,
+   and a panel that obeyed anyway would be off the screen. So `is-right`
+   goes on the wrapper when the room is not there. See placePanel.
+
+   `right: auto` on the flipped case matters as much as the `left`: these
+   inherit `right: 0` from when they hung under a toolbar in a corner. */
 .menu-panel,
 .atis-box {
   top: 0;
+  left: auto;
+  right: calc(100% + 1px);
+  /* Never wider than the glass, whichever side it lands on. */
+  max-width: calc(100vw - 44px);
+}
+
+.is-right .menu-panel,
+.is-right .atis-box {
   right: auto;
   left: calc(100% + 1px);
 }
@@ -1670,8 +1688,6 @@ canvas {
    panel arriving from a different direction. */
 :root[data-chrome='flat'] .atis-box {
   top: 0;
-  right: auto;
-  left: calc(100% + 1px);
   min-width: 196px;
   padding: 0 0 6px;
 }
@@ -1714,9 +1730,14 @@ canvas {
 }
 
 .guide-window {
-  right: auto;
-  left: 32px;
+  right: calc(100% + 1px);
+  left: auto;
   top: 0;
+}
+
+.is-right .guide-window {
+  right: auto;
+  left: calc(100% + 1px);
 }
 
 /* Tighter type and spacing throughout the panels: a modern readout fits

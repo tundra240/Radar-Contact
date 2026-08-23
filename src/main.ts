@@ -524,10 +524,36 @@ function start(
    * unprompted rather than as the one you asked for. Closed silently, or
    * each would report its own closing and call this again.
    */
+  /**
+   * Decide which side of the rail a panel opens on.
+   *
+   * Left of the button is what is wanted, and it is only possible when
+   * there is that much glass to the left of the rail -- which, with the
+   * rail against the edge, there is not. So the wrapper is marked
+   * `is-right` and the stylesheet puts the panel on the other side rather
+   * than off the screen.
+   *
+   * Measured when the panel opens rather than assumed, because the rail
+   * moves with the layout and the three panels are not the same width.
+   */
+  const placePanel = (root: Element | null, panelSelector: string): void => {
+    const panel = root?.querySelector<HTMLElement>(panelSelector)
+    if (!root || !panel) return
+    // Cleared first, so the reading is of the panel rather than of wherever
+    // it was last put.
+    root.classList.remove('is-right')
+    const needed = panel.getBoundingClientRect().width + 8
+    root.classList.toggle('is-right', root.getBoundingClientRect().left < needed)
+  }
+
   const soleOpen = (keep: 'menu' | 'atis' | 'guide'): void => {
     if (keep !== 'menu') menu.setOpen(false, true)
     if (keep !== 'atis') atisBar.setOpen(false, true)
     if (keep !== 'guide') guide.setOpen(false, true)
+
+    if (keep === 'menu') placePanel(controls.querySelector('.menu'), '.menu-panel')
+    else if (keep === 'atis') placePanel(controls.querySelector('.atis'), '.atis-box')
+    else placePanel(controls.querySelector('.guide'), '.guide-window')
   }
 
   const menu = new Menu({
@@ -1326,6 +1352,7 @@ function start(
   syncStrips()
   paintWx()
   paintAtis()
+  if (atisBar.open) placePanel(controls.querySelector('.atis'), '.atis-box')
   paintTools()
   paintMenu()
   resize()
