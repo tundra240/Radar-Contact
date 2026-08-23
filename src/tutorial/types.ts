@@ -37,6 +37,15 @@ export type Spotlight =
   | { readonly kind: 'fix'; readonly name: string }
   /** The whole picture, which is a hole with nothing dark in it. */
   | { readonly kind: 'scope' }
+  /**
+   * Several of the above at once.
+   *
+   * Needed because the things a step talks about are not all of one sort:
+   * "the aircraft and the rate button" is one instruction about a target
+   * and a control, and without this it could only highlight whichever of
+   * the two happened to be expressible as a selector.
+   */
+  | { readonly kind: 'group'; readonly of: readonly Spotlight[] }
 
 /* ---------------------------------------------------------------- goals */
 

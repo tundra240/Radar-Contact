@@ -187,6 +187,11 @@ describe('building a step weather', () => {
 
 /* --------------------------------------------------------- the lesson data */
 
+/** A spotlight, with any group taken apart. */
+function flatten(light: Spotlight): readonly Spotlight[] {
+  return light.kind === 'group' ? light.of.flatMap((one) => flatten(one)) : [light]
+}
+
 /** Every ref a goal or a spotlight mentions, with the step it is in. */
 function refsMentioned(module: TutorialModule): { step: string; ref: string }[] {
   const out: { step: string; ref: string }[] = []
@@ -195,8 +200,9 @@ function refsMentioned(module: TutorialModule): { step: string; ref: string }[] 
       const ref = (leaf as Goal & { ref?: string }).ref
       if (ref !== undefined) out.push({ step: step.id, ref })
     }
-    const light: Spotlight = step.spotlight
-    if (light.kind === 'aircraft') out.push({ step: step.id, ref: light.ref })
+    for (const light of flatten(step.spotlight)) {
+      if (light.kind === 'aircraft') out.push({ step: step.id, ref: light.ref })
+    }
   }
   return out
 }
@@ -260,7 +266,9 @@ describe('the basics lesson', () => {
     const fixes = new Set(airport.navaids.map((n) => n.name))
     const corridors = new Set((airport.overflights?.corridors ?? []).map((c) => c.id))
     for (const step of BASICS.steps) {
-      if (step.spotlight.kind === 'fix') expect(fixes).toContain(step.spotlight.name)
+      for (const light of flatten(step.spotlight)) {
+        if (light.kind === 'fix') expect(fixes).toContain(light.name)
+      }
       for (const spec of step.scene?.traffic ?? []) {
         if (spec.kind === 'arrival') expect(fixes, step.id).toContain(spec.fix)
         else expect(corridors, step.id).toContain(spec.corridor)
@@ -284,13 +292,13 @@ describe('the basics lesson', () => {
       '.strip-bay',
     ])
     for (const step of BASICS.steps) {
-      const light = step.spotlight
-      const selectors =
+      const selectors = flatten(step.spotlight).flatMap((light) =>
         light.kind === 'element'
           ? [light.selector]
           : light.kind === 'elements'
             ? light.selectors
-            : []
+            : [],
+      )
       for (const selector of selectors) {
         expect(known, `${step.id} points at ${selector}`).toContain(selector)
       }

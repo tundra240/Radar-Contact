@@ -52,7 +52,16 @@ export const BASICS: TutorialModule = {
       text:
         'A flight has entered the sector at BIG, 10,000 feet and 250 knots. It is tracking ' +
         'direct to the fix on its own. Wind the clock on to 4x and watch it get there.',
-      spotlight: { kind: 'elements', selectors: ['.rate-button'] },
+      // The aircraft as well as the control: the instruction is about
+      // watching one while pressing the other, and dimming the aeroplane
+      // the step is asking you to watch would be the wrong way round.
+      spotlight: {
+        kind: 'group',
+        of: [
+          { kind: 'aircraft', ref: 'inbound' },
+          { kind: 'elements', selectors: ['.rate-button'] },
+        ],
+      },
       goal: { kind: 'speed', to: 4 },
       button: null,
       scene: {

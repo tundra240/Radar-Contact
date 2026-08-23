@@ -1543,6 +1543,8 @@ canvas {
   box-shadow:
     inset 1px 1px 0 0 var(--bevel-shadow),
     inset -1px -1px 0 0 var(--bevel-light);
+}
+
 /* ------------------------------------------------- flat chrome (tracon)
 
    The modern control-room look. Everything above draws its edges as a
@@ -1584,6 +1586,8 @@ canvas {
 :root[data-chrome='flat'] .strip-count,
 :root[data-chrome='flat'] .strip-empty,
 :root[data-chrome='flat'] .atis-box,
+:root[data-chrome='flat'] .tutorial-continue,
+:root[data-chrome='flat'] .tutorial-toast,
 :root[data-chrome='flat'] .atis-choice {
   box-shadow: none;
   border: 1px solid var(--edge);
@@ -1597,6 +1601,7 @@ canvas {
 :root[data-chrome='flat'] .guide-close:active,
 :root[data-chrome='flat'] .strip-action:active,
 :root[data-chrome='flat'] .tagmenu-key:active,
+:root[data-chrome='flat'] .tutorial-continue:active,
 :root[data-chrome='flat'] .strip-collapse:active {
   box-shadow: none;
   background: var(--well);
@@ -1869,6 +1874,11 @@ canvas {
     0 6px 24px rgb(0 0 0 / 45%);
 }
 
+/* The toast keeps its own colour: it is a warning, not a panel. */
+:root[data-chrome='flat'] .tutorial-toast {
+  border-color: var(--warn);
+}
+
 .tutorial-head {
   display: flex;
   align-items: center;
@@ -1884,19 +1894,27 @@ canvas {
   text-transform: uppercase;
 }
 
+/* Quiet, because ending the lesson is not what anyone came here to do.
+   Typography from the same scale as every other label in the interface. */
 .tutorial-close {
   border: 0;
   padding: 2px 4px;
   background: none;
   color: var(--chrome-dim);
-  font: inherit;
+  font-family: inherit;
   font-size: 10px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   cursor: pointer;
 }
 
 .tutorial-close:hover {
   color: var(--warn);
+}
+
+.tutorial-close:focus-visible {
+  outline: 1px dotted var(--chrome-text);
+  outline-offset: 1px;
 }
 
 .tutorial-title {
@@ -1912,22 +1930,34 @@ canvas {
 
 .tutorial-continue {
   margin-top: 10px;
-  padding: 5px 12px;
+  padding: 8px 14px;
   border: 0;
-  background: var(--well);
-  color: var(--accent);
-  font: inherit;
-  font-size: 11px;
-  letter-spacing: 0.1em;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  cursor: pointer;
+  /* The step is asking for this one, so it reads as the default action --
+     the same treatment .logon-go gets for the same reason. */
+  color: var(--title-text);
+  background: var(--title-bar);
   box-shadow:
     inset 1px 1px 0 0 var(--bevel-light),
     inset -1px -1px 0 0 var(--bevel-shadow);
+  cursor: pointer;
 }
 
-:root[data-chrome='flat'] .tutorial-continue {
-  box-shadow: inset 0 0 0 1px var(--edge);
+/* Pressed in, the way every other bevelled control in here is. */
+.tutorial-continue:active {
+  box-shadow:
+    inset 1px 1px 0 0 var(--bevel-shadow),
+    inset -1px -1px 0 0 var(--bevel-light);
+}
+
+.tutorial-continue:focus-visible {
+  outline: 1px dotted var(--chrome-text);
+  outline-offset: -4px;
 }
 
 .tutorial-continue[hidden] {

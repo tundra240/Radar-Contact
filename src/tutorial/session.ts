@@ -327,6 +327,9 @@ export class TutorialSession {
         if (navaid === undefined) return []
         return [holeAround(this.world.screenOf(navaid.posNM), FIX_HOLE_PX)]
       }
+
+      case 'group':
+        return spotlight.of.flatMap((one) => this.holesFor(one))
     }
   }
 }
