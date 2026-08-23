@@ -323,3 +323,94 @@ describe('the basics lesson', () => {
     }
   })
 })
+
+describe('the instructions match the interface', () => {
+  /**
+   * The failure this exists to catch, which happened: the descent step told
+   * the player they could type the clearance, and the command line had been
+   * taken out of the interface some time before. The step was reachable, the
+   * menu worked, and anyone who followed the sentence rather than guessing
+   * was stuck on it with nothing to press.
+   *
+   * So an instruction may only name a way of doing something that exists.
+   */
+  const stepsOf = BASICS.steps
+
+  it('never tells the player to type a clearance', () => {
+    // There is no command line. Clearances are the tag menu and the drag.
+    for (const step of stepsOf) {
+      // The verb, followed by something callsign-shaped. The noun is fine:
+      // a strip legitimately shows an aircraft type.
+      expect(step.text, step.id).not.toMatch(/\btype\s+(?:in\s+)?[A-Z]{2,3}\d/)
+      expect(step.text.toLowerCase(), step.id).not.toMatch(/keyboard/)
+      expect(step.text.toLowerCase(), step.id).not.toMatch(/command line/)
+    }
+  })
+
+  it('says to right-click for anything that comes off the menu', () => {
+    // Altitude, speed, the approach and RESUME NAV are all menu items and
+    // nothing else reaches them, so a step wanting one has to say so.
+    const fromMenu = new Set(['altitude', 'airspeed', 'approach', 'resumeNav'])
+    for (const step of stepsOf) {
+      const wants = leavesOf(step.goal).filter((g) => fromMenu.has(g.kind))
+      if (wants.length === 0) continue
+      expect(step.text.toLowerCase(), `${step.id} needs the menu`).toMatch(
+        /right-click|menu/,
+      )
+    }
+  })
+
+  it('says to drag for anything that is a heading', () => {
+    // A heading is not in the menu's root as a value -- it is pulled out of
+    // the target -- so a step asking for one has to describe the drag.
+    for (const step of stepsOf) {
+      const wants = leavesOf(step.goal).filter(
+        (g) => g.kind === 'heading' || g.kind === 'vector',
+      )
+      if (wants.length === 0) continue
+      expect(step.text.toLowerCase(), `${step.id} needs a drag`).toMatch(/drag|pull/)
+    }
+  })
+
+  it('names the exact value it is asking for', () => {
+    // "Descend it" is not an instruction. "Pick 3000" is.
+    for (const step of stepsOf) {
+      for (const goal of leavesOf(step.goal)) {
+        if (goal.kind === 'altitude') {
+          expect(step.text, `${step.id} should name ${goal.ft}`).toContain(String(goal.ft))
+        }
+        if (goal.kind === 'airspeed') {
+          expect(step.text, `${step.id} should name ${goal.kts}`).toContain(String(goal.kts))
+        }
+        if (goal.kind === 'heading') {
+          // Headings are spoken as three digits, and 360 reads as itself.
+          const spoken = String(goal.deg).padStart(3, '0')
+          expect(step.text, `${step.id} should name ${spoken}`).toContain(spoken)
+        }
+        if (goal.kind === 'speed') {
+          expect(step.text, `${step.id} should name x${goal.to}`).toContain(`x${goal.to}`)
+        }
+      }
+    }
+  })
+
+  it('names the aircraft each step is about', () => {
+    // The scope can hold several. "The target" is ambiguous the moment it
+    // does, and the checkride names all three by naming none.
+    const named = new Map()
+    for (const step of stepsOf) {
+      for (const spec of step.scene?.traffic ?? []) {
+        if (spec.callsign !== undefined) named.set(spec.ref, spec.callsign)
+      }
+      const refs = leavesOf(step.goal)
+        .map((g) => (g as { ref?: string }).ref)
+        .filter((r) => r !== undefined)
+      // One aircraft in play and a step that acts on it: the callsign should
+      // be in the text, so the player knows which strip to look at.
+      if (new Set(refs).size !== 1) continue
+      const callsign = named.get(refs[0])
+      if (callsign === undefined) continue
+      expect(step.text, `${step.id} should name ${callsign}`).toContain(callsign)
+    }
+  })
+})

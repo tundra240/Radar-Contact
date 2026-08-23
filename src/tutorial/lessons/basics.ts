@@ -14,6 +14,15 @@ import type { TutorialModule } from '../types'
  * hold, work that arrival onto the ILS, meet the ATIS, meet the traffic
  * that is not yours, and then do the whole thing at once with weather in
  * the way.
+ *
+ * Every instruction names the control and the value. That is deliberate and
+ * it was learned the hard way: an earlier draft of the descent step said
+ * "or type BAW214 D30 S180 if you prefer the keyboard", and the command line
+ * had been taken out of the interface some time before -- so the lesson
+ * offered a way to do it that did not exist, beside a way it never really
+ * described. Anyone who tried the sentence rather than guessing at the menu
+ * got stuck there with nothing to press. Nothing here says "issue a
+ * clearance" and leaves the how to the reader.
  */
 export const BASICS: TutorialModule = {
   id: 'basics',
@@ -25,9 +34,10 @@ export const BASICS: TutorialModule = {
       id: 'welcome',
       title: 'Welcome to London Terminal Control',
       text:
-        'This is Heathrow approach. The scope shows your airspace, the four entry fixes ' +
-        'aircraft arrive over -- BNN, OCK, LAM and BIG -- and the runways in use. ' +
-        'Nothing moves until you let it.',
+        'This is Heathrow approach. The white outline is your airspace. The four orange ' +
+        'racetracks are the holds arrivals wait in -- BNN north-west, LAM north-east, ' +
+        'BIG south-east, OCK south-west. The clock is stopped, so nothing moves until you ' +
+        'let it. Press Continue.',
       spotlight: { kind: 'scope' },
       goal: { kind: 'continue' },
       button: 'Continue',
@@ -35,12 +45,13 @@ export const BASICS: TutorialModule = {
     },
     {
       id: 'time',
-      title: 'Time controls',
+      title: 'The clock',
       text:
-        'Traffic moves faster than you will want to read at first. The rate button steps ' +
-        'through the speeds and wraps round; the one above it stops the clock. Both are on ' +
-        'the rail down the left.',
-      spotlight: { kind: 'elements', selectors: ['.rate-button', '.pause-button'] },
+        'Two controls on the rail, both highlighted. The upper one starts and stops the ' +
+        'clock. The lower one steps the rate: press it and it goes x1, x2, x4, x0.5 and ' +
+        'round again. Whatever it is set to shows in the RATE column along the top. ' +
+        'Press Continue.',
+      spotlight: { kind: 'elements', selectors: ['.pause-button', '.rate-button'] },
       goal: { kind: 'continue' },
       button: 'Continue',
     },
@@ -50,8 +61,9 @@ export const BASICS: TutorialModule = {
       id: 'inbound',
       title: 'An inbound',
       text:
-        'A flight has entered the sector at BIG, 10,000 feet and 250 knots. It is tracking ' +
-        'direct to the fix on its own. Wind the clock on to 4x and watch it get there.',
+        'BAW214 has appeared south-east of the field at 10,000 feet, tracking to BIG on ' +
+        'its own. It needs about seven minutes to get there. Press the rate button until ' +
+        'the RATE column reads x4, and watch it run in.',
       // The aircraft as well as the control: the instruction is about
       // watching one while pressing the other, and dimming the aeroplane
       // the step is asking you to watch would be the wrong way round.
@@ -84,10 +96,9 @@ export const BASICS: TutorialModule = {
       id: 'hold',
       title: 'The holding pattern',
       text:
-        'Reaching BIG with no further clearance, the flight has entered the published hold ' +
-        'and will orbit there until you do something about it. A racetrack with a ' +
-        'one-minute inbound leg, so about two minutes round. This is where arrivals wait ' +
-        'for a runway.',
+        'Nothing to press here. Reaching BIG with no further clearance, BAW214 turns onto ' +
+        'the published racetrack and orbits -- a one-minute leg each way, so about two ' +
+        'minutes a circuit. The clock stops by itself once it is established.',
       spotlight: { kind: 'aircraft', ref: 'inbound' },
       goal: { kind: 'holding', ref: 'inbound' },
       button: null,
@@ -99,9 +110,10 @@ export const BASICS: TutorialModule = {
       id: 'hold-read',
       title: 'Reading the stack',
       text:
-        'Aircraft stack over a fix a thousand feet apart, and that vertical gap is what ' +
-        'keeps them separated while they are all over the same point. Take the clock off ' +
-        'pause when you are ready.',
+        'Its strip is in the bay on the right: callsign and type, then level, heading and ' +
+        'speed, with HOLDING BIG underneath. More arrivals would stack above it a ' +
+        'thousand feet apart, and that vertical gap is the whole of what keeps them apart ' +
+        'over one point. Press Continue.',
       spotlight: { kind: 'aircraft', ref: 'inbound' },
       goal: { kind: 'continue' },
       button: 'Continue',
@@ -112,8 +124,9 @@ export const BASICS: TutorialModule = {
       id: 'select',
       title: 'Selecting an aircraft',
       text:
-        'Click the target or its data block to select it. Its strip is highlighted in the ' +
-        'bay on the right, and right-clicking opens the command menu.',
+        'LEFT-click BAW214 -- either the small square or the block of text beside it. ' +
+        'The square fills in to show it is yours, and its strip lights up in the bay. The ' +
+        'clock is running again from here.',
       spotlight: { kind: 'aircraft', ref: 'inbound' },
       goal: { kind: 'select', ref: 'inbound' },
       button: null,
@@ -123,9 +136,9 @@ export const BASICS: TutorialModule = {
       id: 'descend',
       title: 'Descent and speed',
       text:
-        'Bring it down to 3,000 feet -- the level it needs to be at to intercept the ' +
-        'glidepath -- and slow it to 180 knots. Right-click the target for the menu, or ' +
-        'type BAW214 D30 S180 if you prefer the keyboard.',
+        'RIGHT-click BAW214 to open its command menu. Choose ALTITUDE, then pick 3000 ' +
+        '-- the level it needs to meet the glidepath. The menu closes when you pick. ' +
+        'Right-click it again, choose SPEED, and pick 180.',
       spotlight: { kind: 'aircraft', ref: 'inbound' },
       goal: {
         kind: 'every',
@@ -140,8 +153,10 @@ export const BASICS: TutorialModule = {
       id: 'downwind',
       title: 'Vectoring off the hold',
       text:
-        'Press on the target and drag: an elastic line follows the cursor and lets go as a ' +
-        'heading. Take it out of the hold onto 090, which is downwind for 27R.',
+        'A heading is dragged, not picked from a list. Press and hold on BAW214, pull ' +
+        'the elastic line out to the EAST -- to the right of the aircraft -- and let go. ' +
+        'Aim for 090; the heading follows the line as you drag it. That takes BAW214 out ' +
+        'of the hold and onto the downwind leg for 27R.',
       spotlight: { kind: 'aircraft', ref: 'inbound' },
       goal: { kind: 'heading', deg: 90, ref: 'inbound' },
       button: null,
@@ -152,21 +167,22 @@ export const BASICS: TutorialModule = {
       id: 'atis',
       title: 'The ATIS',
       text:
-        'The board on the left carries the current letter, the wind and the runways in ' +
-        'use. The wind decides the direction the field runs in, and everything you do with ' +
-        'an arrival is aimed at the runway it names. Aircraft need to meet the localiser ' +
-        'at less than 30 degrees to capture it.',
+        'The board on the left is the ATIS: the letter it is on, the wind, and the ' +
+        'runways in use -- ARR 27R, DEP 27L. The wind decides which way the field runs, ' +
+        'and every arrival is aimed at the runway named there. The highlighted button ' +
+        'puts the board away and brings it back. Press Continue.',
       spotlight: { kind: 'elements', selectors: ['.atis-button', '.atis-box'] },
       goal: { kind: 'continue' },
       button: 'Continue',
     },
     {
       id: 'base',
-      title: 'Base leg',
+      title: 'Base leg and the intercept',
       text:
-        'Turn it north onto 360 to come off downwind, then onto 240 to close on the 27R ' +
-        'localiser from the south. Thirty degrees off the final approach track is a ' +
-        'capture; ninety degrees is a fly-through.',
+        'Two drags on BAW214, in order. First pull a heading NORTH, to 360, to come off ' +
+        'the downwind leg. Then pull one to 240 -- south-west -- which closes on the 27R ' +
+        'localiser at about thirty degrees. Shallower than thirty and the beam captures; ' +
+        'come at it square and the aircraft flies straight through it.',
       spotlight: { kind: 'aircraft', ref: 'inbound' },
       goal: {
         kind: 'inOrder',
@@ -181,9 +197,9 @@ export const BASICS: TutorialModule = {
       id: 'clear-ils',
       title: 'Cleared for the approach',
       text:
-        'On an intercept heading and at 3,000 feet, clear it for the ILS. The approach ' +
-        'arms; the aircraft captures the localiser when the geometry actually allows it ' +
-        'and follows the glidepath down from there.',
+        'RIGHT-click BAW214, choose APPROACH, then pick ILS 27R. That arms the ' +
+        'approach: the aircraft captures the localiser once the geometry actually allows ' +
+        'it, and follows the glidepath down from there without further instruction.',
       spotlight: { kind: 'aircraft', ref: 'inbound' },
       goal: { kind: 'approach', ref: 'inbound' },
       button: null,
@@ -195,9 +211,10 @@ export const BASICS: TutorialModule = {
       id: 'transit',
       title: 'Traffic crossing the sector',
       text:
-        'This one is not yours to land. It is a Gatwick inbound crossing at FL140 on its ' +
-        'own flight plan, drawn in steel blue so you can tell at a glance. It needs ' +
-        'nothing from you -- but it is in your airspace, and it counts for separation.',
+        'EZY63 is not yours to land: a Gatwick inbound crossing at FL140 on its own ' +
+        'flight plan. It is drawn in steel blue rather than green, and its data block ' +
+        'carries EGKK where an arrival carries nothing. It wants no instruction from you ' +
+        '-- but it is in your airspace and it counts for separation. Press Continue.',
       spotlight: { kind: 'aircraft', ref: 'transit' },
       goal: { kind: 'continue' },
       button: 'Continue',
@@ -212,7 +229,6 @@ export const BASICS: TutorialModule = {
             altFt: 14000,
             iasKts: 280,
             callsign: 'EZY63',
-            type: 'A320',
           },
         ],
       },
@@ -221,9 +237,10 @@ export const BASICS: TutorialModule = {
       id: 'resume-nav',
       title: 'Vector it, then give it back',
       text:
-        'Separation is 3 nautical miles or 1,000 feet -- either one, not both. Vector the ' +
-        'transit off its track as though something were in the way, then give it back its ' +
-        'flight plan with RESUME NAV on its menu, or type EZY63 NAV.',
+        'Separation is 3 miles apart OR 1,000 feet apart -- either one on its own is ' +
+        'enough. Drag EZY63 onto any heading, as though something were in its way. Then ' +
+        'RIGHT-click it and choose RESUME NAV, which hands the flight plan back and lets ' +
+        'it carry on to Gatwick by itself.',
       spotlight: { kind: 'aircraft', ref: 'transit' },
       goal: {
         kind: 'inOrder',
@@ -240,9 +257,10 @@ export const BASICS: TutorialModule = {
       id: 'weather',
       title: 'Weather',
       text:
-        'A cell has developed over OCK. The bands are painted light, moderate and red, and ' +
-        'the red core is the one that matters: an aircraft vectored into it asks you to get ' +
-        'it out. Plan round it rather than through it.',
+        'A cell has grown over OCK, south-west of the field. Three bands: faint at the ' +
+        'edge, brighter through the middle, red in the core. An aircraft vectored into ' +
+        'the red calls up asking to be taken out of it, and its target turns red until ' +
+        'you do. Plan round the core rather than through it. Press Continue.',
       spotlight: { kind: 'fix', name: 'OCK' },
       goal: { kind: 'continue' },
       button: 'Continue',
@@ -256,9 +274,10 @@ export const BASICS: TutorialModule = {
       id: 'checkride',
       title: 'Checkride',
       text:
-        'Three arrivals, a storm over OCK and one runway. Vector them round the weather, ' +
-        'keep them apart, and land all three on 27R. Lose separation and the step starts ' +
-        'again.',
+        'Three arrivals, a storm over OCK, one runway. For each: descend it to 3000, drag ' +
+        'it onto a base leg, then APPROACH and ILS 27R. Land all three. Keep every pair 3 ' +
+        'miles or 1,000 feet apart the whole way, and keep them out of the red. Lose ' +
+        'separation and the step starts again.',
       spotlight: { kind: 'none' },
       goal: { kind: 'allLanded' },
       button: null,

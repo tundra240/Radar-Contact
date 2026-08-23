@@ -21,8 +21,18 @@ export interface Hole {
   readonly y: number
   readonly w: number
   readonly h: number
-  /** Corner radius. A target gets a round hole, a button a soft-cornered one. */
+  /** Corner radius, for a rectangular hole. Ignored when `round`. */
   readonly r?: number
+  /**
+   * Cut a circle rather than a rounded rectangle.
+   *
+   * Worth being a separate shape rather than a large corner radius. A radius
+   * only reads as a circle while it is exactly half the shorter side, and the
+   * padding added around every hole is applied to the width and the height --
+   * so a "circle" defined that way came out as a square with very round
+   * corners, and by a different amount at every size.
+   */
+  readonly round?: boolean
 }
 
 export interface CardView {
@@ -192,25 +202,36 @@ export class TutorialOverlay {
     for (const hole of holes) {
       const x = hole.x - PADDING_PX
       const y = hole.y - PADDING_PX
-      const w = hole.w + PADDING_PX * 2
-      const h = hole.h + PADDING_PX * 2
-      const r = String(hole.r ?? 4)
+      const w = Math.max(0, hole.w + PADDING_PX * 2)
+      const h = Math.max(0, hole.h + PADDING_PX * 2)
 
-      const cut = document.createElementNS(NS, 'rect')
-      cut.setAttribute('x', String(x))
-      cut.setAttribute('y', String(y))
-      cut.setAttribute('width', String(Math.max(0, w)))
-      cut.setAttribute('height', String(Math.max(0, h)))
-      cut.setAttribute('rx', r)
+      // The cut-out and the ring are the same shape at the same place: one
+      // builder, used twice, so the bright edge can never sit somewhere
+      // other than the hole it is supposed to be drawing round.
+      const shape = (): SVGElement => {
+        if (hole.round === true) {
+          const circle = document.createElementNS(NS, 'circle')
+          circle.setAttribute('cx', String(x + w / 2))
+          circle.setAttribute('cy', String(y + h / 2))
+          // The larger half-side, so a target and its data block are both
+          // inside the circle rather than clipped by it.
+          circle.setAttribute('r', String(Math.max(w, h) / 2))
+          return circle
+        }
+        const rect = document.createElementNS(NS, 'rect')
+        rect.setAttribute('x', String(x))
+        rect.setAttribute('y', String(y))
+        rect.setAttribute('width', String(w))
+        rect.setAttribute('height', String(h))
+        rect.setAttribute('rx', String(hole.r ?? 4))
+        return rect
+      }
+
+      const cut = shape()
       cut.setAttribute('fill', 'black')
       this.maskHoles.appendChild(cut)
 
-      const ring = document.createElementNS(NS, 'rect')
-      ring.setAttribute('x', String(x))
-      ring.setAttribute('y', String(y))
-      ring.setAttribute('width', String(Math.max(0, w)))
-      ring.setAttribute('height', String(Math.max(0, h)))
-      ring.setAttribute('rx', r)
+      const ring = shape()
       ring.setAttribute('class', 'tutorial-ring')
       this.rings.appendChild(ring)
     }
@@ -253,7 +274,13 @@ export function holeOfElement(selector: string): Hole | null {
   return { x: box.x, y: box.y, w: box.width, h: box.height, r: 4 }
 }
 
-/** A hole of a given size centred on a point, for things drawn on canvas. */
+/**
+ * A round hole centred on a point, for things drawn on the canvas.
+ *
+ * Round rather than rectangular because what it is drawn around is round:
+ * a radar target, or a navaid symbol. A box round a blip reads as a box
+ * somebody has drawn on the picture.
+ */
 export function holeAround(
   at: { readonly x: number; readonly y: number },
   sizePx: number,
@@ -263,6 +290,6 @@ export function holeAround(
     y: at.y - sizePx / 2,
     w: sizePx,
     h: sizePx,
-    r: sizePx / 2,
+    round: true,
   }
 }

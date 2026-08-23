@@ -226,9 +226,38 @@ describe('working out where a hole goes', () => {
     expect(hole.x).toBe(152)
     expect(hole.y).toBe(102)
     expect(hole.w).toBe(96)
-    // Round, because a target is round and a square hole round one reads as
-    // a box drawn on the picture.
-    expect(hole.r).toBe(48)
+    // A circle, asked for as one. It used to be a rectangle with a corner
+    // radius of half its width, which only reads as a circle before the
+    // padding is added -- and the padding is added to the width and the
+    // height, so it came out a rounded square at a different amount for
+    // every size.
+    expect(hole.round).toBe(true)
+  })
+
+  it('cuts a real circle for a round hole', () => {
+    const overlay = new TutorialOverlay({
+      mount: document.body,
+      onContinue: () => {},
+      onExit: () => {},
+    })
+    overlay.show({ title: 't', counter: 'Step 1 of 1', text: 'x', button: null })
+    overlay.place([holeAround({ x: 400, y: 300 }, 96)])
+    const ring = overlay.element.querySelector('.tutorial-ring')
+    expect(ring?.tagName.toLowerCase()).toBe('circle')
+    // Centred where it was asked for, whatever the padding does to the size.
+    expect(Number(ring?.getAttribute('cx'))).toBe(400)
+    expect(Number(ring?.getAttribute('cy'))).toBe(300)
+  })
+
+  it('still cuts a rectangle for a control', () => {
+    const overlay = new TutorialOverlay({
+      mount: document.body,
+      onContinue: () => {},
+      onExit: () => {},
+    })
+    overlay.show({ title: 't', counter: 'Step 1 of 1', text: 'x', button: null })
+    overlay.place([{ x: 10, y: 20, w: 30, h: 12 }])
+    expect(overlay.element.querySelector('.tutorial-ring')?.tagName.toLowerCase()).toBe('rect')
   })
 })
 

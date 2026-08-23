@@ -414,13 +414,16 @@ describe('the spotlight', () => {
     tutorial.observeSpeed(4)
     // On the hold step, which spotlights the aircraft.
     tutorial.layout()
-    const first = tutorial.element.querySelector('.tutorial-ring')?.getAttribute('x')
+    // A target's hole is a circle, so it is positioned by its centre.
+    const ring = (): string | null =>
+      tutorial.element.querySelector('.tutorial-ring')?.getAttribute('cx') ?? null
+    const first = ring()
+    expect(first).not.toBeNull()
 
     const [a] = world.state.traffic
     world.setTraffic([{ ...(a as Aircraft), pos: { x: 30, y: 30 } }])
     tutorial.layout()
-    const moved = tutorial.element.querySelector('.tutorial-ring')?.getAttribute('x')
-    expect(moved).not.toBe(first)
+    expect(ring()).not.toBe(first)
   })
 
   it('does nothing at all when no lesson is running', () => {
