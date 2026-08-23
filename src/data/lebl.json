@@ -721,5 +721,7 @@
   "provenance": {
     "positions": "CONSTRUCTED, NOT SURVEYED.",
     "notes": "The aerodrome reference point, the runway designators and bearings, and the field elevation are real to the best of the author knowledge. EVERYTHING ELSE IS CONSTRUCTED: the entry fixes and their names, the airspace boundary, the terrain and noise areas and the traffic mix are invented to give the sector a shape to control, and are NOT taken from any AIP. Do not use for anything but this game. Contrast egll.json, whose positions are surveyed."
-  }
+  },
+  "shortName": "Barcelona",
+  "challenge": "Crossing runways, four gates, noise floors and transits through the arrivals."
 }

@@ -442,6 +442,23 @@ export interface Airport {
    * tier is what the menu sorts by and what the brief describes.
    */
   readonly tier: AirportTier
+  /**
+   * What to call it in a list.
+   *
+   * Not the ICAO code and not the full name: a chooser wants "Heathrow",
+   * which is neither "EGLL" nor "London Heathrow". Explicit rather than
+   * derived from the long name, because the rule that turns one into the
+   * other is different at every field.
+   */
+  readonly shortName: string
+  /**
+   * The one line that says why this field is worth flying.
+   *
+   * Sized for a chooser rather than a briefing: shown at a fixed height so
+   * moving across the list cannot make the panel change shape underneath
+   * the cursor, which is what the paragraph used to do.
+   */
+  readonly challenge: string
   /** A paragraph on how the place works and what catches people out. */
   readonly brief: string
   /**
@@ -719,6 +736,8 @@ export function loadAirport(raw: unknown): Airport {
     sector,
     render,
     tier: parseTier(root['tier']),
+    shortName: str(root['shortName'], 'shortName'),
+    challenge: str(root['challenge'], 'challenge'),
     brief: str(root['brief'], 'brief'),
     provenance: parseProvenance(root['provenance']),
     terrain: parseTerrain(root['terrain'], projection),

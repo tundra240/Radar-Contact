@@ -40,7 +40,11 @@ export type SessionMode = 'career' | 'sandbox'
 export interface AirportChoice {
   readonly icao: string
   readonly name: string
+  /** What the button says. "Heathrow", not "EGLL". */
+  readonly shortName: string
   readonly tier: string
+  /** One line, shown at a fixed height so the panel cannot reflow. */
+  readonly challenge: string
   readonly brief: string
 }
 
@@ -340,10 +344,15 @@ export class Logon {
     for (const field of this.opts.airports) {
       const button = document.createElement('button')
       button.type = 'button'
-      button.className = 'logon-level logon-field'
+      // Not 'logon-field': that class already belongs to the labelled form
+      // rows above, and sharing it made every query for a sector button find
+      // Controller, Airspace and Position as well.
+      button.className = 'logon-level logon-sector'
       button.dataset['airport'] = field.icao
-      button.textContent = field.icao
-      button.title = `${field.name} -- ${field.tier}`
+      // The name, not the code. Somebody choosing where to fly knows
+      // "Nice"; "LFMN" is what the strip bay calls it afterwards.
+      button.textContent = field.shortName
+      button.title = `${field.name} (${field.icao}) -- ${field.tier}. ${field.brief}`
       button.addEventListener('click', () => this.opts.onAirport(field.icao))
       button.addEventListener('pointerenter', () => this.describeAirport(field.icao))
       button.addEventListener('pointerleave', () => this.describeAirport(this.opts.airport))
@@ -353,7 +362,7 @@ export class Logon {
     wrap.appendChild(row)
 
     this.fieldNote = document.createElement('p')
-    this.fieldNote.className = 'logon-note logon-field-note'
+    this.fieldNote.className = 'logon-note logon-sector-note'
     wrap.appendChild(this.fieldNote)
     return wrap
   }
@@ -362,7 +371,11 @@ export class Logon {
   private describeAirport(icao: string): void {
     const field = this.opts.airports.find((f) => f.icao === icao)
     if (field === undefined) return
-    this.fieldNote.textContent = `${field.name} (${field.tier}). ${field.brief}`
+    // One line at a fixed height. The paragraph used to go here, and it is
+    // a different length at every field -- so moving the cursor across the
+    // list grew and shrank the panel under it, and pushed the whole dialog
+    // past the height it had, which is where the scrollbar came from.
+    this.fieldNote.textContent = `${field.tier.toUpperCase()} -- ${field.challenge}`
     for (const button of this.fieldButtons) {
       const on = button.dataset['airport'] === this.opts.airport
       button.classList.toggle('is-on', on)

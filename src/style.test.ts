@@ -67,3 +67,25 @@ describe('the stylesheet', () => {
     expect(deepest).toBeLessThanOrEqual(2)
   })
 })
+
+describe('the logon choice notes', () => {
+  const rule = (selector: string): string => {
+    const escaped = selector.replace('.', '\\.')
+    return new RegExp(escaped + '[^{]*\\{[^}]*\\}').exec(stylesheet)?.[0] ?? ''
+  }
+
+  it('gives them a slot so the panel cannot reflow', () => {
+    // The line under each row changes as the cursor moves across the
+    // choices, and its natural height differs by a line. Without a slot the
+    // whole panel grew and shrank under the cursor.
+    const notes = rule('.logon-sector-note')
+    expect(notes).toMatch(/min-height/)
+  })
+
+  it('gives them a size, because nothing else does', () => {
+    // .logon-note is only styled inside a .logon-check, so these two were
+    // rendering at the browser default -- half again the size of anything
+    // else on the panel.
+    expect(rule('.logon-sector-note')).toMatch(/font-size/)
+  })
+})

@@ -68,13 +68,28 @@ export function airportOf(icao: string): Airport {
 export interface AirportSummary {
   readonly icao: string
   readonly name: string
+  readonly shortName: string
   readonly tier: string
+  readonly challenge: string
   readonly brief: string
 }
 
 export function airportSummaries(): readonly AirportSummary[] {
   return AIRPORT_IDS.map((icao) => {
-    const raw = PROFILES[icao] as { name: string; tier: string; brief: string }
-    return { icao, name: raw.name, tier: raw.tier, brief: raw.brief }
+    const raw = PROFILES[icao] as {
+      name: string
+      shortName: string
+      tier: string
+      challenge: string
+      brief: string
+    }
+    return {
+      icao,
+      name: raw.name,
+      shortName: raw.shortName,
+      tier: raw.tier,
+      challenge: raw.challenge,
+      brief: raw.brief,
+    }
   })
 }

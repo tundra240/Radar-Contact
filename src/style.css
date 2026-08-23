@@ -831,6 +831,29 @@ canvas {
   gap: 4px;
 }
 
+/* The line under each row of choices.
+ *
+ * Two things at once. The type: .logon-note is only styled inside a
+ * .logon-check, so these two -- which are not in one -- were rendering at
+ * the browser default of sixteen pixels, half again the size of anything
+ * else on the panel. And the height: they change as you move across the
+ * choices, their natural heights differ by a line, and without a slot the
+ * panel grew and shrank under the cursor and at its tallest was taller than
+ * the window, which is where the scrollbar came from.
+ *
+ * Three lines of slot at this size, which is one more than the longest
+ * line needs, so nothing here can reflow. min-height rather than height:
+ * a longer line should wrap rather than be clipped. */
+.logon-sector-note,
+.logon-level-note {
+  margin: 6px 0 0;
+  min-height: 4.5em;
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: var(--chrome-dim);
+}
+
 .logon-level {
   flex: 1 1 0;
   padding: 6px 4px;

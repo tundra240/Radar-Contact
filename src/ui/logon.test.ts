@@ -45,8 +45,22 @@ function mountLogon(over: { initials?: string; enforceAirspace?: boolean } = {})
     difficulty: 'normal',
     mode: 'career',
     airports: [
-      { icao: 'LPFR', name: 'Faro', tier: 'easy', brief: 'One runway and the sea.' },
-      { icao: 'EGLL', name: 'Heathrow', tier: 'normal', brief: 'Four stacks and two parallels.' },
+      {
+        icao: 'LPFR',
+        name: 'Faro',
+        shortName: 'Faro',
+        tier: 'easy',
+        challenge: 'One runway and open sea.',
+        brief: 'One runway and the sea.',
+      },
+      {
+        icao: 'EGLL',
+        name: 'London Heathrow',
+        shortName: 'Heathrow',
+        tier: 'normal',
+        challenge: 'Four stacks and two parallels.',
+        brief: 'Four stacks and two parallels.',
+      },
     ],
     airport: 'EGLL',
     onAirport: (icao) => h.fields.push(icao),
@@ -287,5 +301,47 @@ describe('starting the tutorial from the menu', () => {
     button(h.mount, '.logon-tutorial').click()
     expect(h.tutorials).toHaveLength(0)
     expect(h.mount.querySelector<HTMLElement>('.logon-error')?.hidden).toBe(false)
+  })
+})
+
+describe('choosing a sector', () => {
+  const fields = (mount: HTMLElement): HTMLButtonElement[] => [
+    ...mount.querySelectorAll<HTMLButtonElement>('.logon-sector'),
+  ]
+
+  it('names them rather than showing the code', () => {
+    // Somebody choosing where to fly knows "Heathrow". "EGLL" is what the
+    // strip bay calls it afterwards.
+    const { mount } = mountLogon()
+    expect(fields(mount).map((b) => b.textContent)).toEqual(['Faro', 'Heathrow'])
+  })
+
+  it('keeps the code where it is still useful', () => {
+    const { mount } = mountLogon()
+    expect(fields(mount)[0]?.title).toContain('LPFR')
+  })
+
+  it('lights the one that is loaded, not the one under the cursor', () => {
+    // Hovering is reading, not choosing. An earlier version repainted on
+    // hover in a way that made the panel change shape under the pointer.
+    const { mount } = mountLogon()
+    const nice = fields(mount)[0]
+    nice?.dispatchEvent(new Event('pointerenter'))
+    const lit = fields(mount).filter((b) => b.classList.contains('is-on'))
+    expect(lit.map((b) => b.textContent)).toEqual(['Heathrow'])
+  })
+
+  it('describes the one under the cursor without changing the choice', () => {
+    const h = mountLogon()
+    const faro = fields(h.mount)[0]
+    faro?.dispatchEvent(new Event('pointerenter'))
+    expect(h.mount.querySelector('.logon-sector-note')?.textContent).toContain('EASY')
+    expect(h.fields).toEqual([])
+  })
+
+  it('asks for a different sector when one is pressed', () => {
+    const h = mountLogon()
+    fields(h.mount)[0]?.click()
+    expect(h.fields).toEqual(['LPFR'])
   })
 })
