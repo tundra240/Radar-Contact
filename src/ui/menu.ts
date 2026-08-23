@@ -52,6 +52,14 @@ export interface MenuOptions {
   readonly onSpeed: (next: Speed) => void
   readonly onTogglePause: () => void
   readonly onToggleSound: () => void
+  /**
+   * Called when the panel opens or closes.
+   *
+   * The rail's panels all occupy the same strip of glass beside it, so two
+   * open at once is two stacked on each other. Whoever owns them uses this
+   * to put the others away.
+   */
+  readonly onToggle?: (open: boolean) => void
   readonly onSave: () => void
   readonly onLoad: () => void
 }
@@ -244,9 +252,10 @@ export class Menu {
     return this.isOpen
   }
 
-  setOpen(open: boolean): void {
+  setOpen(open: boolean, silent = false): void {
     this.isOpen = open
     this.paintOpen()
+    if (!silent) this.opts.onToggle?.(open)
   }
 
   toggle(): void {

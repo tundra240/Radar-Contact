@@ -507,6 +507,7 @@ function start(
     open: storedAtisOpen(),
     onChange: (next) => setAtis(next),
     onToggle: (open) => {
+      if (open) soleOpen('atis')
       try {
         window.localStorage.setItem(ATIS_STORAGE, open ? 'on' : 'off')
       } catch {
@@ -515,8 +516,25 @@ function start(
     },
   })
 
+  /**
+   * Put away every panel but the one just opened.
+   *
+   * They all open into the same strip of glass beside the rail, so two at
+   * once is two stacked on each other -- which reads as a panel appearing
+   * unprompted rather than as the one you asked for. Closed silently, or
+   * each would report its own closing and call this again.
+   */
+  const soleOpen = (keep: 'menu' | 'atis' | 'guide'): void => {
+    if (keep !== 'menu') menu.setOpen(false, true)
+    if (keep !== 'atis') atisBar.setOpen(false, true)
+    if (keep !== 'guide') guide.setOpen(false, true)
+  }
+
   const menu = new Menu({
     mount: controls,
+    onToggle: (open) => {
+      if (open) soleOpen('menu')
+    },
     onOverlays: (next) => setOverlays(next),
     onPalette: (next) => applyPalette(next),
     onSpeed: (speed) => {
@@ -544,7 +562,10 @@ function start(
   // TUTORIAL.md, so that file is both the document a person edits and the
   // one the game shows.
 
-  new Guide({
+  const guide = new Guide({
+    onToggle: (open) => {
+      if (open) soleOpen('guide')
+    },
     mount: controls,
     source: guideSource,
     title: `${airport.icao} approach -- how to play`,

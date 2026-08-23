@@ -24,9 +24,12 @@ export interface GuideOptions {
   readonly title: string
   /** Shown under the caption: where to edit what is on screen. */
   readonly note?: string
+  /** Called when the window opens or closes; see Menu.onToggle. */
+  readonly onToggle?: (open: boolean) => void
 }
 
 export class Guide {
+  private readonly opts: GuideOptions
   private readonly root: HTMLDivElement
   private readonly button: HTMLButtonElement
   private readonly window: HTMLDivElement
@@ -37,6 +40,7 @@ export class Guide {
   private readonly onDocumentKeyDown: (e: KeyboardEvent) => void
 
   constructor(opts: GuideOptions) {
+    this.opts = opts
     this.root = document.createElement('div')
     this.root.className = 'guide'
 
@@ -115,12 +119,13 @@ export class Guide {
     return this.isOpen
   }
 
-  setOpen(open: boolean): void {
+  setOpen(open: boolean, silent = false): void {
     this.isOpen = open
     this.paint()
     // The body scrolls, so it takes focus and the arrow keys work without
     // having to click into it first.
     if (open) this.body.focus()
+    if (!silent) this.opts.onToggle?.(open)
   }
 
   toggle(): void {

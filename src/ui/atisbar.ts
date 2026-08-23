@@ -83,10 +83,7 @@ export class AtisBar {
     this.button.className = 'mode-toggle atis-button'
     setToolLabel(this.button, 'atis', 'ATIS and runways')
     this.button.title = 'Show or hide the ATIS board'
-    this.button.addEventListener('click', () => {
-      this.setOpen(!this.isOpen)
-      this.opts.onToggle?.(this.isOpen)
-    })
+    this.button.addEventListener('click', () => this.setOpen(!this.isOpen))
     this.root.appendChild(this.button)
 
     this.box = document.createElement('div')
@@ -118,7 +115,8 @@ export class AtisBar {
 
     this.root.appendChild(this.box)
     opts.mount.appendChild(this.root)
-    this.setOpen(this.isOpen)
+    // Silent: the state it starts in is not somebody toggling it.
+    this.setOpen(this.isOpen, true)
   }
 
   private section(title: string): HTMLDivElement {
@@ -140,12 +138,13 @@ export class AtisBar {
     return this.isOpen
   }
 
-  setOpen(open: boolean): void {
+  setOpen(open: boolean, silent = false): void {
     this.isOpen = open
     this.box.hidden = !open
     // Pressed in while the board is up, the same affordance as WX.
     this.button.classList.toggle('is-on', open)
     this.button.setAttribute('aria-pressed', String(open))
+    if (!silent) this.opts.onToggle?.(open)
   }
 
   paint(state: AtisBarState): void {
