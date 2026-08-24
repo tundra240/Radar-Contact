@@ -1660,7 +1660,16 @@ function start(
   // up a particular situation without waiting for the cadence.
   const spawnNow = (): void => {
     const arrivals = spawner.spawnNow(loop.clock, traffic)
-    if (arrivals.length === 0) return
+    if (arrivals.length === 0) {
+      // Said out loud for the same reason the transit key says it: a key
+      // that silently declines is indistinguishable from a key that is not
+      // wired up. It declines more often than it used to, because a gate
+      // with somebody standing on it is now blocked whatever the level
+      // difference -- which is the point, but it does mean the press has to
+      // account for itself.
+      announce('no arrival available -- every gate is occupied', 'reject')
+      return
+    }
     traffic = [...traffic, ...arrivals]
     syncStrips()
     requestDraw()

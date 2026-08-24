@@ -248,9 +248,18 @@ describe('releasing one on command', () => {
   it('counts arrivals separately from transits when judging the cap', () => {
     // The cap is on transits, not on everything: a busy arrival stream must
     // not stop one crossing.
+    // Positioned, and nowhere near a corridor entry. They used to be bare
+    // callsigns, which was fine while nothing looked at where they were --
+    // and the release rule does, because the question it asks is whether
+    // there is room.
     const arrivals: Aircraft[] = []
     for (let i = 0; i < 20; i += 1) {
-      arrivals.push({ callsign: `BAW${i}`, role: 'arrival' } as Aircraft)
+      arrivals.push({
+        callsign: `BAW${i}`,
+        role: 'arrival',
+        pos: { x: 400 + i, y: 400 },
+        altFt: 5000,
+      } as Aircraft)
     }
     expect(generator().spawnNow(clockAt(0), arrivals)).toHaveLength(1)
   })

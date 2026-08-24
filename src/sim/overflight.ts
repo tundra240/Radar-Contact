@@ -11,6 +11,7 @@ import {
   type DifficultySettings,
 } from './difficulty'
 import type { FlightGenerator } from './flightgen'
+import { isClearForRelease } from './release'
 import type { Aircraft, Route, RouteLeg } from './types'
 
 /**
@@ -161,6 +162,12 @@ export function semicircularLevelFt(rng: Rng, corridor: Corridor, trackDeg: numb
   return levels[rng.range(0, levels.length - 1)] as number
 }
 
+/** Where a transit appears, and the way it is pointing when it does. */
+interface Entry {
+  readonly pos: Vec2NM
+  readonly hdg: number
+}
+
 /** Everything the generator remembers between releases. */
 export interface OverflightState {
   readonly seed: number
@@ -292,9 +299,15 @@ export class Overflights {
     )
     if (corridor === null) return []
 
+    // Where it would appear, before anything is committed. A corridor whose
+    // near end is occupied all the way back is full, and a release into it
+    // would put two transits on one blip.
+    const entry = this.entryFor(corridor, traffic)
+    if (entry === null) return []
+
     this.lastUsedAt.set(corridor.id, clock.elapsedSeconds)
     this.spawnCount += 1
-    return [this.release(corridor, clock, traffic)]
+    return [this.release(corridor, entry, clock, traffic)]
   }
 
   /**
@@ -318,12 +331,22 @@ export class Overflights {
     const airborne = existing.filter((a) => a.role === 'overflight').length
     if (airborne >= this.cap(config.maxConcurrent)) return []
 
-    // Every corridor, cooldown ignored -- but still weighted, so pressing
-    // the key repeatedly gives the same mix as leaving it alone would.
-    const corridor = this.rng.weighted(this.corridors, (c) => c.weight)
-    this.lastUsedAt.set(corridor.id, clock.elapsedSeconds)
+    // Every corridor with room in it, cooldown ignored -- but still
+    // weighted, so pressing the key repeatedly gives the same mix as
+    // leaving it alone would. The cooldown is what spaces the automatic
+    // flow and a deliberate press is not the automatic flow; having
+    // somewhere to put the aeroplane is a different question, and skipping
+    // THAT is what let two transits appear on the same point at the same
+    // level, which is a separation loss nobody asked for.
+    const open = this.corridors
+      .map((c) => ({ corridor: c, entry: this.entryFor(c, existing) }))
+      .filter((o): o is { corridor: Corridor; entry: Entry } => o.entry !== null)
+    if (open.length === 0) return []
+
+    const chosen = this.rng.weighted(open, (o) => o.corridor.weight)
+    this.lastUsedAt.set(chosen.corridor.id, clock.elapsedSeconds)
     this.spawnCount += 1
-    return [this.release(corridor, clock, existing)]
+    return [this.release(chosen.corridor, chosen.entry, clock, existing)]
   }
 
   /**
@@ -362,11 +385,36 @@ export class Overflights {
     return route
   }
 
-  private release(corridor: Corridor, clock: Clock, traffic: readonly Aircraft[]): Aircraft {
+  /**
+   * Where this corridor's next transit would appear, or null if it is full.
+   *
+   * The corridor's own entry point when that is clear, and further back
+   * along the inbound track when it is not -- which is how transits are
+   * handed over anyway, in trail rather than abreast. Answered BEFORE a
+   * release commits to anything, because drawing a callsign spends it: the
+   * issued set is session-long and a name spent on a spawn that did not
+   * happen is a name gone for good.
+   */
+  private entryFor(corridor: Corridor, traffic: readonly Aircraft[]): Entry | null {
     const config = this.airport.overflights
     const route = this.routeFor(corridor)
     const entry = corridorEntry(this.airport, route, config?.entryDistanceNM ?? 6)
+    // The level is drawn after the corridor is chosen, so the check uses the
+    // middle of the band this corridor flies rather than one level out of
+    // it. The lateral rule is doing the work here anyway -- a corridor
+    // entry point is a fixed point, and two transits released onto it are
+    // on the same point whatever levels they draw.
+    const altFt = (corridor.minAltFt + corridor.maxAltFt) / 2
+    return isClearForRelease(entry.pos, altFt, traffic) ? entry : null
+  }
 
+  private release(
+    corridor: Corridor,
+    entry: Entry,
+    clock: Clock,
+    traffic: readonly Aircraft[],
+  ): Aircraft {
+    const route = this.routeFor(corridor)
     const operators = new Set(corridor.operators)
     // Draw until the operator suits the corridor, then stop caring: an
     // implausible operator is a small cost and a missing aeroplane is not.

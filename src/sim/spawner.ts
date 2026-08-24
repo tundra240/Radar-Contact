@@ -1,5 +1,5 @@
 import type { Clock } from '../core/loop'
-import { advance, bearingDeg, distanceNM, type Vec2NM } from '../core/geo'
+import { advance, bearingDeg, type Vec2NM } from '../core/geo'
 import { exitRangeNM } from './airspace'
 import { makeRng, makeRngAt, type Rng } from '../core/rng'
 import type { Airline, Airport, Navaid, TrafficConfig } from '../data/airport'
@@ -8,6 +8,7 @@ import {
   type FlightGeneratorState,
   type FlightIdentity,
 } from './flightgen'
+import { isClearForRelease } from './release'
 import type { Aircraft, HoldClearance } from './types'
 
 /**
@@ -329,18 +330,16 @@ export class Spawner {
       const altFt = this.entryLevel(fix, existing)
       if (altFt === null) continue
 
-      // Nothing already sitting where this one would appear, at this
-      // level. Traffic a thousand feet away is separated -- that is the
-      // entire point of a stack -- so only a conflict at the same level
-      // blocks the release, and the four fixes do not throttle each other
-      // through airspace they share.
-      const gate = this.entryPoint(fix)
-      const blocked = existing.some(
-        (a) =>
-          distanceNM(a.pos, gate) < t.minFixSpacingNM &&
-          Math.abs(a.altFt - altFt) < STACK_STEP_FT,
-      )
-      if (blocked) continue
+      // Somewhere to actually put it, which is a stronger question than
+      // it used to ask. This checked whether anything was near the gate AT
+      // THIS LEVEL, on the grounds that traffic a thousand feet away is
+      // separated -- true, and the whole point of a stack, and not the
+      // question. Two aeroplanes a thousand feet apart and no distance
+      // apart are legally separated and completely unreadable, and pressing
+      // the release key twice produced exactly that. sim/release.ts asks it
+      // the other way round: far enough to be its own target, whatever the
+      // levels.
+      if (!isClearForRelease(this.entryPoint(fix), altFt, existing)) continue
 
       slots.push({ fix, altFt })
     }

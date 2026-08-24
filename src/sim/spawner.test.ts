@@ -30,17 +30,28 @@ const clockAt = (seconds: number): Clock => ({
 function fly(
   spawner: Spawner,
   seconds: number,
-  opts?: { move?: boolean; stepSeconds?: number },
+  opts?: { move?: boolean; toFix?: boolean; stepSeconds?: number },
 ): { world: Aircraft[]; all: Aircraft[] } {
   const step = opts?.stepSeconds ?? 0.05
   const move = opts?.move ?? true
+  // Each release goes straight to its fix and stays there. Used by the
+  // stack tests: an arrival that never leaves its gate is not in a stack,
+  // it is standing on the doorstep, and the gate is the one place another
+  // release is not allowed to land.
+  const toFix = opts?.toFix ?? false
   let world: Aircraft[] = []
   const all: Aircraft[] = []
 
   for (let s = 0; s <= seconds; s += step) {
     const clock = clockAt(s)
     const born = spawner.update(step, clock, world)
-    world.push(...born)
+    world.push(
+      ...born.map((a) => {
+        if (!toFix) return a
+        const fix = airport.navaids.find((n) => n.name === a.originFix)
+        return fix === undefined ? a : { ...a, pos: fix.posNM }
+      }),
+    )
     all.push(...born)
     if (move) {
       // The same two rules main.ts applies: an inbound aircraft becomes the
@@ -373,17 +384,20 @@ describe('flow management', () => {
     expect(spawner.deferred).toBeGreaterThan(0)
   })
 
-  it('releases past a gate blocker that is a thousand feet away', () => {
-    // Vertical separation is the entire point of a stack. Refusing to
+  it('releases into a fix that already has a stack on it', () => {
+    // Vertical separation is the entire point of a stack, and refusing to
     // release under traffic two thousand feet above would throttle the flow
-    // for a conflict that does not exist.
+    // for a conflict that does not exist. The traffic is put where a stack
+    // actually is -- over the fix -- rather than on the gate: a gate with
+    // somebody standing on it IS blocked, whatever the level difference,
+    // because two data blocks on one point cannot be read.
     const spawner = makeSpawner()
-    const blockers = spawner.entryFixes.map((fix, i) =>
-      parked(`BLK${i}`, gateOf(fix), bottomOf(fix) + 2000),
+    const holding = spawner.entryFixes.map((fix, i) =>
+      parked(`BLK${i}`, fix.posNM, bottomOf(fix) + 2000),
     )
 
     const due = clockAt(airport.traffic.firstSpawnSeconds)
-    expect(spawner.update(airport.traffic.firstSpawnSeconds, due, blockers)).toHaveLength(1)
+    expect(spawner.update(airport.traffic.firstSpawnSeconds, due, holding)).toHaveLength(1)
   })
 
   it('will not release into a stack with no level left', () => {
@@ -697,10 +711,15 @@ describe('the stack', () => {
   /**
    * Arrivals hold over their fix now, so two of them at the same fix have
    * to be at different levels or the controller is handed an overlap they
-   * had no part in. Nothing moves in this run, so every arrival is still
-   * sitting in its stack at the end of it.
+   * had no part in.
+   *
+   * Each release goes straight to its fix and stays there, so the stack is
+   * still standing at the end of the hour. It used to leave them at the
+   * gate, which reads the same and is not: the gate is the one point
+   * another release may not be put on, so a run that parked everything
+   * there could only ever produce one arrival per fix.
    */
-  const { all } = fly(makeSpawner(), 3600, { move: false })
+  const { all } = fly(makeSpawner(), 3600, { move: false, toFix: true })
 
   const byFix = (): Map<string, Aircraft[]> => {
     const out = new Map<string, Aircraft[]>()
