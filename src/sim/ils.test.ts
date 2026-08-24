@@ -70,6 +70,8 @@ function ac(over: Partial<Aircraft> = {}): Aircraft {
     routeLeg: 0,
     destination: null,
     spawnedAt: 0,
+    squawk: '4271',
+    emergencyAt: null,
     ...over,
   }
 }

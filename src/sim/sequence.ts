@@ -1,5 +1,6 @@
 import { distanceNM, type Vec2NM } from '../core/geo'
 import { requiredGapNM } from './separation'
+import { emergencyKind } from './emergency'
 import type { Aircraft } from './types'
 
 /**
@@ -57,6 +58,19 @@ export interface ArrivalSequence {
   readonly inbound: readonly StackedFlight[]
 }
 
+/**
+ * Where an aircraft sorts before distance is considered.
+ *
+ * Emergencies first, and among them the order sim/emergency.ts puts them
+ * in -- worst first, which is also the order they should be landed in.
+ */
+function priority(a: Aircraft): number {
+  const kind = emergencyKind(a)
+  if (kind === 'general') return 0
+  if (kind === 'radio') return 1
+  return 2
+}
+
 /** True once the gap to the aircraft ahead is below what the pair needs. */
 export function isTight(flight: SequencedFlight): boolean {
   return flight.gapNM !== null && flight.requiredNM !== null && flight.gapNM < flight.requiredNM
@@ -81,9 +95,19 @@ export function buildSequence(
 
   const byDistance = working
     .map((a) => ({ a, toFieldNM: distanceNM(a.pos, field) }))
-    // Callsign breaks a tie, so the order cannot flicker between two
-    // aircraft the same distance out.
-    .sort((x, y) => x.toFieldNM - y.toFieldNM || x.a.callsign.localeCompare(y.a.callsign))
+    // Distance decides the order, except that an emergency is first
+    // whatever the distance. That is what priority means and it has to show
+    // in the one place the controller reads the order off: an aeroplane
+    // with a problem on board is number one even from thirty miles, and the
+    // sequence saying so is how you remember to break everybody else off.
+    .sort(
+      (x, y) =>
+        priority(x.a) - priority(y.a) ||
+        x.toFieldNM - y.toFieldNM ||
+        // Callsign breaks a tie, so the order cannot flicker between two
+        // aircraft the same distance out.
+        x.a.callsign.localeCompare(y.a.callsign),
+    )
 
   const sequence: SequencedFlight[] = byDistance.map((entry, i) => {
     const ahead = byDistance[i - 1]

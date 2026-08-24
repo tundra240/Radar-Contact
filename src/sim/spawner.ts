@@ -272,7 +272,11 @@ export class Spawner {
     // Done only once a slot is known to exist, so a release that gets held
     // back never burns a callsign: the issued set is session-long, and a
     // name spent on a spawn that did not happen is a name gone for good.
-    const flight = this.flightGen.next(this.rng, new Set(existing.map((a) => a.callsign)))
+    const flight = this.flightGen.next(
+      this.rng,
+      new Set(existing.map((a) => a.callsign)),
+      new Set(existing.map((a) => a.squawk)),
+    )
     const slot = this.chooseSlot(slots, flight.airline)
 
     const aircraft = this.build(slot, flight, clock)
@@ -512,6 +516,8 @@ export class Spawner {
       trail: [],
       trailAt: clock.elapsedSeconds,
       spawnedAt: clock.elapsedSeconds,
+      squawk: flight.squawk,
+      emergencyAt: null,
     }
   }
 

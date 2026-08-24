@@ -132,6 +132,33 @@ export interface Aircraft {
   readonly wake: WakeCategory
   /** Arrival or transit. See FlightRole. */
   readonly role: FlightRole
+  /**
+   * The transponder code, four octal digits. See sim/squawk.ts.
+   *
+   * Identity rather than state, because that is what it is for: it is how
+   * the radar knows which return is which flight, and it is the same code
+   * from the moment the aircraft appears until something goes wrong.
+   *
+   * When something does, this is where it says so. An emergency IS the
+   * squawk here -- 7600 or 7700 in this field and nothing else -- rather
+   * than a flag beside it, because an aeroplane declares by turning a knob
+   * and two pieces of state could disagree.
+   */
+  readonly squawk: string
+  /**
+   * When the current emergency code went on, in simulated seconds, and null
+   * when the aircraft is squawking an ordinary code.
+   *
+   * Redundant with the squawk on the face of it, and it is not: what it
+   * carries is HOW LONG, which is the whole of the pressure an emergency
+   * puts on a controller. An aeroplane that has been squawking 7700 for
+   * eight minutes is a different problem from one that declared thirty
+   * seconds ago, and nothing else on the record can tell the two apart.
+   *
+   * The invariant -- set exactly when the squawk is an emergency code -- is
+   * asserted in sim/emergency.test.ts.
+   */
+  readonly emergencyAt: number | null
 
   /* ACTUAL state -- what the radar sees */
   readonly pos: Vec2NM

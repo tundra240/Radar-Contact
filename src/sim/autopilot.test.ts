@@ -28,6 +28,8 @@ const base: Aircraft = {
   routeLeg: 0,
   destination: null,
   spawnedAt: 0,
+  squawk: '4271',
+  emergencyAt: null,
 }
 
 /** Repeats a step, as the loop would. */

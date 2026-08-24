@@ -1413,6 +1413,37 @@ canvas {
   text-decoration: underline;
 }
 
+/* An aircraft in trouble. Colour only, and deliberately: the strip's
+   layout is the same layout for every flight, and a controller finds the
+   one that matters by the colour of the card rather than by its shape being
+   different. The status line already carries what it is squawking. */
+.strip[data-emergency] {
+  border-color: var(--warn);
+  box-shadow: inset 2px 0 0 var(--warn);
+}
+
+.strip[data-emergency] .strip-head,
+.strip[data-emergency] .strip-status {
+  font-weight: bold;
+  color: var(--warn);
+}
+
+/* The sequence number too, because an emergency is number one and that is
+   the number the controller is looking for. */
+.strip[data-emergency] .strip-seq {
+  color: var(--warn);
+  font-weight: bold;
+}
+
+.strip.is-selected[data-emergency] .strip-head,
+.strip.is-selected[data-emergency] .strip-status,
+.strip.is-selected[data-emergency] .strip-seq {
+  /* On the inverted card the warn colour stops being readable, so the
+     emphasis carries it instead -- the same trade the weather rule makes. */
+  color: var(--title-text);
+  text-decoration: underline;
+}
+
 /* The grip on the bay's inner edge. Wider than it looks: a one-pixel
    target is a target you miss. */
 .strip-resize {

@@ -8,6 +8,16 @@ import {
   DEFAULT_AIRPORT,
 } from './data/airports'
 import { departureOf, enterSector, isInSector, stepAircraft } from './sim/aircraft'
+import type { ApproachClearance } from './sim/types'
+import {
+  canDeclare,
+  declareEmergency,
+  emergencyKind,
+  emergenciesIn,
+  inEmergency,
+  isOverdue,
+} from './sim/emergency'
+import { Emergencies } from './sim/emergencyflow'
 import { NO_SCORE, pointsFor, scoreDeparture, type Score } from './sim/score'
 import type { Vec2NM } from './core/geo'
 import { intensityAt, isAvoidable, makeWeather, windVector } from './sim/weather'
@@ -858,7 +868,30 @@ function start(
     seed: sessionSeed,
     difficulty,
   })
+
+  // And the thing that goes wrong. Unlike the other two it puts nothing on
+  // the display: it reaches into the traffic already there and gives one of
+  // them a bad day, which is the only honest way round -- an emergency is
+  // not a kind of aircraft, it is something that happens to an ordinary one.
+  let emergencies = new Emergencies({ seed: sessionSeed, difficulty })
   let traffic: readonly Aircraft[] = []
+
+  /**
+   * The approach a lost-comms arrival will fly itself onto.
+   *
+   * The first runway in use with an ILS, which is what a crew with no radio
+   * is expected to do: fly the approach they were most likely to be given.
+   * Null where there is nothing to give it, in which case it carries on
+   * with the last clearance it heard -- which is also what a real one would
+   * do until it worked out where it was.
+   */
+  const expectedApproach = (): ApproachClearance | null => {
+    for (const rwy of landingRunways()) {
+      const built = applyContext.approachFor(rwy.id)
+      if (built !== null) return built
+    }
+    return null
+  }
 
   // Landing and handoff are Day 2 and 3 work. Until then, crossing the area
   // of responsibility is how an arrival finishes -- and letting go of them
@@ -1039,6 +1072,7 @@ function start(
       traffic: [...traffic],
       spawner: spawner.snapshot(),
       overflights: overflights.snapshot(),
+      emergencies: emergencies.snapshot(),
     }
 
     try {
@@ -1094,6 +1128,7 @@ function start(
     }
     spawner.restore(game.spawner)
     if (game.overflights !== null) overflights.restore(game.overflights)
+    if (game.emergencies !== null) emergencies.restore(game.emergencies)
     loop.setTicks(game.clock.ticks)
 
     // Loaded paused, always. Dropping a controller into moving traffic they
@@ -1305,6 +1340,8 @@ function start(
   /** Who is under a noise abatement floor, and has already been charged. */
   let overNoise: ReadonlySet<string> = new Set()
   const chargedForNoise = new Set<string>()
+  /** Who has been chased for taking too long over an emergency. */
+  const overdueEmergency = new Set<string>()
 
   /** Where the runway-change cycle has got to. See sim/atisflow.ts. */
   let atisFlow: AtisFlowState = beginAtisFlow()
@@ -1361,11 +1398,18 @@ function start(
           continue
         }
 
-        score = scoreDeparture(score, departure, difficulty)
-        const worth = signed(pointsFor(departure, difficulty))
+        // What it was squawking when it finished with the sector, which is
+        // what decides the score: landing one that had declared is worth
+        // double, and losing one costs four times an ordinary loss.
+        const facts = { emergency: inEmergency(a) }
+        score = scoreDeparture(score, departure, difficulty, facts)
+        const worth = signed(pointsFor(departure, difficulty, facts))
         if (departure === 'landed') {
           announce(
-            `${a.callsign} landed ${a.clearedApproach?.runway ?? ''} ${worth}`.replace('  ', ' '),
+            `${a.callsign}${facts.emergency ? ' (EMERGENCY)' : ''} landed ${a.clearedApproach?.runway ?? ''} ${worth}`.replace(
+              '  ',
+              ' ',
+            ),
             'readback',
           )
         } else if (departure === 'transited') {
@@ -1378,8 +1422,15 @@ function start(
           )
         } else {
           // Refused rather than noted: an arrival that leaves the sector
-          // unlanded is one you lost, and the log should read like it.
-          announce(`${a.callsign} left the sector unlanded ${worth}`, 'reject')
+          // unlanded is one you lost, and the log should read like it. One
+          // that was in trouble when it went is the worst outcome the
+          // simulation has, and it is named as such.
+          announce(
+            facts.emergency
+              ? `${a.callsign} left the sector STILL IN EMERGENCY ${worth}`
+              : `${a.callsign} left the sector unlanded ${worth}`,
+            'reject',
+          )
         }
       }
 
@@ -1416,7 +1467,16 @@ function start(
         // is really on the display.
         const withArrivals = arrivals.length > 0 ? [...flown, ...arrivals] : flown
         const crossing = overflights.update(dt, clock, withArrivals)
-        traffic = crossing.length > 0 ? [...withArrivals, ...crossing] : withArrivals
+        const settled = crossing.length > 0 ? [...withArrivals, ...crossing] : withArrivals
+
+        // Last, so that whatever declares is an aeroplane already on the
+        // display rather than one released this tick.
+        const before = new Set(settled.filter(inEmergency).map((a) => a.callsign))
+        traffic = emergencies.update(dt, clock, settled, () => expectedApproach())
+        for (const a of traffic) {
+          if (!inEmergency(a) || before.has(a.callsign)) continue
+          announceEmergency(a)
+        }
       }
 
       // Do not keep pointing at an aircraft that has left.
@@ -1460,6 +1520,21 @@ function start(
           announce(`${callsign} below the noise abatement floor -${cost}`, 'reject')
         }
         overNoise = loud
+
+        // The emergencies still airborne, and the ones that have been up
+        // too long. Said once each rather than once a sweep, like the
+        // terrain and the noise: a warning repeated five times a second is
+        // not a warning, it is a fault.
+        for (const a of emergenciesIn(traffic)) {
+          if (!isOverdue(a, loop.clock.elapsedSeconds)) continue
+          if (overdueEmergency.has(a.callsign)) continue
+          overdueEmergency.add(a.callsign)
+          announce(
+            `${a.callsign} has been in emergency too long -- get it on the ground`,
+            'reject',
+          )
+        }
+
         // Once a sweep rather than once a tick: no goal here can change
         // faster than that, and the conflict scan would otherwise run
         // twenty times a second for nothing.
@@ -1654,6 +1729,62 @@ function start(
       return
     }
     tutorial.start()
+  }
+
+  /**
+   * An aircraft has declared.
+   *
+   * Said in the words the situation is described in on frequency, because
+   * "7700" and "7600" are what a controller hears and what the data block
+   * will be showing -- a log that paraphrased them into "emergency" and
+   * "radio problem" would be teaching the wrong vocabulary.
+   */
+  const announceEmergency = (a: Aircraft): void => {
+    const kind = emergencyKind(a)
+    if (kind === 'general') {
+      announce(
+        `${a.callsign} SQUAWKING 7700 -- declaring an emergency, requesting priority`,
+        'reject',
+      )
+      return
+    }
+    announce(
+      `${a.callsign} SQUAWKING 7600 -- no radio. It will fly the approach on its own.`,
+      'reject',
+    )
+  }
+
+  /**
+   * Make something go wrong, on command.
+   *
+   * The counterpart to the arrival and transit keys, and it works the same
+   * way: it does what the session would have done on its own, without
+   * waiting. The selected aircraft if one is selected, because setting up a
+   * particular situation is most of what this is for; otherwise whichever
+   * one the session's own generator would have picked.
+   */
+  const declareNow = (): void => {
+    const eligible = traffic.filter(canDeclare)
+    if (eligible.length === 0) {
+      announce('nothing on frequency can declare an emergency', 'reject')
+      return
+    }
+    const victim =
+      eligible.find((a) => a.callsign === selected) ??
+      (eligible[Math.floor(Math.random() * eligible.length)] as Aircraft)
+    // Two in three are a general emergency, which is the same share the
+    // scheduler uses.
+    const kind = Math.random() < 1 / 3 ? 'radio' : 'general'
+    const declared = declareEmergency(
+      victim,
+      kind,
+      loop.clock.elapsedSeconds,
+      expectedApproach(),
+    )
+    traffic = traffic.map((a) => (a.callsign === victim.callsign ? declared : a))
+    announceEmergency(declared)
+    syncStrips()
+    requestDraw()
   }
 
   // Release an arrival on command, for when the scope is quiet or to line
@@ -2019,6 +2150,12 @@ function start(
         // a second press of N: which kind you wanted is the whole question,
         // and a shortcut that cycled would make it a guess.
         if (controller !== null) spawnTransitNow()
+        return
+      case 'e':
+        // And the same again for the thing that goes wrong. It does not
+        // release an aeroplane -- it picks one already on frequency, which
+        // is what an emergency actually is.
+        if (controller !== null) declareNow()
         return
       default:
         return

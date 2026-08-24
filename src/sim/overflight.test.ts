@@ -6,7 +6,7 @@ import { loadAirport } from '../data/airport'
 import raw from '../data/egll.json'
 import { departureOf, enterSector, isInSector, stepAircraft } from './aircraft'
 import { FlightGenerator } from './flightgen'
-import { DIFFICULTIES } from './difficulty'
+import { allowsCorridor, DIFFICULTIES } from './difficulty'
 import { corridorEntry, corridorRoute, Overflights, semicircularLevelFt } from './overflight'
 import { buildSequence } from './sequence'
 import type { Aircraft } from './types'
@@ -387,7 +387,17 @@ describe('what the difficulty does to the transits', () => {
 
     const overhead = (config?.corridors ?? []).filter((c) => c.crossing === 'overhead')
     expect(overhead.length).toBeGreaterThan(0)
-    const seen = new Set(releases(generator(3, DIFFICULTIES.pro), 300).map((a) => a.destination))
+    // Across several seeds rather than one. Nothing leaves in this harness,
+    // so the concurrency cap stops each run after a handful of releases and
+    // whether any one of them took the corridor over the top is the luck of
+    // the first few draws -- which every change to what else draws from the
+    // same generator quietly shifts. The claim is that Pro CAN send one over
+    // the field, and a union over seeds is what actually says that.
+    expect(allowsCorridor(DIFFICULTIES.pro, 'overhead')).toBe(true)
+    const seen = new Set<string | null>()
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      for (const a of releases(generator(seed, DIFFICULTIES.pro), 300)) seen.add(a.destination)
+    }
     expect(overhead.some((c) => seen.has(c.destination))).toBe(true)
   })
 

@@ -212,6 +212,7 @@ export function drawScope(
     contacts.selected,
     contacts.alerts,
     contacts.trailDots,
+    overlays.squawks,
   )
   // Above the traffic: the line being dragged is the thing the controller
   // is looking at, and it has to be readable over a target it crosses.

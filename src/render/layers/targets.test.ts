@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Camera } from '../../core/camera'
+import { declareEmergency } from '../../sim/emergency'
 import type { Aircraft } from '../../sim/types'
 import { palettes, setPalette, theme } from '../theme'
 import {
@@ -162,6 +163,8 @@ function plane(over: Partial<Aircraft> = {}): Aircraft {
     routeLeg: 0,
     destination: null,
     spawnedAt: 0,
+    squawk: '4271',
+    emergencyAt: null,
     ...over,
   }
 }
@@ -340,6 +343,43 @@ describe('blockLines', () => {
   it('rounds speed to five knots so the digits can be read', () => {
     expect(blockLines(plane({ iasKts: 238, gsKts: 238 }))[2]).toBe('240 A320')
     expect(blockLines(plane({ iasKts: 232, gsKts: 232 }))[2]).toBe('230 A320')
+  })
+})
+
+describe('the transponder code on a block', () => {
+  it('is not shown until it is asked for', () => {
+    // Four more digits on every block is four more digits to read past. The
+    // code is how the radar knows which return is which flight, and once the
+    // label is on the screen the controller does not need it.
+    expect(blockLines(plane())[2]).not.toContain('4271')
+    expect(blockLines(plane(), false, true)[2]).toContain('4271')
+  })
+
+  it('is shown for an emergency whatever the switch says', () => {
+    // A display that could be configured to omit 7700 is a display you
+    // cannot trust.
+    const mayday = declareEmergency(plane(), 'general', 0)
+    expect(blockLines(mayday, false, false)[2]).toContain('7700')
+    expect(blockLines(mayday, false, false)[0]).toContain('EMRG')
+
+    const nordo = declareEmergency(plane(), 'radio', 0)
+    expect(blockLines(nordo, false, false)[2]).toContain('7600')
+    // Named differently, because the two want telling apart at a glance:
+    // one of them can hear you.
+    expect(blockLines(nordo, false, false)[0]).toContain('NORDO')
+  })
+
+  it('keeps the block three lines whatever is on it', () => {
+    // A line that appears and disappears moves everything under it, and the
+    // block is read at a glance.
+    for (const a of [
+      plane(),
+      plane({ wake: 'H' }),
+      declareEmergency(plane(), 'general', 0),
+      declareEmergency(plane({ wake: 'J', destination: 'EGKK' }), 'radio', 0),
+    ]) {
+      expect(blockLines(a, true, true)).toHaveLength(3)
+    }
   })
 })
 

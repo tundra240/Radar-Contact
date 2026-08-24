@@ -180,6 +180,39 @@ where you land most of the traffic still climbs -- it is a penalty, not a punish
 `LANDED n LOST n` cell breaks the same figure into its two halves, and every landing and every
 loss is named in the console as it happens.
 
+### When somebody declares
+
+Every aircraft carries a **transponder code** -- four digits, none of them 8 or 9. Almost all of
+them are just a label, and the display leaves them off unless you switch **Squawk codes** on in
+the overlays, because once the callsign is on the screen you do not need the code as well.
+
+Three codes are not labels, and two of them can happen here. The target turns the warning
+colour, gets a ring round it, and shows its code on the block whatever the overlay setting
+says -- a display that could be configured to hide 7700 would be a display you cannot trust.
+
+**7700 -- general emergency.** Something is wrong on board and the crew have told you. They
+still take clearances and they still fly what you give them, and they are going to land here
+whatever your sequence said a minute ago. The strip goes to the top of the bay as number one.
+What they need is the shortest path to a runway and everybody else out of the way. There is a
+**twelve-minute clock** from declaring to touching down; miss it and the console starts asking
+you where it is.
+
+**7600 -- radio failure.** The aeroplane is fine. It simply cannot hear you, and this is the
+more interesting problem of the two. Every clearance you send is refused with *no radio, no
+reply*, and the aeroplane does what a crew with no radio is expected to do: it takes itself off
+your vector, joins the approach for the runway in use, and lands. You cannot steer it, you
+cannot stop it, and you cannot ask it to wait. **Move everything else.**
+
+Landing one that had declared is worth **+200** rather than +100. Losing one off the boundary
+costs **200** rather than 50, and it is the one outcome in this simulation that is meant to
+feel bad. The count of emergencies landed is kept separately, because it is the headline of a
+shift.
+
+Emergencies do not happen on **Easy** at all, for the same reason there are no transits there.
+They get steadily more likely from Normal to Pro. Pressing **E** declares one on demand -- on
+the selected aircraft if you have one selected, which is how you set up a particular situation
+without waiting for it.
+
 ### Drag the vector you want
 
 **Press on an aircraft and drag.** A line comes out of the target and follows the cursor, with

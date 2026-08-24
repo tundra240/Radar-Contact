@@ -48,6 +48,8 @@ const base: Aircraft = {
   routeLeg: 0,
   destination: null,
   spawnedAt: 0,
+  squawk: '4271',
+  emergencyAt: null,
 }
 
 /** Runs the simulation the way the loop does: fixed fifty millisecond steps. */
@@ -586,6 +588,8 @@ describe('an aircraft flying the hold it was cleared to', () => {
     routeLeg: 0,
     destination: null,
     spawnedAt: 0,
+    squawk: '4271',
+    emergencyAt: null,
     trail: [],
     trailAt: 0,
     ...over,

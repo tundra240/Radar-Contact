@@ -1,3 +1,5 @@
+import { emergencyKind } from '../sim/emergency'
+import type { EmergencyKind } from '../sim/squawk'
 import { isHeavy, modeC, statusText, trendOf, type Aircraft } from '../sim/types'
 import {
   buildSequence,
@@ -66,6 +68,8 @@ interface Rendered {
   status: string
   mode: string
   wx: boolean
+  /** Which emergency, or null. Drives a data attribute and nothing else. */
+  emergency: EmergencyKind | null
 }
 
 interface Row {
@@ -323,6 +327,7 @@ export class StripBay {
         status: '',
         mode: '',
         wx: false,
+        emergency: null,
       },
       selected: false,
     }
@@ -338,6 +343,7 @@ export class StripBay {
     alerting = false,
   ): void {
     const inSequence = entry !== undefined && 'position' in entry
+    const emergency = emergencyKind(a)
     const heavy = isHeavy(a.wake) ? ` ${a.wake}` : ''
     const trend = TREND_MARK[trendOf(a.vsFpm)] ?? '='
     const hdgNow = String(Math.round(a.hdg)).padStart(3, '0')
@@ -369,10 +375,19 @@ export class StripBay {
       tight: flight !== null && isTight(flight),
       // The weather displaces the phase of flight while it lasts: the phase
       // is what the aircraft is doing and this is what it is asking for,
-      // and the request is the thing that wants acting on.
-      status: alerting ? 'WX -- REQUESTING VECTOR' : statusText(a),
+      // and the request is the thing that wants acting on. An emergency
+      // displaces both, for the same reason and more of it.
+      status:
+        emergency === 'general'
+          ? 'EMERGENCY -- SQUAWKING 7700'
+          : emergency === 'radio'
+            ? 'NO RADIO -- SQUAWKING 7600'
+            : alerting
+              ? 'WX -- REQUESTING VECTOR'
+              : statusText(a),
       mode: a.navMode,
       wx: alerting,
+      emergency,
     }
 
     // Field by field: at 5 Hz a wholesale rewrite would be visible work for
@@ -393,6 +408,13 @@ export class StripBay {
       // Guarded, like everything else here: an idle refresh must not write.
       if (next.wx) row.el.dataset['wx'] = 'true'
       else delete row.el.dataset['wx']
+    }
+    if (next.emergency !== row.rendered.emergency) {
+      // An attribute rather than new markup, so the stylesheet recolours
+      // the strip and the strip's design is untouched. Which kind, because
+      // the two want telling apart: one of them can hear you.
+      if (next.emergency === null) delete row.el.dataset['emergency']
+      else row.el.dataset['emergency'] = next.emergency
     }
     row.rendered = next
 

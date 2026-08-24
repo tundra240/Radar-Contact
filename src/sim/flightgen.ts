@@ -1,5 +1,6 @@
 import type { Rng } from '../core/rng'
 import type { AircraftType, Airline, Airport, WakeCategory } from '../data/airport'
+import { allocateSquawk } from './squawk'
 
 /**
  * Flight identity: who a generated aircraft is, as distinct from where it
@@ -22,6 +23,15 @@ export interface FlightIdentity {
   readonly wake: WakeCategory
   readonly cruiseKts: number
   readonly approachKts: number
+  /**
+   * The transponder code, drawn here rather than by the spawner.
+   *
+   * It belongs with the callsign for the same reason the type does: it is
+   * part of who the flight is rather than of how it entered, and the one
+   * rule about it -- that no two aircraft on frequency share one -- is the
+   * same rule this class already enforces for callsigns.
+   */
+  readonly squawk: string
 }
 
 /** Everything a FlightGenerator remembers between flights. */
@@ -97,8 +107,17 @@ export class FlightGenerator {
    * twice. Two aircraft the controller cannot tell apart is worse than an
    * implausible flight number, so uniqueness wins over the bands if it
    * comes to it.
+   *
+   * `takenSquawks` is the same question for transponder codes, and the
+   * answer differs in one way: codes ARE reused once an aircraft has gone.
+   * There are four thousand of them and a busy day would run out by
+   * lunchtime, so only the traffic on frequency has to be unique.
    */
-  next(rng: Rng, taken: ReadonlySet<string>): FlightIdentity {
+  next(
+    rng: Rng,
+    taken: ReadonlySet<string>,
+    takenSquawks: ReadonlySet<string> = new Set(),
+  ): FlightIdentity {
     const airline = rng.weighted(this.airlines, (a) => a.weight)
     const fleet = this.fleets.get(airline.code) ?? []
     // Weighted by the global fleet mix, so within an operator's own types
@@ -117,6 +136,7 @@ export class FlightGenerator {
       wake: type.wake,
       cruiseKts: type.cruiseKts,
       approachKts: type.approachKts,
+      squawk: allocateSquawk(rng, takenSquawks),
     }
   }
 

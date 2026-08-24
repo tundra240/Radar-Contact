@@ -102,6 +102,8 @@ function parked(
     routeLeg: 0,
     destination: null,
     spawnedAt: 0,
+    squawk: '4271',
+    emergencyAt: null,
     ...over,
   }
 }
@@ -644,6 +646,8 @@ describe('on command', () => {
         routeLeg: 0,
         destination: null,
         spawnedAt: 0,
+        squawk: '4271',
+        emergencyAt: null,
       }),
     )
     expect(spawner.spawnNow(clockAt(0), full)).toHaveLength(0)

@@ -8,6 +8,7 @@ import {
   type Vec2NM,
 } from '../../core/geo'
 import { TRAIL_POINTS } from '../../sim/aircraft'
+import { emergencyKind } from '../../sim/emergency'
 import { isHeavy, modeC, trendOf, type Aircraft } from '../../sim/types'
 import { fonts, theme } from '../theme'
 
@@ -101,14 +102,21 @@ export function drawTargets(
   alerts: ReadonlySet<string> = new Set(),
   /** How much of the recorded history to show. Defaults to all of it. */
   trailDots: number = TRAIL_POINTS,
+  /** Whether ordinary transponder codes are shown. Emergencies always are. */
+  showSquawks = false,
 ): void {
   // Two passes so that no target's data block can be buried under a
   // neighbour's trail, however close the two pass.
   for (const a of traffic) drawTrail(g, cam, a, alphaFor(a), trailDots)
-  for (const a of traffic) {
+  // Emergencies last, so that where two blocks overlap it is the one in
+  // trouble that ends up on top.
+  const order = [...traffic].sort(
+    (x, y) => Number(emergencyKind(x) !== null) - Number(emergencyKind(y) !== null),
+  )
+  for (const a of order) {
     const alpha = alphaFor(a)
     g.globalAlpha = alpha
-    drawTarget(g, cam, a, a.callsign === selected, alerts.has(a.callsign))
+    drawTarget(g, cam, a, a.callsign === selected, alerts.has(a.callsign), showSquawks)
     // Back to full strength for whatever is drawn next, here or after.
     if (alpha !== 1) g.globalAlpha = 1
   }
@@ -156,13 +164,28 @@ function drawTarget(
   a: Aircraft,
   isSelected: boolean,
   alerting = false,
+  showSquawk = false,
 ): void {
   const p = cam.worldToScreen(a.pos)
   // Selection is a change of ink rather than an extra mark, so a selected
   // target stays the same size and shape as every other one. An aircraft
   // asking to get out of the weather overrides both: it is the one thing on
   // the display that wants doing something about.
-  const ink = alerting ? theme.warn : isSelected ? theme.accent : inkFor(a)
+  // An emergency outranks even the weather alert: there is no reason for a
+  // target to be a different colour that beats "this one is in trouble".
+  const emergency = emergencyKind(a) !== null
+  const ink = emergency || alerting ? theme.warn : isSelected ? theme.accent : inkFor(a)
+
+  // A ring round an emergency whether or not it is selected. The ink says
+  // something is wrong somewhere and a ring says which one, and on a scope
+  // with thirty targets on it the second is what finds it.
+  if (emergency) {
+    g.strokeStyle = ink
+    g.lineWidth = 1
+    g.beginPath()
+    g.arc(p.x, p.y, SELECT_RING_PX + 3, 0, Math.PI * 2)
+    g.stroke()
+  }
 
   // The ring goes down first so the target and its vector sit inside it.
   if (isSelected) {
@@ -195,14 +218,18 @@ function drawTarget(
     g.stroke()
   }
 
-  if (cam.pxPerNM >= BLOCK_MIN_PX_PER_NM) drawBlock(g, cam, a, p, ink, alerting)
+  if (cam.pxPerNM >= BLOCK_MIN_PX_PER_NM) drawBlock(g, cam, a, p, ink, alerting, showSquawk)
 }
 
 /**
  * The three lines every approach controller reads off a target: who it is,
  * what level it is passing and where it is going, and how fast.
  */
-export function blockLines(a: Aircraft, alerting = false): readonly string[] {
+export function blockLines(
+  a: Aircraft,
+  alerting = false,
+  showSquawk = false,
+): readonly string[] {
   const trend = trendOf(a.vsFpm)
   const glyph = trend === 'climb' ? '^' : 'v'
 
@@ -217,12 +244,21 @@ export function blockLines(a: Aircraft, alerting = false): readonly string[] {
   // WX against the callsign rather than a fourth line: the block is read at
   // a glance and a line that appears and disappears moves everything under
   // it.
-  const flags = `${isHeavy(a.wake) ? ' H' : ''}${alerting ? ' WX' : ''}`
+  // An emergency goes on the same line, and first: it is the only thing on
+  // a block that changes what you do next rather than describing what is
+  // already happening.
+  const kind = emergencyKind(a)
+  const emergency = kind === null ? '' : kind === 'radio' ? ' NORDO' : ' EMRG'
+  const flags = `${emergency}${isHeavy(a.wake) ? ' H' : ''}${alerting ? ' WX' : ''}`
   // Where a transit is going, on the line that already carries the type.
   // It is the whole reason the aeroplane is not the controller's problem,
   // and the colour says "not yours" without saying whose.
   const bound = a.destination === null ? '' : ` ${a.destination}`
-  return [`${a.callsign}${flags}`, level, `${speed} ${a.type}${bound}`]
+  // The transponder code, when it has been asked for or when it is saying
+  // something. An emergency code is never hidden by the switch: a display
+  // that could be configured to omit 7700 is a display you cannot trust.
+  const code = showSquawk || kind !== null ? ` ${a.squawk}` : ''
+  return [`${a.callsign}${flags}`, level, `${speed} ${a.type}${bound}${code}`]
 }
 
 /**
@@ -257,8 +293,9 @@ function drawBlock(
   p: Vec2Px,
   ink: string,
   alerting = false,
+  showSquawk = false,
 ): void {
-  const lines = blockLines(a, alerting)
+  const lines = blockLines(a, alerting, showSquawk)
   const box = blockBox(cam, a, p)
   const dir = box.flip ? -1 : 1
   // The text hangs off whichever edge of the box faces the target.

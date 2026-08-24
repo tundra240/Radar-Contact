@@ -40,6 +40,20 @@ export interface DifficultySettings {
   readonly arrivalsPerHour: number
   /** Transits per hour. Zero switches them off entirely. */
   readonly transitsPerHour: number
+  /**
+   * How often somebody declares, per hour.
+   *
+   * None at all on Easy, for the same reason there are no transits there:
+   * the setting exists to teach the shape of the job, and an emergency
+   * rewrites the sequence you were in the middle of learning to build. It
+   * climbs from there, and on Pro it is often enough that you cannot treat
+   * one as an event -- it is part of the shift.
+   *
+   * A rate rather than a chance, so it reads the same way the arrival and
+   * transit rates do and so the interval between them can be worked out the
+   * same way. See intervalSecondsFor.
+   */
+  readonly emergenciesPerHour: number
   /** Which corridors are in use. Empty means none. */
   readonly corridors: readonly CorridorClass[]
   /**
@@ -105,6 +119,7 @@ export const DIFFICULTIES: Record<DifficultyName, DifficultySettings> = {
     summary: 'One or two at a time, calm air, and a warning long before you need it.',
     arrivalsPerHour: 9,
     transitsPerHour: 0,
+    emergenciesPerHour: 0,
     corridors: [],
     maxConcurrent: 6,
     windStrength: 0,
@@ -126,6 +141,7 @@ export const DIFFICULTIES: Record<DifficultyName, DifficultySettings> = {
     summary: 'A steady stream, a little wind, and transits crossing clear of the approach.',
     arrivalsPerHour: 16,
     transitsPerHour: 4,
+    emergenciesPerHour: 0.8,
     corridors: ['clear'],
     maxConcurrent: 10,
     windStrength: 0.6,
@@ -147,6 +163,7 @@ export const DIFFICULTIES: Record<DifficultyName, DifficultySettings> = {
     summary: 'Four fixes feeding at once, storms near the holds, and transits through the flow.',
     arrivalsPerHour: 24,
     transitsPerHour: 8,
+    emergenciesPerHour: 1.6,
     corridors: ['clear', 'crossing'],
     maxConcurrent: 14,
     windStrength: 1,
@@ -168,6 +185,7 @@ export const DIFFICULTIES: Record<DifficultyName, DifficultySettings> = {
     summary: 'Peak Heathrow. No history dots, no early warning, and the runway can turn on you.',
     arrivalsPerHour: 34,
     transitsPerHour: 12,
+    emergenciesPerHour: 2.5,
     corridors: ['clear', 'crossing', 'overhead'],
     maxConcurrent: 20,
     windStrength: 1.4,

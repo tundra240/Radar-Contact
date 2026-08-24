@@ -37,6 +37,8 @@ function ac(over: Partial<Aircraft> = {}): Aircraft {
     trail: [],
     trailAt: 0,
     spawnedAt: 0,
+    squawk: '4271',
+    emergencyAt: null,
     ...over,
   }
 }

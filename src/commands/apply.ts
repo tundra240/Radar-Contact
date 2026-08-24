@@ -1,6 +1,7 @@
 import { normalizeHeading } from '../core/geo'
 import { isInSector } from '../sim/aircraft'
 import { isControlled, type ControlZone } from '../sim/airspace'
+import { isNordo } from '../sim/emergency'
 import { onApproach } from '../sim/ils'
 import { rejoinLeg } from '../sim/route'
 import type { Aircraft, ApproachClearance, HoldClearance } from '../sim/types'
@@ -73,6 +74,18 @@ export function applyCommand(
     return {
       ok: false,
       reason: `${aircraft.callsign} is not in your airspace yet`,
+    }
+  }
+
+  // And an aircraft squawking 7600 cannot hear a word of it. Refused here
+  // rather than per verb, because the radio is not a property of the
+  // clearance: there is no instruction that gets through, including the
+  // ones that would help. The aeroplane is flying the procedure it is
+  // expected to fly and the job is to move everybody else.
+  if (isNordo(aircraft)) {
+    return {
+      ok: false,
+      reason: `${aircraft.callsign} is squawking 7600 -- no radio, no reply`,
     }
   }
 

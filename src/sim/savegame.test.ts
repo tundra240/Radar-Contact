@@ -48,6 +48,8 @@ function aircraft(over: Partial<Aircraft> = {}): Aircraft {
     routeLeg: 0,
     destination: null,
     spawnedAt: 60,
+    squawk: '4271',
+    emergencyAt: null,
     ...over,
   }
 }
@@ -58,8 +60,9 @@ function game(over: Partial<SavedGame> = {}): SavedGame {
     airport: 'EGLL',
     savedAt: '2026-08-22T09:41:00.000Z',
     overflights: null,
+    emergencies: null,
     clock: { ticks: 4321, elapsedSeconds: 216.05, timeOfDaySeconds: 43416.05 },
-    score: { points: 350, landed: 4, lost: 1, transited: 2 },
+    score: { points: 350, landed: 4, lost: 1, transited: 2, emergencies: 0 },
     atis: {
       letterIndex: 0,
       arrivals: ['27R', '27L'],
@@ -295,12 +298,13 @@ describe('resuming a real session', () => {
       airport: airport.icao,
       savedAt: '2026-08-22T09:41:00.000Z',
       clock: clockAt(original.ticks),
-      score: { points: 0, landed: 0, lost: 0, transited: 0 },
+      score: { points: 0, landed: 0, lost: 0, transited: 0, emergencies: 0 },
       controller: { initials: 'NF', position: 'EGLL_APP', enforceAirspace: true, difficulty: 'normal', mode: 'career' },
       selected: null,
       traffic: [...original.traffic],
       spawner: original.spawner.snapshot(),
       overflights: null,
+      emergencies: null,
     })
     const atSave = fingerprint(original)
 

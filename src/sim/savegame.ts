@@ -2,10 +2,12 @@ import type { Clock } from '../core/loop'
 import type { Vec2NM } from '../core/geo'
 import type { Atis } from './atis'
 import type { Score } from './score'
+import type { EmergencyFlowState } from './emergencyflow'
 import type { OverflightState } from './overflight'
 import type { SpawnerState } from './spawner'
 import type { DifficultyName } from './difficulty'
 import type { SessionMode } from '../ui/logon'
+import { isSquawk } from './squawk'
 import { ROLES } from './types'
 import type {
   Aircraft,
@@ -42,7 +44,7 @@ import type { WakeCategory } from '../data/airport'
  * Bumped whenever the shape changes. An older save is refused rather than
  * guessed at -- there is no migration path worth the bugs it would carry.
  */
-export const SAVE_VERSION = 6
+export const SAVE_VERSION = 7
 
 export interface SavedController {
   readonly initials: string
@@ -94,6 +96,16 @@ export interface SavedGame {
    * has none" from "this save predates them", which version 5 also does.
    */
   readonly overflights: OverflightState | null
+  /**
+   * Where the emergency scheduler had got to.
+   *
+   * Nullable, like the transit state, so a save written before it existed
+   * still loads -- and so a session restored from one simply starts its
+   * clock again rather than refusing to open. The emergencies themselves are
+   * on the aircraft, in the squawk, so a reload never forgets one that has
+   * already happened.
+   */
+  readonly emergencies: EmergencyFlowState | null
 }
 
 export type LoadResult =
@@ -226,7 +238,22 @@ function parseAircraft(v: unknown, path: string): Aircraft {
     trail: arr(o['trail'], `${path}.trail`).map((p, i) => vec(p, `${path}.trail[${i}]`)),
     trailAt: num(o['trailAt'], `${path}.trailAt`),
     spawnedAt: num(o['spawnedAt'], `${path}.spawnedAt`),
+    squawk: squawk(o['squawk'], `${path}.squawk`),
+    emergencyAt: nullableNum(o['emergencyAt'], `${path}.emergencyAt`),
   }
+}
+
+/**
+ * A transponder code, checked rather than taken on trust.
+ *
+ * Four octal digits is a shape a typo cannot survive, and a save that has
+ * been edited by hand into "7A00" or "88" should be refused at the door
+ * rather than drawn on a data block.
+ */
+function squawk(v: unknown, path: string): string {
+  const code = str(v, path)
+  if (!isSquawk(code)) fail(path, `is not a transponder code: "${code}"`)
+  return code
 }
 
 function parseAtis(v: unknown, path: string): Atis {
@@ -260,6 +287,18 @@ function parseController(v: unknown): SavedController | null {
     enforceAirspace: bool(o['enforceAirspace'], 'save.controller.enforceAirspace'),
     difficulty: oneOf(o['difficulty'], 'save.controller.difficulty', DIFFICULTY_NAMES),
     mode: oneOf(o['mode'], 'save.controller.mode', SESSION_MODES),
+  }
+}
+
+function parseEmergencies(v: unknown, path: string): EmergencyFlowState | null {
+  if (v === null || v === undefined) return null
+  const o = obj(v, path)
+  return {
+    seed: num(o['seed'], `${path}.seed`),
+    draws: num(o['draws'], `${path}.draws`),
+    sinceLast: num(o['sinceLast'], `${path}.sinceLast`),
+    waitSeconds: num(o['waitSeconds'], `${path}.waitSeconds`),
+    declared: num(o['declared'], `${path}.declared`),
   }
 }
 
@@ -363,6 +402,7 @@ export function parseSavedGame(text: string, at: { readonly airport: string }): 
           landed: num(score['landed'], 'save.score.landed'),
           lost: num(score['lost'], 'save.score.lost'),
           transited: num(score['transited'], 'save.score.transited'),
+          emergencies: num(score['emergencies'], 'save.score.emergencies'),
         },
         atis: parseAtis(o['atis'], 'save.atis'),
         controller: parseController(controller),
@@ -372,6 +412,7 @@ export function parseSavedGame(text: string, at: { readonly airport: string }): 
         ),
         spawner: parseSpawner(o['spawner'], 'save.spawner'),
         overflights: parseOverflights(o['overflights'], 'save.overflights'),
+        emergencies: parseEmergencies(o['emergencies'], 'save.emergencies'),
       },
     }
   } catch (e) {

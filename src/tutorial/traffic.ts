@@ -124,6 +124,8 @@ function buildArrival(
     trail: [],
     trailAt: elapsedSeconds,
     spawnedAt: elapsedSeconds,
+    squawk: '4271',
+    emergencyAt: null,
   }
 }
 
@@ -166,6 +168,8 @@ function buildOverflight(
     trail: [],
     trailAt: elapsedSeconds,
     spawnedAt: elapsedSeconds,
+    squawk: '4271',
+    emergencyAt: null,
   }
 }
 

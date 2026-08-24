@@ -92,6 +92,10 @@ into blank ground. The fence adjusts for the size of the window, so it is the ed
   flies through the centreline instead of capturing it.
 - Wake categories (light, medium, heavy, super) are carried per aircraft type. The MVP uses a
   flat 3 NM; the real 4 / 5 / 6 NM minima behind heavier aircraft are post-MVP.
+- **An emergency is number one**, whatever the sequence said a minute ago. Aircraft squawking
+  **7700** get priority and a twelve-minute clock; aircraft squawking **7600** cannot hear a
+  word you say and fly the approach themselves, so the whole job becomes moving everybody else.
+  See [TUTORIAL.md](TUTORIAL.md).
 
 ### What is playable today
 

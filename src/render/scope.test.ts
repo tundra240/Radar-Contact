@@ -1189,6 +1189,8 @@ describe('traffic on the scope', () => {
       routeLeg: 0,
       destination: null,
       spawnedAt: 0,
+      squawk: '4271',
+      emergencyAt: null,
       ...over,
     }
   }
@@ -1342,6 +1344,8 @@ describe('a vector being dragged', () => {
       routeLeg: 0,
       destination: null,
       spawnedAt: 0,
+      squawk: '4271',
+      emergencyAt: null,
       ...over,
     }
   }

@@ -52,6 +52,21 @@ export interface Overlays {
   readonly rivers: boolean
   /** The lateral limit of the London FIR -- the edge of UK airspace. */
   readonly firBoundary: boolean
+  /**
+   * Transponder codes on the data blocks.
+   *
+   * Off by default, and it is not laziness. A discrete code is how the
+   * radar knows which return is which flight, and once the label is on the
+   * screen the controller does not need it -- so four more digits on every
+   * block is four more digits to read past. It is worth having when you are
+   * checking a code against a flight plan, and worth losing the rest of the
+   * time.
+   *
+   * An EMERGENCY code ignores this completely. 7600 and 7700 are drawn
+   * whatever the setting says, because a switch that could hide them would
+   * be a switch that hides the one thing on the display that cannot wait.
+   */
+  readonly squawks: boolean
 }
 
 export type OverlayKey = keyof Overlays
@@ -73,6 +88,7 @@ export const OVERLAY_ITEMS: readonly { readonly key: OverlayKey; readonly label:
   { key: 'coastline', label: 'Coastline' },
   { key: 'rivers', label: 'River Thames' },
   { key: 'firBoundary', label: 'FIR boundary' },
+  { key: 'squawks', label: 'Squawk codes' },
 ]
 
 export type DensityName = 'minimal' | 'standard' | 'full'
@@ -95,6 +111,7 @@ export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
     coastline: false,
     rivers: false,
     firBoundary: false,
+    squawks: false,
   },
   /** Enough surrounding context to stay oriented. */
   standard: {
@@ -113,6 +130,7 @@ export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
     coastline: true,
     rivers: true,
     firBoundary: true,
+    squawks: false,
   },
   /** Everything the data supports. */
   full: {
@@ -131,6 +149,7 @@ export const OVERLAY_PRESETS: Record<DensityName, Overlays> = {
     coastline: true,
     rivers: true,
     firBoundary: true,
+    squawks: true,
   },
 }
 

@@ -418,10 +418,12 @@ export class Overflights {
     const operators = new Set(corridor.operators)
     // Draw until the operator suits the corridor, then stop caring: an
     // implausible operator is a small cost and a missing aeroplane is not.
-    let identity = this.flights.next(this.rng, new Set(traffic.map((a) => a.callsign)))
+    const callsigns = new Set(traffic.map((a) => a.callsign))
+    const codes = new Set(traffic.map((a) => a.squawk))
+    let identity = this.flights.next(this.rng, callsigns, codes)
     for (let attempt = 0; attempt < 8 && operators.size > 0; attempt += 1) {
       if (operators.has(identity.airline)) break
-      identity = this.flights.next(this.rng, new Set(traffic.map((a) => a.callsign)))
+      identity = this.flights.next(this.rng, callsigns, codes)
     }
 
     const altFt = semicircularLevelFt(this.rng, corridor, entry.hdg)
@@ -462,6 +464,8 @@ export class Overflights {
       trail: [],
       trailAt: clock.elapsedSeconds,
       spawnedAt: clock.elapsedSeconds,
+      squawk: identity.squawk,
+      emergencyAt: null,
     }
   }
 }
